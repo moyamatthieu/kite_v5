@@ -37,3 +37,5 @@ Cette version autonome contient:
 - Three.js pour le rendu 3D
 - TypeScript pour le développement
 - Vite pour le bundling et le serveur de développement
+
+Utilisez `npm run dev` (Vite) pour le développement.
