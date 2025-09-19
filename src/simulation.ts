@@ -194,7 +194,6 @@ const CONFIG = {
     turbulenceFreqZ: 0.7,
     turbulenceIntensityXZ: 0.8,
     turbulenceIntensityY: 0.2,
-    maxApparentSpeed: 25, // m/s - Limite vent apparent
   },
   rendering: {
     shadowMapSize: 2048,
@@ -328,6 +327,8 @@ class ControlBarManager {
 class WindSimulator {
   private params: WindParams;
   private time: number = 0; // Compteur de temps pour faire varier les turbulences
+  private windSpeedMs: number;
+  private windRad: number;
 
   constructor() {
     // On démarre avec les réglages par défaut du vent
@@ -336,6 +337,12 @@ class WindSimulator {
       direction: CONFIG.wind.defaultDirection,
       turbulence: CONFIG.wind.defaultTurbulence,
     };
+    this.updateWindInternals();
+  }
+
+  private updateWindInternals(): void {
+    this.windSpeedMs = this.params.speed / 3.6;
+    this.windRad = (this.params.direction * Math.PI) / 180;
   }
 
   /**
@@ -351,13 +358,10 @@ class WindSimulator {
   ): THREE.Vector3 {
     this.time += deltaTime;
 
-    const windSpeedMs = this.params.speed / 3.6;
-    const windRad = (this.params.direction * Math.PI) / 180;
-
     const windVector = new THREE.Vector3(
-      Math.sin(windRad) * windSpeedMs,
+      Math.sin(this.windRad) * this.windSpeedMs,
       0,
-      -Math.cos(windRad) * windSpeedMs
+      -Math.cos(this.windRad) * this.windSpeedMs
     );
 
     // Ajouter des rafales aléatoires mais réalistes
@@ -371,17 +375,17 @@ class WindSimulator {
       // On utilise des sinus pour créer des variations douces et naturelles
       windVector.x +=
         Math.sin(this.time * freq) *
-        windSpeedMs *
+        this.windSpeedMs *
         turbIntensity *
         CONFIG.wind.turbulenceIntensityXZ;
       windVector.y +=
         Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
-        windSpeedMs *
+        this.windSpeedMs *
         turbIntensity *
         CONFIG.wind.turbulenceIntensityY;
       windVector.z +=
         Math.cos(this.time * freq * CONFIG.wind.turbulenceFreqZ) *
-        windSpeedMs *
+        this.windSpeedMs *
         turbIntensity *
         CONFIG.wind.turbulenceIntensityXZ;
     }
@@ -390,10 +394,6 @@ class WindSimulator {
     // Si le kite va vite vers l'avant, il "crée" du vent de face
     const apparent = windVector.clone().sub(kiteVelocity);
 
-    // On limite pour éviter des valeurs irréalistes
-    if (apparent.length() > CONFIG.wind.maxApparentSpeed) {
-      apparent.setLength(CONFIG.wind.maxApparentSpeed);
-    }
     return apparent;
   }
 
@@ -401,13 +401,10 @@ class WindSimulator {
    * Obtient le vecteur de vent à une position donnée
    */
   getWindAt(_position: THREE.Vector3): THREE.Vector3 {
-    const windSpeedMs = this.params.speed / 3.6;
-    const windRad = (this.params.direction * Math.PI) / 180;
-
     const windVector = new THREE.Vector3(
-      Math.sin(windRad) * windSpeedMs,
+      Math.sin(this.windRad) * this.windSpeedMs,
       0,
-      -Math.cos(windRad) * windSpeedMs
+      -Math.cos(this.windRad) * this.windSpeedMs
     );
 
     if (this.params.turbulence > 0) {
@@ -415,11 +412,11 @@ class WindSimulator {
         (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
       const freq = 0.5;
 
-      windVector.x += Math.sin(this.time * freq) * windSpeedMs * turbIntensity;
+      windVector.x += Math.sin(this.time * freq) * this.windSpeedMs * turbIntensity;
       windVector.y +=
-        Math.sin(this.time * freq * 1.3) * windSpeedMs * turbIntensity * 0.3;
+        Math.sin(this.time * freq * 1.3) * this.windSpeedMs * turbIntensity * 0.3;
       windVector.z +=
-        Math.cos(this.time * freq * 0.7) * windSpeedMs * turbIntensity;
+        Math.cos(this.time * freq * 0.7) * this.windSpeedMs * turbIntensity;
     }
 
     return windVector;
@@ -427,6 +424,7 @@ class WindSimulator {
 
   setParams(params: Partial<WindParams>): void {
     Object.assign(this.params, params);
+    this.updateWindInternals();
   }
 
   getParams(): WindParams {
@@ -1985,9 +1983,6 @@ export class Simulation {
     // NEZ est à [0, 0.65, 0] et SPINE_BAS à [0, 0, 0] en coordonnées locales
     // Le centre est donc à [0, 0.325, 0] en local
     const centerLocal = new THREE.Vector3(0, 0.325, 0);
-    const centerWorld = centerLocal
-      .clone()
-      .applyQuaternion(this.kite.quaternion)
       .add(kitePosition);
 
     if (kiteState.velocity.length() > 0.1) {
