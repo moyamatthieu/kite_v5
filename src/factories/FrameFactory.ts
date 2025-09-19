@@ -20,12 +20,12 @@ export interface FrameParams extends FactoryParams {
  * Factory pour créer des structures filaires
  * 
  * TODO: Questions pour évolution future
- * - [ ] Supporter différents profils (carré, rond, I-beam) ?
- * - [ ] Ajouter des jonctions/connecteurs aux intersections ?
- * - [ ] Calculer automatiquement les connexions optimales ?
- * - [ ] Supporter des courbes (splines) entre points ?
- * - [ ] Ajouter contraintes mécaniques (résistance, poids) ?
- */
+ * - [ ] Supporter différents profils (carré, rond, I-beam) ? uniquemet rond
+ * - [ ] Ajouter des jonctions/connecteurs aux intersections ?  non 
+ * - [ ] Calculer automatiquement les connexions optimales ? non
+ * - [ ] Supporter des courbes (splines) entre points ? non
+ * - [ ] Ajouter contraintes mécaniques (résistance, poids) ? plus tard
+  */
 export class FrameFactory extends BaseFactory<StructuredObject & ICreatable> {
   protected metadata = {
     category: 'structure',
@@ -91,13 +91,3 @@ export class FrameFactory extends BaseFactory<StructuredObject & ICreatable> {
     return frame;
   }
 }
-
-/**
- * TODO: Méthodes utilitaires à considérer
- * 
- * - createTruss() : Créer une structure triangulée
- * - createLattice() : Créer une structure en treillis
- * - createSpaceFrame() : Structure spatiale 3D
- * - optimizeJoints() : Optimiser les jonctions
- * - calculateStress() : Calculer les contraintes (FEA simplifié)
- */

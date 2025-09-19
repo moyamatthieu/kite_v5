@@ -5,7 +5,7 @@ Version autonome de la simulation de cerf-volant extraite de Kite-simulator-v3.
 ## Installation
 
 ```bash
-cd srv-v8
+cd kite_v5
 npm install
 ```
 
@@ -26,11 +26,12 @@ Ouvrir http://localhost:3001 dans votre navigateur.
 ## Architecture
 
 Cette version autonome contient:
-- `simulationV8.ts`: Simulation physique principale
-- `Kite2.ts`: Modèle 3D du cerf-volant
+- `src/simulation.ts`: Simulation physique principale
+- `src/objects/organic/Kite.ts`: Modèle 3D du cerf-volant
 - Classes core: `Node3D`, `StructuredObject`, `Primitive`
 - Factories: `FrameFactory`, `SurfaceFactory`, `BaseFactory`
-- Types TypeScript nécessaires
+- Types TypeScript nécessaires dans `src/types`
+- Interface utilisateur dans `src/ui`
 
 ## Dépendances
 
