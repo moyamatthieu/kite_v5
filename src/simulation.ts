@@ -412,9 +412,13 @@ class WindSimulator {
         (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
       const freq = 0.5;
 
-      windVector.x += Math.sin(this.time * freq) * this.windSpeedMs * turbIntensity;
+      windVector.x +=
+        Math.sin(this.time * freq) * this.windSpeedMs * turbIntensity;
       windVector.y +=
-        Math.sin(this.time * freq * 1.3) * this.windSpeedMs * turbIntensity * 0.3;
+        Math.sin(this.time * freq * 1.3) *
+        this.windSpeedMs *
+        turbIntensity *
+        0.3;
       windVector.z +=
         Math.cos(this.time * freq * 0.7) * this.windSpeedMs * turbIntensity;
     }
@@ -1983,7 +1987,7 @@ export class Simulation {
     // NEZ est à [0, 0.65, 0] et SPINE_BAS à [0, 0, 0] en coordonnées locales
     // Le centre est donc à [0, 0.325, 0] en local
     const centerLocal = new THREE.Vector3(0, 0.325, 0);
-      .add(kitePosition);
+    const centerWorld = this.kite.localToWorld(centerLocal.clone());
 
     if (kiteState.velocity.length() > 0.1) {
       const velocityArrow = new THREE.ArrowHelper(
