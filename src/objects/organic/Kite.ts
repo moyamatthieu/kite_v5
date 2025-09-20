@@ -120,6 +120,8 @@ export class Kite extends StructuredObject implements ICreatable {
     };
 
     const mainFrame = this.frameFactory.createObject(mainFrameParams);
+    mainFrame.frustumCulled = true; // Skip rendu hors caméra
+    mainFrame.castShadow = false; // Éviter shadows si pas critique (perf +20%)
     this.add(mainFrame);
 
     // Créer les whiskers avec un frame séparé (plus fin)
@@ -258,6 +260,8 @@ export class Kite extends StructuredObject implements ICreatable {
     };
 
     const sail = this.surfaceFactory.createObject(sailParams);
+    sail.frustumCulled = true;
+    sail.castShadow = false;
     this.add(sail);
 
     // Ajouter des marqueurs visuels aux points clés

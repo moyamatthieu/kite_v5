@@ -4,7 +4,13 @@ import { Simulation } from "./simulation";
 console.log("🚀 Démarrage de la simulation ...");
 
 try {
-  const app = new Simulation();
+  // Récupération du conteneur DOM correct
+  const container = document.getElementById('app');
+  if (!container) {
+    throw new Error("Conteneur #app non trouvé dans le DOM");
+  }
+
+  const app = new Simulation(container);
   console.log("✅ Simulation initialisée avec succès");
 
   // Gestion du nettoyage lors de la fermeture de la page

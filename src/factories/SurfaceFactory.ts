@@ -9,6 +9,7 @@ import { BaseFactory, FactoryParams } from "../base/BaseFactory";
 import { StructuredObject } from "../core/StructuredObject";
 import { ICreatable } from "../types/index";
 import * as THREE from "three";
+import { TextureLoader } from "three";
 
 export interface SurfaceParams extends FactoryParams {
   points?: Array<[string, number[]]>; // Points nommés pour la surface
@@ -116,6 +117,26 @@ export class SurfaceFactory extends BaseFactory<StructuredObject & ICreatable> {
 
     const surface = new SurfaceObject();
     surface.init();
+
+    const loader = new TextureLoader();
+    const texture = loader.load("/textures/kite-fabric.jpg"); // Assumer asset, ou générer procedural
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(2, 2);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      color: mergedParams.material?.color || 0xffddaa,
+      opacity: mergedParams.material?.opacity || 0.9,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    // const geometry = new THREE.PlaneGeometry(...); // Basé sur points
+    // const mesh = new THREE.Mesh(geometry, material);
+    // mesh.castShadow = true; // Projette ombres
+    // mesh.receiveShadow = true;
+
     return surface;
   }
 }

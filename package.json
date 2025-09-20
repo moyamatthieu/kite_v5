@@ -14,6 +14,8 @@
     "vite": "^5.4.19"
   },
   "dependencies": {
+    "chart.js": "^4.5.0",
+    "nipplejs": "^0.10.2",
     "three": "^0.160.0",
     "three-bvh-csg": "^0.0.17"
   }
