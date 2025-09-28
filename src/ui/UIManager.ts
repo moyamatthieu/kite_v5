@@ -153,6 +153,29 @@ export class UIManager {
             .ui-panel {
                 animation: slideInFromCorner 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             }
+
+            /* Animations pour notifications */
+            @keyframes slideInFromTop {
+                from {
+                    opacity: 0;
+                    transform: translateY(-50px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes slideOutToTop {
+                from {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateY(-50px);
+                }
+            }
         `;
         document.head.appendChild(style);
     }

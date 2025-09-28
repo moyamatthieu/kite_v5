@@ -3,8 +3,8 @@
  */
 
 export const RENDER_CONFIG = {
-  shadowMapSize: 2048,
-  antialias: true,
+  shadowMapSize: 256, // 🌟 ULTRA-OPTIMISÉ: Réduit à 256 pour diagnostic performance
+  antialias: false, // 🚀 Désactivé temporairement pour tester performance
   fogStart: 100,
   fogEnd: 1000,
 };

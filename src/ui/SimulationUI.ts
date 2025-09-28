@@ -32,60 +32,19 @@ export class SimulationUI {
   }
 
   /**
-   * Initialise tous les panneaux de la simulation
+   * Initialise tous les panneaux de la simulation (réorganisés par priorité)
    */
   private initializePanels(): void {
-    this.createVersionPanel();
-    this.createSystemStatusPanel();
-    this.createWindControlsPanel();
-    this.createSimulationControlsPanel();
-    this.createInfoPanel();
-    this.createDebugPanel();
+    // Panneaux principaux (haute priorité)
     this.createModeSelector();
-    this.createJoystickPanel(); // Nouveau
-    this.createTutorialPanel(); // Nouveau
+    this.createSimulationControlsPanel();
+    this.createWindControlsPanel();
+    this.createInfoPanel();
+
+    // Panneau debug (priorité moyenne)
+    this.createDebugPanel();
   }
 
-  /**
-   * Panneau de version
-   */
-  private createVersionPanel(): void {
-    const config: PanelConfig = {
-      id: "version-panel",
-      title: "🏷️ Version du simulateur",
-      width: 400,
-      height: 120,
-      position: "bottom-left",
-      priority: 10,
-      collapsible: true,
-      content: `
-                <div style="color: #667eea; line-height: 1.6;">
-                    <div><strong>SimulationV10</strong> - Architecture modulaire (système, pilote, barre, lignes)</div>
-                    <div><strong>Moteur:</strong> Three.js r160 + Vite</div>
-                    <div><strong>UI:</strong> Panneaux auto‑organisés, sans superpositions</div>
-                    <div><strong>Monde:</strong> Sol vert, ciel, lumières réalistes</div>
-                </div>
-            `,
-    };
-    this.uiManager.createPanel(config);
-  }
-
-  /**
-   * Panneau d'état du système
-   */
-  private createSystemStatusPanel(): void {
-    const config: PanelConfig = {
-      id: "system-status",
-      title: "📊 État du système",
-      width: 400,
-      height: 180,
-      position: "bottom-left",
-      priority: 9,
-      content:
-        '<div id="periodic-log" style="color: #00ff88; font-family: monospace; font-size: 11px;">En attente...</div>',
-    };
-    this.uiManager.createPanel(config);
-  }
 
   /**
    * Panneau de contrôles du vent
@@ -163,7 +122,7 @@ export class SimulationUI {
       windSpeedSlider.addEventListener("input", () => {
         const speed = parseInt(windSpeedSlider.value);
         windSpeedValue.textContent = `${speed} km/h`;
-        console.log(`🌬️ Slider vent: ${speed} km/h`);
+        // Supprimer le log de slider vent pour éviter le flood
         if (this.appReference) {
           this.appReference.setWindParams({ speed: speed });
         }
@@ -174,7 +133,7 @@ export class SimulationUI {
       windDirectionSlider.addEventListener("input", () => {
         const direction = parseInt(windDirectionSlider.value);
         windDirectionValue.textContent = `${direction}°`;
-        console.log(`🧭 Slider direction: ${direction}°`);
+        // Supprimer le log de slider direction pour éviter le flood
         if (this.appReference) {
           this.appReference.setWindParams({ direction: direction });
         }
@@ -254,8 +213,8 @@ export class SimulationUI {
       title: "🎮 Contrôles",
       width: 220,
       height: 200,
-      position: "top-right",
-      priority: 10,
+      position: "bottom-right",
+      priority: 9,
       content: controls,
     };
     this.uiManager.createPanel(config);
@@ -270,8 +229,8 @@ export class SimulationUI {
       title: "📈 Informations de simulation",
       width: 280,
       height: 160,
-      position: "top-right",
-      priority: 9,
+      position: "bottom-left",
+      priority: 10,
       content: `
                 <div style="line-height: 1.8; color: #fff;">
                     <div><strong>Cerf-volant:</strong> <span id="kite-model">Delta V10</span></div>
@@ -286,26 +245,29 @@ export class SimulationUI {
   }
 
   /**
-   * Panneau de debug physique
+   * Panneau de debug physique avec graphique temps réel
    */
   private createDebugPanel(): void {
     const debugContent = `
-            <canvas id="debug-chart" width="300" height="150"></canvas>
-            <div id="debug-stats">Stats en temps réel...</div>
+            <div id="debug-info" style="color: white; line-height: 1.4;">
+                <div class="debug-section">
+                    <h4>🔄 Chargement des données de debug...</h4>
+                </div>
+            </div>
         `;
 
     const config: PanelConfig = {
       id: "debug-panel",
       title: "🔬 Debug Physique",
       width: 320,
-      height: 140,
+      height: 280, // Plus grand pour le graphique
       position: "top-right",
       priority: 8,
       content: debugContent,
     };
     this.uiManager.createPanel(config);
 
-    // Masquer par défaut
+    // Masquer par défaut, sera rendu visible par toggleDebug
     const panel = this.uiManager.getPanel("debug-panel");
     if (panel) {
       panel.element.style.display = "none";
@@ -313,6 +275,8 @@ export class SimulationUI {
 
     // Initialiser chart
     const ctx = document.getElementById("debug-chart") as HTMLCanvasElement;
+    if (!ctx) return;
+
     this.speedChart = new Chart(ctx, {
       type: "line",
       data: {
@@ -331,16 +295,29 @@ export class SimulationUI {
 
     // Callback pour update (lier à SimulationApp.animate)
     this.updateCallbacks.set("debugChart", () => {
+      if (!this.speedChart) return;
+
       // Récupérer vitesse de physicsEngine (assumer accès)
       const velocity = 5; // Placeholder, lier vraiment
-      this.speedChart.data.labels.push(new Date().toLocaleTimeString());
+      this.speedChart.data.labels?.push(new Date().toLocaleTimeString());
       this.speedChart.data.datasets[0].data.push(velocity);
-      if (this.speedChart.data.labels.length > 50) {
-        this.speedChart.data.labels.shift();
+      if ((this.speedChart.data.labels?.length ?? 0) > 50) {
+        this.speedChart.data.labels?.shift();
         this.speedChart.data.datasets[0].data.shift();
       }
       this.speedChart.update("none");
     });
+  }
+
+  /**
+   * Contrôle la visibilité du panel de debug
+   */
+  public toggleDebugPanel(visible: boolean): void {
+    const panel = this.uiManager.getPanel("debug-panel");
+    if (panel) {
+      panel.element.style.display = visible ? "block" : "none";
+      console.log(`🔬 Panel debug: ${visible ? 'visible' : 'masqué'}`);
+    }
   }
 
   /**
@@ -410,78 +387,6 @@ export class SimulationUI {
     }
   }
 
-  /**
-   * Panneau de joystick pour mobile
-   */
-  private createJoystickPanel(): void {
-    const joystickConfig: PanelConfig = {
-      id: "joystick-panel",
-      title: "🎮 Joystick Mobile",
-      width: 200,
-      height: 200,
-      position: "bottom-right",
-      priority: 7,
-      content:
-        '<div id="joystick-container" style="width: 100%; height: 100%;"></div>',
-      isVisible: () => window.innerWidth < 768, // Seulement mobile
-    };
-    this.uiManager.createPanel(joystickConfig);
-
-    // Initialiser nipplejs
-    const manager = nipplejs.create({
-      zone: document.getElementById("joystick-container"),
-      mode: "static",
-      position: { left: "50%", top: "50%" },
-      color: "white",
-    });
-
-    manager.on("move", (evt, data) => {
-      // Mapper à rotation barre : angle = data.angle.degree
-      const rotation =
-        ((data.angle.degree - 180) / 180) * CONFIG.controlBar.maxRotation; // Gauche/droite
-      // Émettre event pour InputHandler (e.g., custom event)
-      window.dispatchEvent(
-        new CustomEvent("joystickRotate", { detail: { rotation } })
-      );
-    });
-
-    manager.on("end", () => {
-      // Reset à 0
-      window.dispatchEvent(
-        new CustomEvent("joystickRotate", { detail: { rotation: 0 } })
-      );
-    });
-  }
-
-  /**
-   * Panneau tutoriel
-   */
-  private createTutorialPanel(): void {
-    const tutorialConfig: PanelConfig = {
-      id: "tutorial-panel",
-      title: "📖 Tutoriel Rapide",
-      width: 300,
-      height: 250,
-      position: "top-right",
-      priority: 6,
-      collapsible: true,
-      content: `
-      <div style="line-height: 1.4; color: #667eea;">
-        <h4>Comment jouer :</h4>
-        <ul style="font-size: 12px;">
-          <li><strong>Flèches ← →</strong> : Tourner barre contrôle (virages)</li>
-          <li><strong>ZQSD</strong> : Déplacer caméra (Tab pour focus)</li>
-          <li><strong>Espace</strong> : Pause/Reprendre</li>
-          <li><strong>R</strong> : Reset</li>
-          <li><strong>F1</strong> : Debug ON/OFF</li>
-          <li>Sliders : Ajuster vent/lignes en temps réel</li>
-        </ul>
-        <p><em>Astuce : Essayez vent à 20 km/h pour un vol stable !</em></p>
-      </div>
-    `,
-    };
-    this.uiManager.createPanel(tutorialConfig);
-  }
 
   /**
    * Configure les écouteurs d'événements
@@ -492,21 +397,37 @@ export class SimulationUI {
       this.uiManager.resize();
     });
 
-    // Mode CAO
+    // Délégation d'événements pour tous les boutons
     document.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
-      if (target.id === "mode-cao") {
-        document.body.style.transition = "opacity 0.3s";
-        document.body.style.opacity = "0";
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 300);
+
+      switch (target.id) {
+        case "mode-cao":
+          this.handleModeSwitch();
+          break;
+        case "reset-sim":
+          this.handleResetSimulation();
+          break;
+        case "play-pause":
+          this.handlePlayPause();
+          break;
+        case "debug-physics":
+          this.handleDebugToggle();
+          break;
       }
     });
 
     // Joystick pour mobile
-    window.addEventListener("joystickRotate", (e) => {
-      this.setTargetBarRotation(e.detail.rotation);
+    window.addEventListener("joystickRotate", (e: any) => {
+      if (this.appReference && this.appReference.inputHandler) {
+        // Transmettre la rotation au gestionnaire d'entrées
+        this.appReference.inputHandler.setTargetBarRotation(e.detail.rotation);
+      }
+    });
+
+    // Écouter les événements de clavier pour synchroniser l'interface
+    window.addEventListener("keydown", (e) => {
+      this.handleKeyboardEvents(e);
     });
   }
 
@@ -517,21 +438,9 @@ export class SimulationUI {
     this.uiManager.updatePanelContent(panelId, content);
   }
 
-  /**
-   * Affiche/masque le panneau de debug
-   */
-  toggleDebugPanel(show: boolean): void {
-    const panel = this.uiManager.getPanel("debug-panel");
-    if (panel) {
-      panel.element.style.display = show ? "block" : "none";
-      if (show) {
-        this.uiManager.resize(); // Repositionner les panneaux
-      }
-    }
-  }
 
   /**
-   * Met à jour les valeurs en temps réel
+   * Met à jour les valeurs en temps réel avec indicateurs visuels
    */
   updateRealTimeValues(data: {
     fps?: number;
@@ -540,10 +449,16 @@ export class SimulationUI {
     tension?: number;
     altitude?: number;
     physicsStatus?: string;
+    kitePosition?: { x: number; y: number; z: number };
+    velocity?: number;
   }): void {
     if (data.fps !== undefined) {
       const fpsEl = document.getElementById("fps");
-      if (fpsEl) fpsEl.textContent = data.fps.toString();
+      if (fpsEl) {
+        fpsEl.textContent = data.fps.toString();
+        // Colorier selon les performances
+        fpsEl.style.color = data.fps > 45 ? "#51cf66" : data.fps > 30 ? "#ffa726" : "#ff6b6b";
+      }
     }
 
     if (data.windSpeed !== undefined) {
@@ -575,6 +490,66 @@ export class SimulationUI {
           data.physicsStatus === "Active" ? "#51cf66" : "#ff6b6b";
       }
     }
+
+    // Mettre à jour le graphique de debug si visible
+    if (this.speedChart && data.velocity !== undefined) {
+      this.updateDebugChart(data.velocity);
+    }
+  }
+
+  /**
+   * Met à jour le graphique de debug
+   */
+  private updateDebugChart(velocity: number): void {
+    if (!this.speedChart) return;
+
+    this.speedChart.data.labels?.push(new Date().toLocaleTimeString());
+    this.speedChart.data.datasets[0].data.push(velocity);
+
+    // Garder seulement les 30 derniers points
+    if ((this.speedChart.data.labels?.length ?? 0) > 30) {
+      this.speedChart.data.labels?.shift();
+      this.speedChart.data.datasets[0].data.shift();
+    }
+
+    this.speedChart.update("none");
+  }
+
+  /**
+   * Affiche une notification temporaire
+   */
+  showNotification(message: string, type: "info" | "success" | "warning" | "error" = "info"): void {
+    const notification = document.createElement("div");
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      z-index: 10000;
+      animation: slideInFromTop 0.3s ease-out;
+      backdrop-filter: blur(10px);
+    `;
+
+    const colors = {
+      info: "rgba(102, 126, 234, 0.9)",
+      success: "rgba(81, 207, 102, 0.9)",
+      warning: "rgba(255, 167, 38, 0.9)",
+      error: "rgba(255, 107, 107, 0.9)"
+    };
+
+    notification.style.background = colors[type];
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    // Retirer après 3 secondes
+    setTimeout(() => {
+      notification.style.animation = "slideOutToTop 0.3s ease-in";
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
   }
 
   /**
@@ -585,10 +560,97 @@ export class SimulationUI {
   }
 
   /**
+   * Gestionnaires d'événements pour les boutons
+   */
+  private handleModeSwitch(): void {
+    console.log("🔄 Changement de mode vers CAO");
+    document.body.style.transition = "opacity 0.3s";
+    document.body.style.opacity = "0";
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 300);
+  }
+
+  private handleResetSimulation(): void {
+    console.log("🔄 Reset de la simulation");
+    if (this.appReference && this.appReference.reset) {
+      this.appReference.reset();
+      this.showNotification("🔄 Simulation réinitialisée", "success");
+    }
+    this.updateButtonState("reset-sim", "🔄 Reset effectué", 1000);
+  }
+
+  private handlePlayPause(): void {
+    console.log("⏯️ Toggle Play/Pause");
+    if (this.appReference) {
+      const isPlaying = this.appReference.isPlaying;
+      this.appReference.isPlaying = !isPlaying;
+
+      const button = document.getElementById("play-pause");
+      if (button) {
+        button.textContent = this.appReference.isPlaying ? "⏸️ Pause" : "▶️ Lancer";
+        button.style.background = this.appReference.isPlaying
+          ? "linear-gradient(135deg, #ffa726, #ff7043)"
+          : "linear-gradient(135deg, #51cf66, #47b35b)";
+      }
+    }
+  }
+
+  private handleDebugToggle(): void {
+    console.log("🔍 Toggle Debug");
+    if (this.appReference) {
+      this.appReference.debugMode = !this.appReference.debugMode;
+
+      const button = document.getElementById("debug-physics");
+      if (button) {
+        button.textContent = this.appReference.debugMode ? "🔍 Debug ON" : "🔍 Debug OFF";
+        button.style.background = this.appReference.debugMode
+          ? "linear-gradient(135deg, #4caf50, #2e7d32)"
+          : "linear-gradient(135deg, #667eea, #764ba2)";
+      }
+
+      // Afficher/masquer le panneau de debug
+      this.toggleDebugPanel(this.appReference.debugMode);
+    }
+  }
+
+  private handleKeyboardEvents(e: KeyboardEvent): void {
+    // Synchroniser l'interface avec les raccourcis clavier
+    switch (e.key.toLowerCase()) {
+      case " ": // Espace
+        this.handlePlayPause();
+        break;
+      case "r":
+        this.handleResetSimulation();
+        break;
+      case "f1":
+        e.preventDefault();
+        this.handleDebugToggle();
+        break;
+    }
+  }
+
+  private updateButtonState(buttonId: string, tempText: string, duration: number): void {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      const originalText = button.textContent;
+      button.textContent = tempText;
+      button.style.opacity = "0.7";
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.opacity = "1";
+      }, duration);
+    }
+  }
+
+  /**
    * Nettoie l'interface
    */
   cleanup(): void {
     this.updateCallbacks.clear();
+    if (this.speedChart) {
+      this.speedChart.destroy();
+    }
     // Le UIManager se charge du nettoyage des panneaux
   }
 
@@ -597,5 +659,15 @@ export class SimulationUI {
    */
   getUIManager(): UIManager {
     return this.uiManager;
+  }
+
+  /**
+   * Méthode pour définir la rotation de la barre (pour compatibilité)
+   */
+  setTargetBarRotation(rotation: number): void {
+    if (this.appReference && this.appReference.inputHandler) {
+      // Transmettre la rotation au gestionnaire d'entrées
+      this.appReference.inputHandler.commandContext.controlState.barRotation = rotation;
+    }
   }
 }

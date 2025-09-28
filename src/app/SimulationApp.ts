@@ -35,6 +35,7 @@ import { SimulationAppInitializer } from "./SimulationAppInitializer";
 import { SimulationAppControls } from "./SimulationAppControls";
 import { SimulationAppDebugger } from "./SimulationAppDebugger";
 import { SimulationAppUpdater } from "./SimulationAppUpdater";
+import { logger } from "../utils/Logger";
 
 export class SimulationApp {
   // 🎮 COMPOSANTS PRINCIPAUX - Les "modules" de notre simulation
@@ -85,7 +86,7 @@ export class SimulationApp {
    */
   constructor(container: HTMLElement) {
     this.container = container;
-    console.log("🚀 Démarrage de la Simulation V7 - Version refactorisée");
+    // Supprimer le log de démarrage pour réduire le flood
 
     // ⏰ Création du chronomètre pour mesurer le temps
     this.clock = new THREE.Clock();
@@ -136,39 +137,45 @@ export class SimulationApp {
    * C'est la "pompe" qui fait vivre toute la simulation.
    */
   private animate(currentTime: number = performance.now()): void {
-    const deltaTime = Math.min((currentTime - this._lastTime) / 1000, 0.05); // Cap 50ms
+    const deltaTime = Math.min((currentTime - this._lastTime) / 1000, 0.025); // Cap 25ms pour plus de fluidité
     this._lastTime = currentTime;
+
+    // Early exit si en pause
+    if (!this.isPlaying) {
+      requestAnimationFrame(() => this.animate());
+      return;
+    }
 
     this._physicsStart = performance.now();
 
-    // Fixed timestep : Accumuler et exécuter ticks multiples si lag
+    // Fixed timestep optimisé avec moins d'itérations
     this._accumulator += deltaTime;
-    let physicsDelta = this.PHYSICS_TIMESTEP;
     let iterations = 0;
-    const maxIterations = 5; // Cap pour éviter surcharge CPU
+    const maxIterations = 2; // Réduit à 2 pour fluidité maximale
+    const physicsDelta = this.PHYSICS_TIMESTEP;
+
     while (this._accumulator >= physicsDelta && iterations < maxIterations) {
-      // Mise à jour physique à pas fixe (stabilité)
       const targetRotation = this.inputHandler.getTargetBarRotation();
-      this.physicsEngine.update(physicsDelta, targetRotation, !this.isPlaying);
+      this.physicsEngine.update(physicsDelta, targetRotation, false);
       this._accumulator -= physicsDelta;
       iterations++;
     }
+
+    // Reset plus agressif
     if (iterations >= maxIterations) {
-      console.warn(
-        `Cap itérations physique atteint (${iterations}), accumulator reset pour stabilité`
-      );
-      this._accumulator = 0;
+      this._accumulator = 0; // Reset sans log pour éviter le flood
     }
 
-    // Mise à jour logique à delta variable
+    // Mise à jour input (léger)
     this.inputHandler.update(deltaTime);
 
-    // Mise à jour debug
+    // Debug avec throttling intégré
     this.debugger.updateDebugInfo();
 
-    // Mises à jour via updater
+    // Updater avec throttling intelligent
     this.updater.update(deltaTime, currentTime);
 
+    // Rendu optimisé
     this._renderStart = performance.now();
     this.renderManager.render();
 
@@ -178,15 +185,18 @@ export class SimulationApp {
   // Méthodes publiques de contrôle (gardées dans core)
   public togglePause(): void {
     this.isPlaying = !this.isPlaying;
-    console.log(
-      this.isPlaying ? "▶️ Simulation reprise" : "⏸️ Simulation en pause"
-    );
+    // Supprimer les logs de pause/reprise pour réduire le flood
   }
 
   public resetSimulation(): void {
     this.kite.position.set(0, 7, -5);
     this.kite.quaternion.set(0, 0, 0, 1);
-    console.log("🔄 Simulation réinitialisée");
+    // Supprimer le log de reset pour réduire le flood
+  }
+
+  // Alias pour l'interface utilisateur
+  public reset(): void {
+    this.resetSimulation();
   }
 
   // Les toggles debug sont maintenant dans debugger, mais exposés

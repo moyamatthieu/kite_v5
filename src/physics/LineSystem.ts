@@ -12,6 +12,26 @@ import type { Kite } from '../objects/organic/Kite';
 export class LineSystem {
   public lineLength: number;
 
+  // ✅ Cache pour éviter TOUTES les allocations
+  private _leftAttachCache = new THREE.Vector3();
+  private _rightAttachCache = new THREE.Vector3();
+  private _leftWorldCache = new THREE.Vector3();
+  private _rightWorldCache = new THREE.Vector3();
+  private _leftHandlePosCache = new THREE.Vector3();
+  private _rightHandlePosCache = new THREE.Vector3();
+  private _leftToHandleCache = new THREE.Vector3();
+  private _rightToHandleCache = new THREE.Vector3();
+  private _centerAttachCache = new THREE.Vector3();
+  private _leftForceCache = new THREE.Vector3();
+  private _rightForceCache = new THREE.Vector3();
+  private _torqueCache = new THREE.Vector3();
+  private _zeroForces = {
+    leftForce: new THREE.Vector3(),
+    rightForce: new THREE.Vector3(),
+    torque: new THREE.Vector3(),
+  };
+  private _yAxis = new THREE.Vector3(0, 1, 0); // Statique pour applyAxisAngle
+
   constructor(lineLength: number = CONFIG.lines.defaultLength) {
     this.lineLength = lineLength;
   }
@@ -44,57 +64,49 @@ export class LineSystem {
     const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
     const ctrlRight = kite.getPoint("CTRL_DROIT");
     if (!ctrlLeft || !ctrlRight) {
-      return {
-        leftForce: new THREE.Vector3(),
-        rightForce: new THREE.Vector3(),
-        torque: new THREE.Vector3(),
-      };
+      return this._zeroForces;
     }
-    const leftAttach = ctrlLeft.clone();
-    const rightAttach = ctrlRight.clone();
 
-    // Transformer en coordonnées monde
-    const leftWorld = leftAttach
-      .clone()
+    // ✅ Réutiliser cache au lieu de clone()
+    this._leftAttachCache.copy(ctrlLeft);
+    this._rightAttachCache.copy(ctrlRight);
+
+    // Transformer en coordonnées monde (ZÉRO allocation)
+    this._leftWorldCache
+      .copy(this._leftAttachCache)
       .applyQuaternion(kite.quaternion)
       .add(kite.position);
-    const rightWorld = rightAttach
-      .clone()
+    this._rightWorldCache
+      .copy(this._rightAttachCache)
       .applyQuaternion(kite.quaternion)
       .add(kite.position);
 
-    // On calcule où sont exactement les mains du pilote
-    // Imaginez que vous tenez une barre de 60cm de large
+    // On calcule où sont exactement les mains du pilote (ZÉRO allocation)
     const barHalfWidth = CONFIG.controlBar.width * 0.5; // 30cm de chaque côté
-    const barRight = new THREE.Vector3(1, 0, 0);
 
-    // Quand vous tournez la barre (comme un guidon de vélo) :
-    // - Tourner à gauche = votre main gauche recule, la droite avance
-    // - Tourner à droite = votre main droite recule, la gauche avance
-    const leftHandleOffset = barRight
-      .clone()
-      .multiplyScalar(-barHalfWidth)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), controlRotation);
-    const rightHandleOffset = barRight
-      .clone()
-      .multiplyScalar(barHalfWidth)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), controlRotation);
+    // Réutiliser leftToHandleCache et rightToHandleCache pour les offsets (ZÉRO allocation)
+    this._leftToHandleCache
+      .set(-barHalfWidth, 0, 0)
+      .applyAxisAngle(this._yAxis, controlRotation);
+    this._rightToHandleCache
+      .set(barHalfWidth, 0, 0)
+      .applyAxisAngle(this._yAxis, controlRotation);
 
-    const leftHandlePos = pilotPosition.clone().add(leftHandleOffset);
-    const rightHandlePos = pilotPosition.clone().add(rightHandleOffset);
+    this._leftHandlePosCache.copy(pilotPosition).add(this._leftToHandleCache);
+    this._rightHandlePosCache.copy(pilotPosition).add(this._rightToHandleCache);
 
-    // Vecteurs ligne : du kite vers le pilote
-    const leftDistance = leftWorld.distanceTo(leftHandlePos);
-    const rightDistance = rightWorld.distanceTo(rightHandlePos);
+    // Vecteurs ligne : du kite vers le pilote (utilise cache)
+    const leftDistance = this._leftWorldCache.distanceTo(this._leftHandlePosCache);
+    const rightDistance = this._rightWorldCache.distanceTo(this._rightHandlePosCache);
 
-    const leftLineDir = leftHandlePos.clone().sub(leftWorld).normalize();
-    const rightLineDir = rightHandlePos.clone().sub(rightWorld).normalize();
+    // Réutiliser leftToHandleCache et rightToHandleCache pour directions
+    this._leftToHandleCache.copy(this._leftHandlePosCache).sub(this._leftWorldCache).normalize();
+    this._rightToHandleCache.copy(this._rightHandlePosCache).sub(this._rightWorldCache).normalize();
 
     // PRINCIPE CLÉ : Les lignes sont des CORDES, pas des ressorts!
-    // - Ligne molle (distance < longueur) = AUCUNE force
-    // - Ligne tendue (distance > longueur) = Force proportionnelle
-    let leftForce = new THREE.Vector3();
-    let rightForce = new THREE.Vector3();
+    // Réutiliser les caches de forces
+    this._leftForceCache.set(0, 0, 0);
+    this._rightForceCache.set(0, 0, 0);
 
     // Ligne gauche : F = k × extension (Hooke pour corde rigide)
     if (leftDistance > this.lineLength) {
@@ -103,7 +115,7 @@ export class LineSystem {
         CONFIG.lines.stiffness * extension,
         CONFIG.lines.maxTension
       );
-      leftForce = leftLineDir.multiplyScalar(tension); // Force vers le pilote
+      this._leftForceCache.copy(this._leftToHandleCache).multiplyScalar(tension);
     }
 
     // Ligne droite : même physique
@@ -113,36 +125,32 @@ export class LineSystem {
         CONFIG.lines.stiffness * extension,
         CONFIG.lines.maxTension
       );
-      rightForce = rightLineDir.multiplyScalar(tension);
+      this._rightForceCache.copy(this._rightToHandleCache).multiplyScalar(tension);
     }
 
-    // COUPLE ÉMERGENT : Résulte de l'asymétrie des tensions
-    // Si ligne gauche tire plus fort → rotation horaire
-    // Si ligne droite tire plus fort → rotation anti-horaire
-    let totalTorque = new THREE.Vector3();
+    // COUPLE ÉMERGENT : Résulte de l'asymétrie des tensions (ZÉRO allocation)
+    this._torqueCache.set(0, 0, 0);
 
     // Couple ligne gauche (si tendue)
-    if (leftForce.length() > 0) {
-      const leftTorque = new THREE.Vector3().crossVectors(
-        leftAttach.clone().applyQuaternion(kite.quaternion), // Bras de levier
-        leftForce // Force appliquée
-      );
-      totalTorque.add(leftTorque);
+    if (this._leftForceCache.length() > 0) {
+      // Réutiliser centerAttachCache pour bras de levier
+      this._centerAttachCache.copy(this._leftAttachCache).applyQuaternion(kite.quaternion);
+      // Réutiliser leftHandlePosCache temporairement pour crossVector
+      this._leftHandlePosCache.crossVectors(this._centerAttachCache, this._leftForceCache);
+      this._torqueCache.add(this._leftHandlePosCache);
     }
 
     // Couple ligne droite (si tendue)
-    if (rightForce.length() > 0) {
-      const rightTorque = new THREE.Vector3().crossVectors(
-        rightAttach.clone().applyQuaternion(kite.quaternion),
-        rightForce
-      );
-      totalTorque.add(rightTorque);
+    if (this._rightForceCache.length() > 0) {
+      this._centerAttachCache.copy(this._rightAttachCache).applyQuaternion(kite.quaternion);
+      this._rightHandlePosCache.crossVectors(this._centerAttachCache, this._rightForceCache);
+      this._torqueCache.add(this._rightHandlePosCache);
     }
 
     return {
-      leftForce,
-      rightForce,
-      torque: totalTorque,
+      leftForce: this._leftForceCache,
+      rightForce: this._rightForceCache,
+      torque: this._torqueCache,
     };
   }
 

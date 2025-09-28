@@ -96,7 +96,7 @@ export class SimulationAppInitializer {
     this.app.controlBar.add(barMesh);
 
     // Poignées aux extrémités (30cm de chaque côté)
-    const handleGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.1);
+    const handleGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6); // 6 segments au lieu de 32 par défaut
     const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x4a4a4a });
 
     const leftHandle = new THREE.Mesh(handleGeometry, handleMaterial);

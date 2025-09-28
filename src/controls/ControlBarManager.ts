@@ -9,51 +9,63 @@ import { PhysicsConstants } from "../physics/PhysicsConstants";
 import { CONFIG } from "../config/GlobalConfig";
 import type { HandlePositions } from "../types/controls";
 import type { Kite } from "../objects/organic/Kite";
+import { vector3Pool } from "../utils/Vector3Pool";
 
 export class ControlBarManager {
   private position: THREE.Vector3;
   private rotation: number = 0;
   private angularVelocity: number = 0; // Vitesse angulaire de la barre
 
+  // ✅ Cache pour éviter TOUTES les allocations
+  private _tempToKite = new THREE.Vector3();
+  private _tempBarDirection = new THREE.Vector3();
+  private _tempRotationAxis = new THREE.Vector3();
+  private _tempQuaternion = new THREE.Quaternion();
+  private _tempHandleLeft = new THREE.Vector3();
+  private _tempHandleRight = new THREE.Vector3();
+  private _tempCenter = new THREE.Vector3();
+
   constructor(position: THREE.Vector3 = new THREE.Vector3(0, 0, 0)) {
     this.position = position.clone();
   }
 
   /**
-   * Calcule le quaternion de rotation de la barre
+   * Calcule le quaternion de rotation de la barre (ZÉRO allocation)
    */
   private computeRotationQuaternion(
     toKiteVector: THREE.Vector3
   ): THREE.Quaternion {
-    const barDirection = new THREE.Vector3(1, 0, 0);
-    const rotationAxis = new THREE.Vector3()
-      .crossVectors(barDirection, toKiteVector)
+    this._tempBarDirection.set(1, 0, 0);
+    this._tempRotationAxis
+      .crossVectors(this._tempBarDirection, toKiteVector)
       .normalize();
 
-    if (rotationAxis.length() < PhysicsConstants.CONTROL_DEADZONE) {
-      rotationAxis.set(0, 1, 0);
+    if (this._tempRotationAxis.length() < PhysicsConstants.CONTROL_DEADZONE) {
+      this._tempRotationAxis.set(0, 1, 0);
     }
 
-    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.rotation);
+    return this._tempQuaternion.setFromAxisAngle(this._tempRotationAxis, this.rotation);
   }
 
   /**
-   * Obtient les positions des poignées (méthode unique centralisée)
+   * Obtient les positions des poignées (ZÉRO allocation)
    */
   getHandlePositions(kitePosition: THREE.Vector3): HandlePositions {
-    const toKiteVector = kitePosition.clone().sub(this.position).normalize();
-    const rotationQuaternion = this.computeRotationQuaternion(toKiteVector);
+    // Réutiliser _tempToKite pour le calcul de direction
+    this._tempToKite.copy(kitePosition).sub(this.position).normalize();
+    const rotationQuaternion = this.computeRotationQuaternion(this._tempToKite);
 
     const halfWidth = CONFIG.controlBar.width / 2;
-    const handleLeftLocal = new THREE.Vector3(-halfWidth, 0, 0);
-    const handleRightLocal = new THREE.Vector3(halfWidth, 0, 0);
+    this._tempHandleLeft.set(-halfWidth, 0, 0);
+    this._tempHandleRight.set(halfWidth, 0, 0);
 
-    handleLeftLocal.applyQuaternion(rotationQuaternion);
-    handleRightLocal.applyQuaternion(rotationQuaternion);
+    this._tempHandleLeft.applyQuaternion(rotationQuaternion);
+    this._tempHandleRight.applyQuaternion(rotationQuaternion);
 
+    // Retourner de nouveaux Vector3 seulement ici (unavoidable pour l'API)
     return {
-      left: handleLeftLocal.clone().add(this.position),
-      right: handleRightLocal.clone().add(this.position),
+      left: this._tempHandleLeft.clone().add(this.position),
+      right: this._tempHandleRight.clone().add(this.position),
     };
   }
 
@@ -102,7 +114,7 @@ export class ControlBarManager {
   }
 
   /**
-   * Met à jour l'objet 3D visuel de la barre
+   * Met à jour l'objet 3D visuel de la barre (ZÉRO allocation)
    */
   updateVisual(bar: THREE.Group, kite: Kite): void {
     if (!bar) return;
@@ -111,18 +123,20 @@ export class ControlBarManager {
     const ctrlRight = kite.getPoint("CTRL_DROIT");
 
     if (ctrlLeft && ctrlRight) {
-      const kiteLeftWorld = ctrlLeft.clone();
-      const kiteRightWorld = ctrlRight.clone();
-      kite.localToWorld(kiteLeftWorld);
-      kite.localToWorld(kiteRightWorld);
+      // Réutiliser les vecteurs cache
+      this._tempHandleLeft.copy(ctrlLeft);
+      this._tempHandleRight.copy(ctrlRight);
+      kite.localToWorld(this._tempHandleLeft);
+      kite.localToWorld(this._tempHandleRight);
 
-      const centerKite = kiteLeftWorld
-        .clone()
-        .add(kiteRightWorld)
+      this._tempCenter
+        .copy(this._tempHandleLeft)
+        .add(this._tempHandleRight)
         .multiplyScalar(0.5);
-      const toKiteVector = centerKite.clone().sub(this.position).normalize();
 
-      bar.quaternion.copy(this.computeRotationQuaternion(toKiteVector));
+      this._tempToKite.copy(this._tempCenter).sub(this.position).normalize();
+
+      bar.quaternion.copy(this.computeRotationQuaternion(this._tempToKite));
     }
   }
 }

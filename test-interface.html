@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de l'Interface - Kite Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        h1 { text-align: center; margin-bottom: 40px; }
+        h2 { color: #667eea; margin-bottom: 15px; }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .test-item:last-child { border-bottom: none; }
+        .status {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.pass { background: #51cf66; }
+        .status.fail { background: #ff6b6b; }
+        .status.pending { background: #ffa726; }
+        .launch-btn {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 15px;
+            background: linear-gradient(135deg, #51cf66, #47b35b);
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.3s;
+        }
+        .launch-btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🪁 Test de l'Interface - Kite Simulator V10</h1>
+
+        <div class="test-section">
+            <h2>📋 Liste de vérification de l'interface</h2>
+
+            <div class="test-item">
+                <span>✅ Panneaux réorganisés par priorité</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>🎮 Contrôles principaux connectés</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>🌬️ Sliders de vent fonctionnels</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>🔧 Boutons Reset/Play/Debug reliés</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>📊 Indicateurs temps réel améliorés</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>🔔 Système de notifications</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>📱 Support mobile (joystick)</span>
+                <span class="status pass">FAIT</span>
+            </div>
+
+            <div class="test-item">
+                <span>🎨 Ergonomie et organisation</span>
+                <span class="status pass">FAIT</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Fonctionnalités à tester</h2>
+
+            <div class="test-item">
+                <span>⬅️➡️ Contrôles fléchées (rotation barre)</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+
+            <div class="test-item">
+                <span>🎚️ Sliders vent en temps réel</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+
+            <div class="test-item">
+                <span>⏯️ Bouton Play/Pause</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+
+            <div class="test-item">
+                <span>🔄 Bouton Reset</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+
+            <div class="test-item">
+                <span>🔍 Mode Debug (F1)</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+
+            <div class="test-item">
+                <span>📊 Affichage FPS en couleur</span>
+                <span class="status pending">À TESTER</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📱 Instructions de test</h2>
+            <ol>
+                <li><strong>Lancer la simulation</strong> avec le bouton ci-dessous</li>
+                <li><strong>Tester les contrôles :</strong>
+                    <ul>
+                        <li>Flèches ← → pour tourner le kite</li>
+                        <li>Espace pour pause/reprendre</li>
+                        <li>R pour reset</li>
+                        <li>F1 pour debug</li>
+                    </ul>
+                </li>
+                <li><strong>Tester les sliders :</strong>
+                    <ul>
+                        <li>Vitesse du vent (0-50 km/h)</li>
+                        <li>Direction du vent</li>
+                        <li>Turbulence</li>
+                        <li>Longueur des lignes</li>
+                    </ul>
+                </li>
+                <li><strong>Vérifier les notifications</strong> lors des actions</li>
+                <li><strong>Observer le FPS</strong> (doit être coloré selon performance)</li>
+            </ol>
+        </div>
+
+        <a href="http://localhost:3002/" class="launch-btn" target="_blank">
+            🚀 LANCER LA SIMULATION
+        </a>
+
+        <div class="test-section">
+            <h2>✅ Améliorations apportées</h2>
+            <ul>
+                <li><strong>Organisation logique :</strong> Panneaux réorganisés par priorité d'usage</li>
+                <li><strong>Contrôles fonctionnels :</strong> Tous les boutons reliés aux actions</li>
+                <li><strong>Retour visuel :</strong> Notifications et indicateurs colorés</li>
+                <li><strong>Ergonomie :</strong> Meilleure disposition et interactions fluides</li>
+                <li><strong>Compatibilité :</strong> Support mobile avec joystick virtuel</li>
+                <li><strong>Debug amélioré :</strong> Graphiques temps réel et métriques</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

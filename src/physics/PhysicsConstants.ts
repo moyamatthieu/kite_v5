@@ -22,7 +22,7 @@ export class PhysicsConstants {
   static readonly MAX_VELOCITY = 30; // Vitesse max : 30 m/s = 108 km/h
   static readonly MAX_ANGULAR_VELOCITY = 425; // Rotation max : presque 1 tour par seconde
   static readonly MAX_ACCELERATION = 100; // Le kite ne peut pas accélérer plus vite qu'une voiture de sport
-  static readonly MAX_ANGULAR_ACCELERATION = 20; // La rotation ne peut pas s'emballer
+  static readonly MAX_ANGULAR_ACCELERATION = 100; // La rotation ne peut pas s'emballer
 }
 
 export const MAX_ANGULAR_VELOCITY = Math.PI * 4; // 720 deg/s maximum reasonable angular speed for stability

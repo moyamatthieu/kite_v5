@@ -92,7 +92,7 @@ export class SimulationAppControls {
       windSpeedSlider.addEventListener("input", () => {
         const speed = parseInt(windSpeedSlider.value);
         windSpeedValue.textContent = `${speed} km/h`;
-        console.log(`Slider vent: ${speed} km/h → setWindParams appelé`);
+        // Supprimer le log pour éviter le flood
         this.app.setWindParams({ speed: speed }); // Utiliser app.setWindParams (public)
       });
     }
@@ -101,7 +101,7 @@ export class SimulationAppControls {
       windDirectionSlider.addEventListener("input", () => {
         const direction = parseInt(windDirectionSlider.value);
         windDirectionValue.textContent = `${direction}°`;
-        console.log(`Slider direction: ${direction}° → setWindParams appelé`);
+        // Supprimer le log pour éviter le flood
         this.app.setWindParams({ direction: direction });
       });
     }

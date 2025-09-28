@@ -61,7 +61,7 @@ abstract class KiteCommand implements ICommand {
       }
     }
 
-    console.log(`Rotation barre: ${newRotation.toFixed(3)} rad`);
+    // Supprimer le log pour éviter le flood - rotation mise à jour à chaque frame
   }
 }
 

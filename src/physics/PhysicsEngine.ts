@@ -13,6 +13,7 @@ import { AerodynamicsCalculator } from "../physics/AerodynamicsCalculator";
 import { CONFIG } from "../config/GlobalConfig";
 import type { WindParams } from "../types/wind";
 import type { Kite } from "../objects/organic/Kite";
+import { logger } from "../utils/Logger";
 
 export class PhysicsEngine {
   private windSimulator: WindSimulator;
@@ -21,9 +22,26 @@ export class PhysicsEngine {
   private controlBarManager: ControlBarManager;
 
   private _lastKitePos: THREE.Vector3 | null = null;
-  private readonly MOVEMENT_THRESHOLD: number = 0.001; // m - Réduit pour décollage initial
+  private readonly MOVEMENT_THRESHOLD: number = 0.01; // m - Augmenté pour performance (1cm)
   private _aeroStart: number = 0;
   private _linesStart: number = 0;
+
+  // Optimisation fréquence : calculs lourds à 30 FPS au lieu de 60
+  private _frameCount: number = 0;
+  private _lastHeavyCalc: {
+    lift: THREE.Vector3;
+    drag: THREE.Vector3;
+    aeroTorque: THREE.Vector3;
+  } = {
+    lift: new THREE.Vector3(),
+    drag: new THREE.Vector3(),
+    aeroTorque: new THREE.Vector3(),
+  };
+
+  // Pool d'objets Vector3 pour éviter les allocations
+  private _vectorPool: THREE.Vector3[] = [];
+  private _poolIndex: number = 0;
+  private readonly VECTOR_POOL_SIZE: number = 50; // Pool de 50 Vector3 pré-alloués
 
   constructor(kites: Kite[], controlBarPosition: THREE.Vector3) {
     this.windSimulator = new WindSimulator();
@@ -32,6 +50,27 @@ export class PhysicsEngine {
       this.kiteControllers.push(new KiteController(kite));
     });
     this.controlBarManager = new ControlBarManager(controlBarPosition);
+
+    // Initialiser le pool de Vector3
+    this.initializeVectorPool();
+  }
+
+  /**
+   * Initialise un pool de Vector3 pré-alloués pour éviter le GC
+   */
+  private initializeVectorPool(): void {
+    for (let i = 0; i < this.VECTOR_POOL_SIZE; i++) {
+      this._vectorPool.push(new THREE.Vector3());
+    }
+  }
+
+  /**
+   * Récupère un Vector3 du pool au lieu d'en créer un nouveau
+   */
+  private getPooledVector(): THREE.Vector3 {
+    const vector = this._vectorPool[this._poolIndex];
+    this._poolIndex = (this._poolIndex + 1) % this.VECTOR_POOL_SIZE;
+    return vector.set(0, 0, 0); // Reset du vector
   }
 
   /**
@@ -64,19 +103,18 @@ export class PhysicsEngine {
     // Limiter le pas de temps pour éviter l'instabilité numérique
     const cappedDelta = Math.min(deltaTime, CONFIG.physics.deltaTimeMax);
 
-    // Calcul damping adaptatif basé sur vitesse kite
+    // Calcul damping adaptatif basé sur vitesse kite avec facteur d'effet
     const kiteState = this.kiteControllers[0].getState();
     const velocityMag = kiteState.velocity.length();
+    const dampingMultiplier =
+      CONFIG.physics.dampingEffectFactor *
+      (1 +
+        CONFIG.physics.adaptiveDampingFactor *
+          (velocityMag / CONFIG.physics.maxVelocityForDamping));
     const adaptiveLinearDamping =
-      CONFIG.physics.linearDamping *
-      (1 +
-        CONFIG.physics.adaptiveDampingFactor *
-          (velocityMag / CONFIG.physics.maxVelocityForDamping));
+      CONFIG.physics.linearDamping * dampingMultiplier;
     const adaptiveAngularDamping =
-      CONFIG.physics.angularDamping *
-      (1 +
-        CONFIG.physics.adaptiveDampingFactor *
-          (velocityMag / CONFIG.physics.maxVelocityForDamping));
+      CONFIG.physics.angularDamping * dampingMultiplier;
 
     // Appliquer damping adaptatif dans kiteController.update en passant comme paramètres
 
@@ -109,21 +147,29 @@ export class PhysicsEngine {
       !this._lastKitePos ||
       currentPos.distanceTo(this._lastKitePos) > this.MOVEMENT_THRESHOLD;
 
-    // Calculs aéro seulement si moved
+    // Calculs aéro : alternance 30 FPS pour performance
     this._aeroStart = performance.now();
-    let lift = new THREE.Vector3();
-    let drag = new THREE.Vector3();
-    let aeroTorque = new THREE.Vector3();
-    if (hasMoved) {
+    let lift = this._lastHeavyCalc.lift;
+    let drag = this._lastHeavyCalc.drag;
+    let aeroTorque = this._lastHeavyCalc.aeroTorque;
+
+    // Recalcul tous les 2 frames (30 FPS) et seulement si movement
+    if (hasMoved && this._frameCount % 2 === 0) {
+      // DEBUG: Compteur d'allocations Vector3
+      let allocCount = 0;
       const {
         lift: l,
         drag: d,
         torque: t,
       } = AerodynamicsCalculator.calculateForces(apparentWind, kite.quaternion);
+      this._lastHeavyCalc.lift.copy(l);
+      this._lastHeavyCalc.drag.copy(d);
+      this._lastHeavyCalc.aeroTorque.copy(t);
       lift = l;
       drag = d;
       aeroTorque = t;
     }
+    this._frameCount++;
     const aeroTime = performance.now() - this._aeroStart;
 
     // Gravité (force constante vers le bas)
@@ -166,6 +212,7 @@ export class PhysicsEngine {
       .add(rightForce);
 
     // Couple total = somme des moments (rotation du corps rigide)
+    let aeroAlloc = 0;
     // Le couple émerge NATURELLEMENT sans facteur artificiel!
     const totalTorque = aeroTorque.clone().add(lineTorque);
 
@@ -175,6 +222,8 @@ export class PhysicsEngine {
       const currentHandles = this.controlBarManager.getHandlePositions(
         currentKite.position
       );
+      // DEBUG: Estimation grossière des allocations Vector3 dans aéro
+      aeroAlloc += 16; // 4 triangles × 4 allocations typiques
       controller.update(
         totalForce,
         totalTorque,
@@ -187,15 +236,12 @@ export class PhysicsEngine {
 
     this._lastKitePos = hasMoved ? currentPos.clone() : this._lastKitePos;
 
-    // Profiling
+    // Profiling optimisé - utilise le logger pour éviter le flood
     const totalTime = performance.now() - startTime;
     if (totalTime > 16) {
-      console.warn(
-        `⚙️ Physique total: ${totalTime.toFixed(
-          1
-        )}ms | Aéro: ${aeroTime.toFixed(1)}ms | Lignes: ${linesTime.toFixed(
-          1
-        )}ms`
+      // Utilise le logger importé statiquement
+      logger.warn(
+        `Physique lente: ${totalTime.toFixed(1)}ms | Aéro: ${aeroTime.toFixed(1)}ms | Lignes: ${linesTime.toFixed(1)}ms`
       );
     }
   }

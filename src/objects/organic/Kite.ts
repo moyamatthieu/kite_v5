@@ -208,7 +208,7 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
-   * Met à jour les lignes de bridage pour suivre les points
+   * Met à jour les lignes de bridage pour suivre les points (OPTIMISÉ)
    * À appeler si les points bougent dynamiquement
    */
   public updateBridleLines(): void {
@@ -223,12 +223,31 @@ export class Kite extends StructuredObject implements ICreatable {
 
         if (startPos && endPos) {
           const geometry = line.geometry as THREE.BufferGeometry;
-          const points = [
-            new THREE.Vector3(...startPos),
-            new THREE.Vector3(...endPos),
-          ];
-          geometry.setFromPoints(points);
-          geometry.attributes.position.needsUpdate = true;
+          const positionAttr = geometry.getAttribute(
+            "position"
+          ) as THREE.BufferAttribute;
+
+          // 🚀 OPTIMISATION: Mise à jour directe du buffer existant
+          if (positionAttr && positionAttr.array instanceof Float32Array) {
+            const array = positionAttr.array;
+            // Point de départ
+            array[0] = startPos[0];
+            array[1] = startPos[1];
+            array[2] = startPos[2];
+            // Point d'arrivée
+            array[3] = endPos[0];
+            array[4] = endPos[1];
+            array[5] = endPos[2];
+
+            positionAttr.needsUpdate = true;
+          } else {
+            // Fallback pour initialisation
+            const points = [
+              new THREE.Vector3(...startPos),
+              new THREE.Vector3(...endPos),
+            ];
+            geometry.setFromPoints(points);
+          }
         }
       }
     });

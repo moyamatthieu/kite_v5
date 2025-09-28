@@ -209,6 +209,7 @@ export class KiteController {
     // Les lignes + brides forment une pyramide qui maintient une géométrie stable
     // Le kite "glisse" sur la surface de la sphère définie par la longueur des lignes
     // C'est quand il sort de cette sphère qu'il "décroche"
+    // il ne peux s'eloigner, il deccrophe quand il se rapproche du centre de la sphere( souvent par manque de vent rare dans le vent fort
 
     const lineLength =
       this.kite.userData.lineLength || CONFIG.lines.defaultLength;

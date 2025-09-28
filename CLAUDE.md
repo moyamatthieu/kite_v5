@@ -12,12 +12,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Dependencies
 - Install: `npm install`
 - Three.js, TypeScript, and Vite are the main dependencies
+- Additional: Chart.js for UI graphs, nipplejs for mobile controls, three-bvh-csg for geometry operations
+
+### Testing and Linting
+- No testing framework is currently configured
+- No linting tools (ESLint/Prettier) are currently configured
+- TypeScript compilation provides basic type checking via `npm run build`
 
 ## Architecture Overview
 
-This is a 3D kite simulation built with Three.js and TypeScript, using a Godot-inspired architecture pattern.
+This is a 3D kite simulation built with Three.js and TypeScript, using a **modular architecture inspired by Godot Engine**. The project features real-time physics simulation, wind modeling, and comprehensive UI controls.
 
-### Core Architecture Pattern
+### Core Modular Architecture
+
+The project follows a **component-based architecture** with clear separation of concerns:
+
+- **SimulationApp** (`src/app/SimulationApp.ts`): Main orchestrator that coordinates all components and manages the animation loop
+- **PhysicsEngine** (`src/physics/PhysicsEngine.ts`): Handles aerodynamic calculations, line constraints, and kite physics
+- **RenderManager** (`src/rendering/RenderManager.ts`): Manages Three.js scene, camera controls, and 3D rendering
+- **InputHandler** (`src/input/InputHandler.ts`): Processes keyboard and mouse inputs for controls
+- **SimulationUI** (`src/ui/SimulationUI.ts`): Manages the user interface panels and real-time data display
+
+### Core Architecture Pattern - Node3D System
 
 The project uses a **Godot-compatible Node3D system** with Three.js as the rendering backend:
 
@@ -27,24 +43,36 @@ The project uses a **Godot-compatible Node3D system** with Three.js as the rende
 
 ### Key Design Patterns
 
-1. **Named Anatomical Points**: All objects define named 3D points (e.g., "wing_tip_left", "center") stored in a Map, enabling structured object construction
+1. **Named Anatomical Points**: All objects define named 3D points (e.g., "CTRL_GAUCHE", "WHISKER_DROIT") stored in a Map, enabling structured object construction
 2. **Factory Pattern**: Separate factories for different object aspects:
    - `FrameFactory`: Creates structural frames and skeletons
    - `SurfaceFactory`: Creates surfaces and visual elements
-   - `BaseFactory`: Base factory functionality
+   - `PointFactory`: Creates markers and debug points
 3. **Godot-Style Lifecycle**: Objects have `_ready()`, `_process()`, and `_physics_process()` methods for initialization and updates
+4. **Configuration System**: Centralized configuration in `src/config/GlobalConfig.ts` that aggregates all subsystem configs
 
-### Directory Structure
+### Updated Directory Structure
 
 ```
 src/
-├── core/           # Core architecture classes
-├── objects/        # 3D objects (e.g., Kite class)
-├── factories/      # Object construction factories
-├── types/          # TypeScript type definitions
-├── ui/             # User interface components
-├── main.ts         # Application entry point
-└── simulation.ts   # Main simulation class
+├── app/                # SimulationApp - main orchestrator
+├── base/               # Base classes and utilities
+├── config/             # Centralized configuration (GlobalConfig.ts, WindConfig.ts, etc.)
+├── controllers/        # Business controllers (KiteController.ts)
+├── controls/           # Control bar management (ControlBarManager.ts)
+├── core/               # Base architecture classes (Node3D.ts, StructuredObject.ts)
+├── factories/          # Object construction factories
+├── geometry/           # Geometry utilities (KiteGeometry.ts)
+├── input/              # Input handling (InputHandler.ts, commands/)
+├── objects/            # 3D objects (organic/Kite.ts, environment/)
+├── physics/            # Physics engine and calculations
+├── rendering/          # Rendering management (RenderManager.ts)
+├── simulation/         # Specialized simulators (WindSimulator.ts)
+├── types/              # TypeScript type definitions
+├── ui/                 # User interface (SimulationUI.ts, UIManager.ts)
+├── utils/              # Utility functions and helpers
+├── main.ts             # Application entry point
+└── simulation.ts       # Re-exports SimulationApp for compatibility
 ```
 
 ### Path Aliases
@@ -57,27 +85,37 @@ The project uses TypeScript path aliases:
 - `@factories/*` → `src/factories/*`
 - `@types` → `src/types/index`
 
-### Implementation Guidelines
+### Critical Implementation Guidelines
 
-1. **All 3D objects must**:
-   - Extend `StructuredObject`
-   - Implement `ICreatable` interface
-   - Define anatomical points in `definePoints()`
-   - Build structure in `buildStructure()`
-   - Build surfaces in `buildSurfaces()`
+1. **All 3D objects MUST**:
+   - Extend `StructuredObject` and implement `ICreatable`
+   - Define anatomical points in `definePoints()` using semantic names
+   - Build structure in `buildStructure()` using FrameFactory
+   - Build surfaces in `buildSurfaces()` using SurfaceFactory
+   - Call `this.init()` in constructor
 
-2. **Use the factory pattern** for object construction rather than direct Three.js mesh creation
+2. **Factory Pattern is MANDATORY**: Never create Three.js meshes directly - always use factories
 
-3. **Named points system**: Reference object parts by semantic names rather than hardcoded coordinates
+3. **Named Points System**: Use semantic names like "NEZ", "BORD_GAUCHE" rather than hardcoded coordinates
 
-4. **Godot lifecycle**: Override `_ready()`, `_process()`, and `_physics_process()` for object behavior
+4. **Configuration**: All constants should be centralized in `src/config/GlobalConfig.ts`
 
-### Main Simulation
+### Communication Flow
 
-The `Simulation` class (`src/simulation.ts`) orchestrates the entire 3D scene, physics, and rendering loop. The `Kite` class demonstrates the full architecture pattern with anatomical points, factory-based construction, and structured object hierarchy.
+Data flows through the system as: InputHandler → SimulationApp → PhysicsEngine → RenderManager → UI updates. The SimulationApp orchestrates all components and maintains the main animation loop with fixed timestep physics.
 
-### Controls
+### Controls and Testing
 
-- Arrow keys ↑↓: Rotate control bar
-- Mouse: Orbit camera around scene
-- R key: Reset simulation
+- **↑↓ Arrows**: Rotate control bar (pulls kite lines)
+- **ZQSD/WASD**: Camera movement (Tab to focus)
+- **Mouse**: Orbit camera around scene
+- **R**: Reset simulation
+- **Space**: Pause/resume
+- **F1**: Toggle debug mode
+
+### Performance Requirements
+
+- Target 60 FPS with fixed timestep physics (16.67ms)
+- Adaptive deltaTime handling for low FPS scenarios
+- Wind simulation must maintain stable flight at 20km/h
+- UI panels auto-organize to avoid overlaps
