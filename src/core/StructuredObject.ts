@@ -1,9 +1,30 @@
+
 /**
- * StructuredObject.ts - Classe de base unifiée pour TOUS les objets 3D
- * 
- * Architecture orientée objet avec points anatomiques nommés
- * Pattern unique utilisé par tous les objets du projet
- * 🎮 Compatible Godot via Node3D
+ * StructuredObject.ts - Classe de base unifiée pour tous les objets 3D structurés du projet Kite
+ *
+ * Rôle :
+ *   - Fournit une architecture orientée objet avec points anatomiques nommés
+ *   - Sert de classe mère pour tous les objets 3D complexes (cerf-volant, barre, etc.)
+ *   - Compatible Godot via Node3D
+ *
+ * Dépendances principales :
+ *   - Node3D.ts : Couche d'abstraction Godot-compatible
+ *   - Primitive.ts : Utilitaires pour les formes de base
+ *   - Types : Position3D, NamedPoint, SurfaceOptions, MaterialConfig
+ *   - Three.js : Pour la géométrie et le rendu
+ *
+ * Relation avec les fichiers adjacents :
+ *   - Node3D.ts (dossier core) est la classe mère directe
+ *   - Primitive.ts fournit les utilitaires de création
+ *   - Tous les objets 3D du projet héritent de StructuredObject
+ *
+ * Utilisation typique :
+ *   - Sert de base à la création de tous les objets 3D structurés
+ *   - Permet la gestion des points, labels et debug
+ *
+ * Voir aussi :
+ *   - src/core/Node3D.ts
+ *   - src/core/Primitive.ts
  */
 
 import * as THREE from 'three';

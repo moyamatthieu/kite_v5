@@ -1,6 +1,26 @@
+
 /**
- * Primitive.ts - Générateurs de primitives Three.js propres et simples
- * Utilitaires pour créer les formes de base avec matériaux cohérents
+ * Primitive.ts - Générateurs de primitives Three.js pour la simulation Kite
+ *
+ * Rôle :
+ *   - Fournit des utilitaires pour créer les formes de base (cube, sphère, cylindre, etc.)
+ *   - Permet de générer des matériaux cohérents pour les objets 3D
+ *   - Sert à la construction des objets structurés (cerf-volant, barre, etc.)
+ *
+ * Dépendances principales :
+ *   - Three.js : Pour la géométrie et les matériaux
+ *   - Types : MaterialConfig pour la configuration des matériaux
+ *
+ * Relation avec les fichiers adjacents :
+ *   - StructuredObject.ts (dossier core) utilise Primitive pour créer les éléments 3D
+ *   - Tous les objets 3D du projet peuvent utiliser Primitive pour générer leurs formes
+ *
+ * Utilisation typique :
+ *   - Appelé par les factories et objets structurés pour générer la géométrie
+ *   - Sert à la création rapide et cohérente des primitives
+ *
+ * Voir aussi :
+ *   - src/core/StructuredObject.ts
  */
 
 import * as THREE from 'three';
@@ -132,13 +152,17 @@ export class Primitive {
     if (points.length === 3) {
       // Triangle simple
       indices.push(0, 1, 2);
-    } else if (points.length === 4) {
+    }
+    
+    if (points.length === 4) {
       // Quad - utiliser une triangulation qui préserve la manifold
       // Pour un cube, on utilise toujours la même diagonale (0,2)
       // Cela garantit que l'arête diagonale n'est pas partagée avec d'autres faces
       indices.push(0, 1, 2);  // Premier triangle
       indices.push(0, 2, 3);  // Deuxième triangle
-    } else {
+    }
+    
+    if (points.length > 4) {
       // Fan triangulation pour plus de points
       for (let i = 1; i < points.length - 1; i++) {
         indices.push(0, i, i + 1);
