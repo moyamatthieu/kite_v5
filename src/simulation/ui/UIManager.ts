@@ -145,6 +145,68 @@ export class UIManager {
         bridleValue.textContent = `${percent}%`;
       };
     }
+
+    // Contrôles de damping physique
+    const linearDampingSlider = document.getElementById(
+      "linear-damping"
+    ) as HTMLInputElement;
+    const linearDampingValue = document.getElementById("linear-damping-value");
+    if (linearDampingSlider && linearDampingValue) {
+      linearDampingSlider.value = CONFIG.physics.linearDamping.toString();
+      linearDampingValue.textContent = CONFIG.physics.linearDamping.toFixed(2);
+
+      linearDampingSlider.oninput = () => {
+        const damping = parseFloat(linearDampingSlider.value);
+        CONFIG.physics.linearDamping = damping;
+        linearDampingValue.textContent = damping.toFixed(2);
+      };
+    }
+
+    const angularDampingSlider = document.getElementById(
+      "angular-damping"
+    ) as HTMLInputElement;
+    const angularDampingValue = document.getElementById("angular-damping-value");
+    if (angularDampingSlider && angularDampingValue) {
+      angularDampingSlider.value = CONFIG.physics.angularDamping.toString();
+      angularDampingValue.textContent = CONFIG.physics.angularDamping.toFixed(2);
+
+      angularDampingSlider.oninput = () => {
+        const damping = parseFloat(angularDampingSlider.value);
+        CONFIG.physics.angularDamping = damping;
+        angularDampingValue.textContent = damping.toFixed(2);
+      };
+    }
+
+    // Contrôles aérodynamiques
+    const liftScaleSlider = document.getElementById(
+      "lift-scale"
+    ) as HTMLInputElement;
+    const liftScaleValue = document.getElementById("lift-scale-value");
+    if (liftScaleSlider && liftScaleValue) {
+      liftScaleSlider.value = CONFIG.aero.liftScale.toString();
+      liftScaleValue.textContent = CONFIG.aero.liftScale.toFixed(2);
+
+      liftScaleSlider.oninput = () => {
+        const scale = parseFloat(liftScaleSlider.value);
+        CONFIG.aero.liftScale = scale;
+        liftScaleValue.textContent = scale.toFixed(2);
+      };
+    }
+
+    const dragScaleSlider = document.getElementById(
+      "drag-scale"
+    ) as HTMLInputElement;
+    const dragScaleValue = document.getElementById("drag-scale-value");
+    if (dragScaleSlider && dragScaleValue) {
+      dragScaleSlider.value = CONFIG.aero.dragScale.toString();
+      dragScaleValue.textContent = CONFIG.aero.dragScale.toFixed(2);
+
+      dragScaleSlider.oninput = () => {
+        const scale = parseFloat(dragScaleSlider.value);
+        CONFIG.aero.dragScale = scale;
+        dragScaleValue.textContent = scale.toFixed(2);
+      };
+    }
   }
 
   updatePlayButton(isPlaying: boolean): void {
