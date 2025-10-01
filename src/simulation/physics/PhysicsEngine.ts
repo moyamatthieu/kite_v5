@@ -34,6 +34,7 @@ import * as THREE from "three";
 import { Kite } from "../../objects/organic/Kite";
 import { WindSimulator } from "./WindSimulator";
 import { LineSystem } from "./LineSystem";
+import { BridleSystem } from "./BridleSystem";
 import { AerodynamicsCalculator } from "./AerodynamicsCalculator";
 import { KiteController } from "../controllers/KiteController";
 import { ControlBarManager } from "../controllers/ControlBarManager";
@@ -48,12 +49,14 @@ import { CONFIG } from "../config/SimulationConfig";
 export class PhysicsEngine {
   private windSimulator: WindSimulator;
   private lineSystem: LineSystem;
+  private bridleSystem: BridleSystem;
   private kiteController: KiteController;
   private controlBarManager: ControlBarManager;
 
   constructor(kite: Kite, controlBarPosition: THREE.Vector3) {
     this.windSimulator = new WindSimulator();
     this.lineSystem = new LineSystem();
+    this.bridleSystem = new BridleSystem(kite.getBridleLengths());
     this.kiteController = new KiteController(kite);
     this.controlBarManager = new ControlBarManager(controlBarPosition);
   }
@@ -122,6 +125,14 @@ export class PhysicsEngine {
     // La contrainte géométrique est appliquée par ConstraintSolver dans KiteController
     const pilotPosition = this.controlBarManager.getPosition();
     this.lineSystem.calculateLineTensions(kite, newRotation, pilotPosition);
+
+    // CALCUL DES TENSIONS DES BRIDES (pour affichage/debug uniquement)
+    // Les brides sont des contraintes INTERNES au kite
+    // Les contraintes géométriques sont appliquées par ConstraintSolver.enforceBridleConstraints()
+    const bridleTensions = this.bridleSystem.calculateBridleTensions(kite);
+
+    // Mettre à jour la visualisation des brides selon leurs tensions
+    kite.updateBridleVisualization(bridleTensions);
 
     // Somme vectorielle de toutes les forces (2ème loi de Newton)
     const totalForce = new THREE.Vector3()
