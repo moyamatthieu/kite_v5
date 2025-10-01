@@ -104,8 +104,8 @@ export class AerodynamicsCalculator {
       // C'est comme mettre votre main par la fenêtre de la voiture :
       // - Main à plat face au vent = beaucoup de force
       // - Main de profil = peu de force
-      const facing = windDir.dot(normaleMonde);
-      const cosIncidence = Math.max(0, Math.abs(facing));
+      const windDotNormal = windDir.dot(normaleMonde);
+      const cosIncidence = Math.max(0, Math.abs(windDotNormal));
 
       // Si le vent glisse sur le côté (angle = 0), pas de force
       if (cosIncidence <= PhysicsConstants.EPSILON) {
@@ -113,12 +113,14 @@ export class AerodynamicsCalculator {
       }
 
       // 4. Force perpendiculaire à la surface (pression aérodynamique)
-      const normalDir =
-        facing >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
+      // Si windDotNormal < 0, la normale pointe à l'opposé du vent (face arrière)
+      // → On l'inverse pour qu'elle pointe toujours vers le vent
+      const windFacingNormal =
+        windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
 
       // 5. Intensité = pression dynamique × surface × cos(angle)
       const forceMagnitude = dynamicPressure * surface.area * cosIncidence;
-      const force = normalDir.multiplyScalar(forceMagnitude);
+      const force = windFacingNormal.multiplyScalar(forceMagnitude);
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
@@ -140,29 +142,24 @@ export class AerodynamicsCalculator {
 
       totalForce.add(force);
 
-      // Décomposition des forces élémentaires
-      // Portance = composante perpendiculaire au vent
-      const liftDir = new THREE.Vector3().crossVectors(windDir, normaleMonde).cross(normaleMonde).normalize();
-      const liftMag = force.length() * Math.abs(liftDir.dot(normaleMonde));
-      const lift = liftDir.multiplyScalar(liftMag);
+      // Décomposition correcte selon la physique des cerfs-volants (méthode NASA)
+      // La force normale sur la surface se décompose en :
+      // - Drag : composante parallèle au vent (dans la direction du vent)
+      // - Lift : composante perpendiculaire au vent
 
-      // Vérification pour éviter les vecteurs nuls ou proches de zéro
-      if (liftMag < PhysicsConstants.EPSILON) {
-        liftDir.set(0, 0, 0); // Réinitialiser si la magnitude est trop faible
-      } else {
-        liftDir.normalize();
-      }
+      // Projection de la force sur la direction du vent = drag
+      const dragComponent = force.dot(windDir);
+      const drag = windDir.clone().multiplyScalar(dragComponent);
 
-      // Traînée = composante opposée au vent
-      const dragDir = windDir.clone().negate();
-      const dragMag = force.length() * Math.abs(windDir.dot(normaleMonde));
-      const drag = dragDir.multiplyScalar(dragMag);
+      // Composante perpendiculaire au vent = lift
+      const lift = force.clone().sub(drag);
 
-      // Friction (optionnel, ici nulle)
+      // Friction (négligeable pour l'air, nulle)
       const friction = new THREE.Vector3();
 
-      // Résultante = somme des forces
-      const resultant = force.clone().add(lift).add(drag).add(friction);
+      // Résultante = force normale totale (PAS force + lift + drag !)
+      // lift + drag = force par décomposition vectorielle
+      const resultant = force.clone();
 
       surfaceForces.push({
         surfaceIndex,
@@ -195,13 +192,15 @@ export class AerodynamicsCalculator {
     // Si rightForce > leftForce → rotation vers la gauche
     // AUCUN facteur artificiel nécessaire!
 
-    // 9. Pour un cerf-volant, on retourne directement les forces totales
-    // La décomposition lift/drag classique n'est pas adaptée car le kite
-    // peut voler dans toutes les orientations (looping, vrilles, etc.)
-    // Les forces émergent naturellement de la pression sur chaque surface
+    // Décomposition globale lift/drag selon la direction du vent
+    // Somme de toutes les forces par surface
+    const globalDragComponent = totalForce.dot(windDir);
+    const globalDrag = windDir.clone().multiplyScalar(globalDragComponent);
+    const globalLift = totalForce.clone().sub(globalDrag);
 
-    const lift = totalForce.clone().multiplyScalar(CONFIG.aero.liftScale);
-    const drag = new THREE.Vector3(); // Traînée intégrée dans les forces totales
+    // Application des facteurs de configuration
+    const lift = globalLift.multiplyScalar(CONFIG.aero.liftScale);
+    const drag = globalDrag.multiplyScalar(CONFIG.aero.dragScale);
 
     // Mise à l'échelle du couple
     const baseTotalMag = Math.max(
