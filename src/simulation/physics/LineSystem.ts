@@ -3,8 +3,13 @@
  *
  * Rôle :
  *   - Coordonne les lignes gauche/droite du système de pilotage
- *   - Délègue les calculs physiques à LinePhysics
- *   - Applique les forces calculées sur le kite
+ *   - Calcule les tensions pour affichage/debug (pas de forces appliquées)
+ *   - Les contraintes de distance sont gérées par ConstraintSolver
+ *
+ * IMPORTANT : Les lignes sont des CONTRAINTES, pas des ressorts !
+ *   - Elles RETIENNENT le kite (distance max)
+ *   - Elles ne TIRENT PAS le kite vers le pilote
+ *   - Le ConstraintSolver.enforceLineConstraints() gère la contrainte géométrique
  */
 import * as THREE from "three";
 import { Kite } from "@objects/organic/Kite";
@@ -59,23 +64,27 @@ export class LineSystem {
     const leftVelocity = this.calculateVelocity(leftWorld, handles.left, this.previousLeftKitePos, this.previousLeftBarPos, 1 / 60);
     const rightVelocity = this.calculateVelocity(rightWorld, handles.right, this.previousRightKitePos, this.previousRightBarPos, 1 / 60);
 
+    // Calculer tensions pour info/debug uniquement (pas de force appliquée)
     const leftResult = this.physics.calculateTensionForce(this.leftLine, leftWorld, handles.left, leftVelocity);
     const rightResult = this.physics.calculateTensionForce(this.rightLine, rightWorld, handles.right, rightVelocity);
 
+    // Mettre à jour l'état des lignes (pour affichage)
     this.leftLine.updateState(leftResult.currentLength, leftResult.tension, performance.now());
     this.rightLine.updateState(rightResult.currentLength, rightResult.tension, performance.now());
 
-    const totalTorque = this.calculateTorque(ctrlLeft, ctrlRight, kite.quaternion, leftResult.force, rightResult.force);
-
+    // Mémoriser positions pour prochain frame
     this.previousLeftKitePos = leftWorld.clone();
     this.previousRightKitePos = rightWorld.clone();
     this.previousLeftBarPos = handles.left.clone();
     this.previousRightBarPos = handles.right.clone();
 
+    // ⚠️ IMPORTANT : PAS DE FORCES NI DE COUPLE APPLIQUÉS
+    // Les lignes sont des contraintes géométriques (ConstraintSolver)
+    // Le kite est retenu à distance max, pas tiré vers le pilote
     return {
-      leftForce: leftResult.force,
-      rightForce: rightResult.force,
-      torque: totalTorque,
+      leftForce: new THREE.Vector3(), // Force nulle
+      rightForce: new THREE.Vector3(), // Force nulle
+      torque: new THREE.Vector3(), // Couple nul
     };
   }
 
