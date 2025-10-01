@@ -46,9 +46,14 @@ export const CONFIG = {
     dragScale: 1.0, // Traînée naturelle
   },
   kite: {
-    mass: 0.28, // kg - Masse du cerf-volant
-    area: KiteGeometry.TOTAL_AREA, // m² - Surface totale
-    inertia: 0.08, // kg·m² - Moment d'inertie réduit pour meilleure réactivité
+    // Masse calculée depuis composants réels:
+    // - Frame carbone (4.5m tubes): 77g (50%)
+    // - Tissu ripstop (0.53m²): 21g (14%)
+    // - Accessoires (bridage, connecteurs): 55g (36%)
+    // Total: 153g pour un kite de 1.65m d'envergure
+    mass: 0.153, // kg - Masse du cerf-volant (calculée géométriquement)
+    area: KiteGeometry.TOTAL_AREA, // m² - Surface totale (0.5288 m², calculée automatiquement)
+    inertia: 0.04, // kg·m² - Moment d'inertie ajusté pour masse réduite (I ≈ m·r²)
     minHeight: 0.5, // m - Altitude minimale (plus haut pour éviter le sol)
   },
   lines: {
