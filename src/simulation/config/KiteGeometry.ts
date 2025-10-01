@@ -138,4 +138,158 @@ export class KiteGeometry {
     (sum, surface) => sum + surface.area,
     0
   );
+
+  // ============================================================================
+  // CALCUL AUTOMATIQUE DE LA MASSE DU CERF-VOLANT
+  // ============================================================================
+
+  /**
+   * Spécifications des matériaux utilisés pour calculer la masse
+   * Basé sur des composants réels de kites sport/stunt
+   */
+  private static readonly MATERIAL_SPECS = {
+    // Tubes de carbone (masse linéique en g/m)
+    carbon: {
+      spine: 10,        // 5mm diamètre renforcé
+      leadingEdge: 10,  // 5mm diamètre standard
+      strut: 2,        // 4mm diamètre léger
+    },
+    // Tissu (grammage en g/m²)
+    fabric: {
+      ripstop: 40,      // Ripstop nylon 40D standard
+    },
+    // Accessoires (masse fixe en grammes)
+    accessories: {
+      connectorsLeadingEdge: 10,  // 2× connecteurs @ 5g
+      connectorCenterT: 8,         // 1× connecteur T central
+      connectorsStruts: 12,        // 4× connecteurs @ 3g
+      bridleSystem: 15,            // Système de bridage complet
+      reinforcements: 10,          // Renforts aux points de tension
+    },
+  };
+
+  /**
+   * Calcule la longueur totale de tous les tubes de la frame
+   * @returns Objet contenant les longueurs par type de tube et le total
+   */
+  private static calculateFrameLengths(): {
+    spine: number;
+    leadingEdges: number;
+    struts: number;
+    total: number;
+  } {
+    const spine = KiteGeometry.POINTS.NEZ.distanceTo(
+      KiteGeometry.POINTS.SPINE_BAS
+    );
+
+    const leadingEdgeLeft = KiteGeometry.POINTS.NEZ.distanceTo(
+      KiteGeometry.POINTS.BORD_GAUCHE
+    );
+    const leadingEdgeRight = KiteGeometry.POINTS.NEZ.distanceTo(
+      KiteGeometry.POINTS.BORD_DROIT
+    );
+    const leadingEdges = leadingEdgeLeft + leadingEdgeRight;
+
+    const strutLeft = KiteGeometry.POINTS.BORD_GAUCHE.distanceTo(
+      KiteGeometry.POINTS.WHISKER_GAUCHE
+    );
+    const strutRight = KiteGeometry.POINTS.BORD_DROIT.distanceTo(
+      KiteGeometry.POINTS.WHISKER_DROIT
+    );
+    const spreader = KiteGeometry.POINTS.WHISKER_GAUCHE.distanceTo(
+      KiteGeometry.POINTS.WHISKER_DROIT
+    );
+    const struts = strutLeft + strutRight + spreader;
+
+    return {
+      spine,
+      leadingEdges,
+      struts,
+      total: spine + leadingEdges + struts,
+    };
+  }
+
+  /**
+   * Calcule la masse de la structure (frame) en carbone
+   * @returns Masse en kilogrammes
+   */
+  private static calculateFrameMass(): number {
+    const lengths = KiteGeometry.calculateFrameLengths();
+    const specs = KiteGeometry.MATERIAL_SPECS.carbon;
+
+    const spineMass = lengths.spine * specs.spine;
+    const leadingEdgesMass = lengths.leadingEdges * specs.leadingEdge;
+    const strutsMass = lengths.struts * specs.strut;
+
+    // Somme en grammes, conversion en kg
+    return (spineMass + leadingEdgesMass + strutsMass) / 1000;
+  }
+
+  /**
+   * Calcule la masse du tissu (voile)
+   * @returns Masse en kilogrammes
+   */
+  private static calculateFabricMass(): number {
+    const grammage = KiteGeometry.MATERIAL_SPECS.fabric.ripstop;
+    // Surface en m² × grammage en g/m² → conversion en kg
+    return (KiteGeometry.TOTAL_AREA * grammage) / 1000;
+  }
+
+  /**
+   * Calcule la masse totale des accessoires
+   * @returns Masse en kilogrammes
+   */
+  private static calculateAccessoriesMass(): number {
+    const acc = KiteGeometry.MATERIAL_SPECS.accessories;
+    const total =
+      acc.connectorsLeadingEdge +
+      acc.connectorCenterT +
+      acc.connectorsStruts +
+      acc.bridleSystem +
+      acc.reinforcements;
+
+    // Conversion g → kg
+    return total / 1000;
+  }
+
+  /**
+   * Calcule la masse totale du cerf-volant (frame + tissu + accessoires)
+   * Calculée automatiquement depuis la géométrie et les spécifications matériaux
+   * @returns Masse en kilogrammes
+   */
+  static calculateTotalMass(): number {
+    return (
+      KiteGeometry.calculateFrameMass() +
+      KiteGeometry.calculateFabricMass() +
+      KiteGeometry.calculateAccessoriesMass()
+    );
+  }
+
+  /**
+   * Masse totale du cerf-volant calculée automatiquement
+   * Basée sur la géométrie réelle et les matériaux standards
+   */
+  static readonly TOTAL_MASS = KiteGeometry.calculateTotalMass();
+
+  /**
+   * Calcule le moment d'inertie approximatif du cerf-volant
+   * Utilise la formule simplifiée : I ≈ m × r²
+   * où r est le rayon de giration moyen
+   * @returns Moment d'inertie en kg·m²
+   */
+  static calculateInertia(): number {
+    // Rayon de giration ≈ envergure / 4 (approximation pour forme delta)
+    const wingspan =
+      KiteGeometry.POINTS.BORD_GAUCHE.distanceTo(
+        KiteGeometry.POINTS.BORD_DROIT
+      ) / 2;
+    const radiusOfGyration = wingspan / 2;
+
+    return KiteGeometry.TOTAL_MASS * radiusOfGyration * radiusOfGyration;
+  }
+
+  /**
+   * Moment d'inertie calculé automatiquement
+   */
+  static readonly INERTIA = KiteGeometry.calculateInertia();
 }
