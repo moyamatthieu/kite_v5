@@ -1,6 +1,25 @@
+
 /**
- * Node3D.ts - Couche d'abstraction Godot-compatible
- * Encapsule THREE.Group avec une API similaire à Godot
+ * Node3D.ts - Couche d'abstraction Godot-compatible pour la simulation Kite
+ *
+ * Rôle :
+ *   - Encapsule THREE.Group avec une API similaire à Godot
+ *   - Fournit des propriétés et méthodes compatibles avec le moteur Godot
+ *   - Sert de base à StructuredObject et à tous les objets 3D du projet
+ *
+ * Dépendances principales :
+ *   - Three.js : Pour la gestion des groupes et transformations 3D
+ *
+ * Relation avec les fichiers adjacents :
+ *   - StructuredObject.ts (dossier core) hérite de Node3D
+ *   - Tous les objets 3D du projet héritent indirectement de Node3D
+ *
+ * Utilisation typique :
+ *   - Sert de base à la hiérarchie d'objets 3D
+ *   - Permet la compatibilité avec Godot pour la portabilité
+ *
+ * Voir aussi :
+ *   - src/core/StructuredObject.ts
  */
 
 import * as THREE from 'three';

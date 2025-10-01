@@ -1,10 +1,32 @@
+
 /**
- * Kite.ts - Cerf-volant delta utilisant les factories CAO
+ * Kite.ts - Modèle 3D du cerf-volant delta pour la simulation Kite
  *
- * Approche modulaire avec factories séparées pour:
- * - Points anatomiques (PointFactory)
- * - Structure/Frame (FrameFactory)
- * - Surfaces/Toile (SurfaceFactory)
+ * Rôle :
+ *   - Définit la structure, les points anatomiques et les surfaces du cerf-volant
+ *   - Utilise les factories pour générer la géométrie, la structure et la toile
+ *   - Sert de base à tous les calculs physiques et au rendu
+ *
+ * Dépendances principales :
+ *   - StructuredObject.ts : Classe de base pour tous les objets 3D structurés
+ *   - FrameFactory.ts, SurfaceFactory.ts, PointFactory.ts : Factories pour la création des éléments du kite
+ *   - Primitive.ts : Utilitaires pour les formes de base
+ *   - Types : ICreatable pour l'interface de création
+ *   - Three.js : Pour la géométrie et le rendu
+ *
+ * Relation avec les fichiers adjacents :
+ *   - Les factories (FrameFactory, SurfaceFactory, PointFactory) sont utilisées pour générer la structure et la toile
+ *   - StructuredObject.ts (dossier core) est la classe mère
+ *
+ * Utilisation typique :
+ *   - Instancié par le moteur physique et le rendu pour manipuler le kite
+ *   - Sert de source unique pour les points et la géométrie du kite
+ *
+ * Voir aussi :
+ *   - src/core/StructuredObject.ts
+ *   - src/factories/FrameFactory.ts
+ *   - src/factories/SurfaceFactory.ts
+ *   - src/factories/PointFactory.ts
  */
 
 import { StructuredObject } from "../../core/StructuredObject";
@@ -12,6 +34,7 @@ import { ICreatable } from "../../types/index";
 import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
+import { PointFactory } from "../../factories/PointFactory";
 import * as THREE from "three";
 
 export class Kite extends StructuredObject implements ICreatable {
@@ -43,53 +66,13 @@ export class Kite extends StructuredObject implements ICreatable {
 
   /**
    * Définit tous les points anatomiques du cerf-volant
-   * Pattern "Feature-Based Points Repository" : Map centrale partagée
+   * Utilise PointFactory pour encapsuler la logique de calcul
    */
   protected definePoints(): void {
     const { width, height, depth } = this.params;
 
-    // Calculs préliminaires pour les positions relatives
-    const centreY = height / 4;
-    const ratio = (height - centreY) / height;
-    const interGaucheX = ratio * (-width / 2);
-    const interDroitX = ratio * (width / 2);
-    const fixRatio = 2 / 3;
-
-    // Définir LA Map centrale de points - Single Source of Truth
-    this.pointsMap = new Map<string, [number, number, number]>([
-      // Points structurels principaux
-      ["SPINE_BAS", [0, 0, 0]],
-      ["CENTRE", [0, height / 4, 0]],
-      ["NEZ", [0, height, 0]],
-
-      // Points des bords d'attaque
-      ["BORD_GAUCHE", [-width / 2, 0, 0]],
-      ["BORD_DROIT", [width / 2, 0, 0]],
-
-      // Points d'intersection pour le spreader
-      ["INTER_GAUCHE", [interGaucheX, centreY, 0]],
-      ["INTER_DROIT", [interDroitX, centreY, 0]],
-
-      // Points de fixation whiskers
-      ["FIX_GAUCHE", [fixRatio * interGaucheX, centreY, 0]],
-      ["FIX_DROIT", [fixRatio * interDroitX, centreY, 0]],
-
-      // Points des whiskers
-      ["WHISKER_GAUCHE", [-width / 4, 0.1, -depth]],
-      ["WHISKER_DROIT", [width / 4, 0.1, -depth]],
-
-      // Points de contrôle (bridage) - Position FIXE
-      ["CTRL_GAUCHE", [-width * 0.15, height * 0.4, 0.4]], // Plus bas et plus proche
-      ["CTRL_DROIT", [width * 0.15, height * 0.4, 0.4]],
-
-      // Points d'ancrage des brides (sur l'aile du cerf-volant) - 6 brides alignées sur la structure
-      ["BRIDE_GAUCHE_A", [0, height, 0]], // Ancrage gauche haut (position du nez)
-      ["BRIDE_GAUCHE_B", [interGaucheX, centreY, 0]], // Ancrage gauche milieu (position INTER_GAUCHE)
-      ["BRIDE_GAUCHE_C", [0, height / 4, 0]], // Ancrage gauche bas (position du centre)
-      ["BRIDE_DROITE_A", [0, height, 0]], // Ancrage droit haut (position du nez)
-      ["BRIDE_DROITE_B", [interDroitX, centreY, 0]], // Ancrage droit milieu (position INTER_DROIT)
-      ["BRIDE_DROITE_C", [0, height / 4, 0]], // Ancrage droit bas (position du centre)
-    ]);
+    // Utiliser PointFactory pour calculer les positions
+    this.pointsMap = PointFactory.calculateDeltaKitePoints({ width, height, depth });
 
     // Enregistrer dans StructuredObject pour compatibilité avec le système existant
     this.pointsMap.forEach((position, name) => {

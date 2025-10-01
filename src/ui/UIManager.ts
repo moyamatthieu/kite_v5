@@ -217,11 +217,12 @@ export class UIManager {
         
         // Bouton de réduction/expansion
         if (config.collapsible !== false) {
-            const collapseBtn = document.createElement('button');
-            collapseBtn.className = 'ui-panel-btn';
-            collapseBtn.innerHTML = '−';
-            collapseBtn.onclick = () => this.togglePanel(config.id);
-            controls.appendChild(collapseBtn);
+            const collapseButton = document.createElement('button');
+            collapseButton.className = 'ui-panel-btn';
+            collapseButton.innerHTML = '−';
+            collapseButton.title = 'Réduire/Développer';
+            collapseButton.onclick = () => this.togglePanelCollapse(config.id);
+            controls.appendChild(collapseButton);
         }
         
         header.appendChild(title);
@@ -396,9 +397,9 @@ export class UIManager {
         panel.isCollapsed = !panel.isCollapsed;
         panel.element.classList.toggle('collapsed', panel.isCollapsed);
         
-        const btn = panel.element.querySelector('.ui-panel-btn') as HTMLElement;
-        if (btn) {
-            btn.innerHTML = panel.isCollapsed ? '+' : '−';
+        const button = panel.element.querySelector('.ui-panel-btn') as HTMLElement;
+        if (button) {
+            button.innerHTML = panel.isCollapsed ? '+' : '−';
         }
 
         // Repositionner tous les panneaux

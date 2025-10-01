@@ -1,0 +1,179 @@
+/**
+ * ConstraintSolver.ts - Solveur de contraintes pour les lignes du cerf-volant
+ *
+ * Rôle :
+ *   - Applique les contraintes de distance sur les lignes via l'algorithme Position-Based Dynamics (PBD)
+ *   - Garantit la stabilité géométrique du kite et le respect des longueurs de ligne
+ *   - Permet la rotation naturelle et le décrochage du kite
+ *
+ * Dépendances principales :
+ *   - Kite.ts : Accès à la géométrie et points du cerf-volant
+ *   - PhysicsConstants.ts : Constantes physiques pour la tolérance et la gestion des contraintes
+ *   - SimulationConfig.ts : Paramètres de configuration
+ *   - Types : Utilise HandlePositions pour typer les poignées
+ *
+ * Relation avec les fichiers adjacents :
+ *   - LineSystem.ts : Utilise ConstraintSolver pour appliquer les contraintes sur les lignes
+ *   - PhysicsEngine.ts : Orchestration de l'appel au solveur
+ *
+ * Utilisation typique :
+ *   - Appelé par LineSystem ou PhysicsEngine pour maintenir la contrainte de distance
+ *
+ * Voir aussi :
+ *   - src/simulation/physics/LineSystem.ts
+ *   - src/simulation/physics/PhysicsEngine.ts
+ *   - src/objects/organic/Kite.ts
+ */
+import * as THREE from "three";
+import { Kite } from "../../objects/organic/Kite";
+import { HandlePositions } from "../types";
+import { PhysicsConstants } from "../config/PhysicsConstants";
+import { CONFIG } from "../config/SimulationConfig";
+
+/**
+ * Solveur de contraintes pour les lignes
+ *
+ * Implémente l'algorithme Position-Based Dynamics (PBD) pour maintenir
+ * les contraintes de distance des lignes
+ */
+export class ConstraintSolver {
+  /**
+   * Applique les contraintes des lignes - Solver PBD (Position-Based Dynamics)
+   * Algorithme sophistiqué qui respecte la contrainte de distance tout en
+   * permettant la rotation naturelle du kite
+   */
+  static enforceLineConstraints(
+    kite: Kite,
+    predictedPosition: THREE.Vector3,
+    state: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
+    handles: HandlePositions
+  ): void {
+    // PRINCIPE DE LA PYRAMIDE DE CONTRAINTE :
+    // Le cerf-volant est constamment poussé par le vent contre la sphère de contrainte
+    // Les lignes + brides forment une pyramide qui maintient une géométrie stable
+    // Le kite "glisse" sur la surface de la sphère définie par la longueur des lignes
+    // C'est quand il sort de cette sphère qu'il "décroche"
+
+    const lineLength =
+      kite.userData.lineLength || CONFIG.lines.defaultLength;
+    const tol = PhysicsConstants.LINE_CONSTRAINT_TOLERANCE;
+
+    const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
+    const ctrlRight = kite.getPoint("CTRL_DROIT");
+    if (!ctrlLeft || !ctrlRight) return;
+
+    const mass = CONFIG.kite.mass;
+    const inertia = CONFIG.kite.inertia;
+
+    // Résolution PBD pour chaque ligne
+    const solveLine = (ctrlLocal: THREE.Vector3, handle: THREE.Vector3) => {
+      const q = kite.quaternion;
+      const cpWorld = ctrlLocal
+        .clone()
+        .applyQuaternion(q)
+        .add(predictedPosition);
+      const diff = cpWorld.clone().sub(handle);
+      const dist = diff.length();
+
+      if (dist <= lineLength - tol) return; // Ligne molle
+
+      const n = diff.clone().normalize();
+      const C = dist - lineLength;
+
+      const r = cpWorld.clone().sub(predictedPosition);
+      const alpha = new THREE.Vector3().crossVectors(r, n);
+      const invMass = 1 / mass;
+      const invInertia = 1 / Math.max(inertia, PhysicsConstants.EPSILON);
+      const denom = invMass + alpha.lengthSq() * invInertia;
+      const lambda = C / Math.max(denom, PhysicsConstants.EPSILON);
+
+      // Corrections
+      const dPos = n.clone().multiplyScalar(-invMass * lambda);
+      predictedPosition.add(dPos);
+
+      const dTheta = alpha.clone().multiplyScalar(-invInertia * lambda);
+      const angle = dTheta.length();
+      if (angle > PhysicsConstants.EPSILON) {
+        const axis = dTheta.normalize();
+        const dq = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        kite.quaternion.premultiply(dq).normalize();
+      }
+
+      // Correction de vitesse
+      const q2 = kite.quaternion;
+      const cpWorld2 = ctrlLocal
+        .clone()
+        .applyQuaternion(q2)
+        .add(predictedPosition);
+      const n2 = cpWorld2.clone().sub(handle).normalize();
+      const r2 = cpWorld2.clone().sub(predictedPosition);
+      const pointVel = state.velocity
+        .clone()
+        .add(new THREE.Vector3().crossVectors(state.angularVelocity, r2));
+      const radialSpeed = pointVel.dot(n2);
+
+      if (radialSpeed > 0) {
+        const rxn = new THREE.Vector3().crossVectors(r2, n2);
+        const eff = invMass + rxn.lengthSq() * invInertia;
+        const J = -radialSpeed / Math.max(eff, PhysicsConstants.EPSILON);
+
+        state.velocity.add(n2.clone().multiplyScalar(J * invMass));
+        const angImpulse = new THREE.Vector3().crossVectors(
+          r2,
+          n2.clone().multiplyScalar(J)
+        );
+        state.angularVelocity.add(angImpulse.multiplyScalar(invInertia));
+      }
+    };
+
+    // Deux passes pour mieux satisfaire les contraintes
+    for (let i = 0; i < 2; i++) {
+      solveLine(ctrlLeft, handles.left);
+      solveLine(ctrlRight, handles.right);
+    }
+  }
+
+  /**
+   * Gère la collision avec le sol
+   */
+  static handleGroundCollision(
+    kite: Kite,
+    newPosition: THREE.Vector3,
+    velocity: THREE.Vector3
+  ): void {
+    const groundY = CONFIG.kite.minHeight;
+    const pointsMap = kite.getPointsMap?.() as
+      | Map<string, [number, number, number]>
+      | undefined;
+
+    if (pointsMap && pointsMap.size > 0) {
+      let minY = Infinity;
+      const q = kite.quaternion;
+
+      pointsMap.forEach(([px, py, pz]) => {
+        const world = new THREE.Vector3(px, py, pz)
+          .applyQuaternion(q)
+          .add(newPosition);
+        if (world.y < minY) minY = world.y;
+      });
+
+      if (minY < groundY) {
+        const lift = groundY - minY;
+        newPosition.y += lift;
+
+        if (velocity.y < 0) velocity.y = 0;
+        velocity.x *= PhysicsConstants.GROUND_FRICTION;
+        velocity.z *= PhysicsConstants.GROUND_FRICTION;
+      }
+      return;
+    }
+
+    // Fallback simple
+    if (newPosition.y < groundY) {
+      newPosition.y = groundY;
+      if (velocity.y < 0) velocity.y = 0;
+      velocity.x *= PhysicsConstants.GROUND_FRICTION;
+      velocity.z *= PhysicsConstants.GROUND_FRICTION;
+    }
+  }
+}
