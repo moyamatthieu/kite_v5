@@ -71,6 +71,32 @@ const VECTOR_SCALES = {
 };
 
 /**
+ * Configuration des têtes de flèches pour un rendu plus fin et précis
+ */
+const ARROW_HEAD_CONFIG = {
+  // Grandes flèches (vitesse, vent apparent, résultantes)
+  large: {
+    headLength: 0.15,  // Longueur de la tête de flèche
+    headWidth: 0.12,   // Largeur de la tête de flèche
+  },
+  // Flèches moyennes (forces globales)
+  medium: {
+    headLength: 0.12,
+    headWidth: 0.09,
+  },
+  // Petites flèches (forces par surface)
+  small: {
+    headLength: 0.10,
+    headWidth: 0.07,
+  },
+  // Très petites flèches (friction)
+  tiny: {
+    headLength: 0.08,
+    headWidth: 0.06,
+  },
+};
+
+/**
  * Gestionnaire du rendu de debug
  *
  * Affiche les forces, vitesses et informations de debug
@@ -220,8 +246,8 @@ export class DebugRenderer {
         centerWorld,
         kiteState.velocity.length() * VECTOR_SCALES.velocity,
         DEBUG_COLORS.velocity,
-        undefined,
-        0.3
+        ARROW_HEAD_CONFIG.large.headLength,
+        ARROW_HEAD_CONFIG.large.headWidth
       );
       this.renderManager.addObject(velocityArrow);
       this.debugArrows.push(velocityArrow);
@@ -238,8 +264,8 @@ export class DebugRenderer {
         centerWorld,
         relativeWind.length() * VECTOR_SCALES.apparentWind,
         DEBUG_COLORS.apparentWind,
-        undefined,
-        0.28
+        ARROW_HEAD_CONFIG.large.headLength,
+        ARROW_HEAD_CONFIG.large.headWidth
       );
       this.renderManager.addObject(apparentWindArrow);
       this.debugArrows.push(apparentWindArrow);
@@ -260,8 +286,8 @@ export class DebugRenderer {
             centerWorld,
             Math.sqrt(lift.length()) * VECTOR_SCALES.globalLift,
             DEBUG_COLORS.globalLift,
-            undefined,
-            0.22
+            ARROW_HEAD_CONFIG.medium.headLength,
+            ARROW_HEAD_CONFIG.medium.headWidth
           );
           this.renderManager.addObject(liftArrow);
           this.debugArrows.push(liftArrow);
@@ -275,8 +301,8 @@ export class DebugRenderer {
             centerWorld,
             Math.sqrt(globalResultant.length()) * VECTOR_SCALES.globalResultant,
             DEBUG_COLORS.globalResultant,
-            undefined,
-            0.3
+            ARROW_HEAD_CONFIG.large.headLength,
+            ARROW_HEAD_CONFIG.large.headWidth
           );
           this.renderManager.addObject(resultantArrow);
           this.debugArrows.push(resultantArrow);
@@ -386,8 +412,8 @@ export class DebugRenderer {
           centerWorld,
           Math.sqrt(lift.length()) * VECTOR_SCALES.surfaceLift,
           DEBUG_COLORS.surfaceLift,
-          undefined,
-          0.26
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
         );
         this.renderManager.addObject(liftArrow);
         this.debugArrows.push(liftArrow);
@@ -400,8 +426,8 @@ export class DebugRenderer {
           centerWorld,
           Math.sqrt(drag.length()) * VECTOR_SCALES.surfaceDrag,
           DEBUG_COLORS.surfaceDrag,
-          undefined,
-          0.26
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
         );
         this.renderManager.addObject(dragArrow);
         this.debugArrows.push(dragArrow);
@@ -414,8 +440,8 @@ export class DebugRenderer {
           centerWorld,
           Math.sqrt(friction.length()) * VECTOR_SCALES.surfaceFriction,
           DEBUG_COLORS.surfaceFriction,
-          undefined,
-          0.2
+          ARROW_HEAD_CONFIG.tiny.headLength,
+          ARROW_HEAD_CONFIG.tiny.headWidth
         );
         this.renderManager.addObject(frictionArrow);
         this.debugArrows.push(frictionArrow);
@@ -428,8 +454,8 @@ export class DebugRenderer {
           centerWorld,
           Math.sqrt(resultant.length()) * VECTOR_SCALES.surfaceResultant,
           DEBUG_COLORS.surfaceResultant,
-          undefined,
-          0.38
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
         );
         this.renderManager.addObject(resultantArrow);
         this.debugArrows.push(resultantArrow);
