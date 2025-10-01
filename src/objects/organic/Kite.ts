@@ -34,7 +34,7 @@ import { ICreatable } from "../../types/index";
 import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
-import { PointFactory } from "../../factories/PointFactory";
+import { PointFactory, BridleLengths } from "../../factories/PointFactory";
 import * as THREE from "three";
 
 export class Kite extends StructuredObject implements ICreatable {
@@ -44,7 +44,13 @@ export class Kite extends StructuredObject implements ICreatable {
   private pointsMap: Map<string, [number, number, number]> = new Map();
   private bridleLines: THREE.Group | null = null;
   private bridleLengthFactor: number = 1.0; // Facteur de longueur virtuelle des brides principales
-  private bridleLength: number = 1.0; // Facteur longueur bride NEZ->CTRL (1.0 = défaut, 0.5-1.5)
+
+  // Longueurs physiques des brides (en mètres)
+  private bridleLengths: BridleLengths = {
+    nez: 0.5,      // 50cm du NEZ au CTRL
+    inter: 0.35,   // 35cm du INTER au CTRL
+    centre: 0.3,   // 30cm du CENTRE au CTRL
+  };
 
   // Paramètres du cerf-volant
   private params = {
@@ -72,12 +78,12 @@ export class Kite extends StructuredObject implements ICreatable {
   protected definePoints(): void {
     const { width, height, depth } = this.params;
 
-    // Utiliser PointFactory pour calculer les positions avec bridleLength
+    // Utiliser PointFactory pour calculer les positions avec bridleLengths physiques
     this.pointsMap = PointFactory.calculateDeltaKitePoints({
       width,
       height,
       depth,
-      bridleLength: this.bridleLength
+      bridleLengths: this.bridleLengths
     });
 
     // Enregistrer dans StructuredObject pour compatibilité avec le système existant
@@ -304,15 +310,19 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
-   * Ajuste la longueur physique de la bride NEZ->CTRL (déplace les points de contrôle)
-   * @param factor - Facteur de longueur (0.5 = proche du NEZ, 1.0 = normal, 1.5 = loin du NEZ)
+   * Ajuste les longueurs physiques des brides (en mètres)
+   * @param lengths - Longueurs des 3 brides { nez, inter, centre }
    */
-  public setBridleControlLength(factor: number): void {
-    // Limiter la valeur entre 0.5 et 1.5
-    this.bridleLength = Math.max(0.5, Math.min(1.5, factor));
-    console.log(`🪁 Longueur bride NEZ->CTRL: ${this.bridleLength.toFixed(2)}x`);
+  public setBridleLengths(lengths: Partial<BridleLengths>): void {
+    // Mettre à jour les longueurs (merge avec les valeurs existantes)
+    this.bridleLengths = {
+      ...this.bridleLengths,
+      ...lengths
+    };
 
-    // Recalculer les points avec la nouvelle longueur
+    console.log(`🪁 Longueurs brides: NEZ=${this.bridleLengths.nez.toFixed(2)}m, INTER=${this.bridleLengths.inter.toFixed(2)}m, CENTRE=${this.bridleLengths.centre.toFixed(2)}m`);
+
+    // Recalculer les points avec les nouvelles longueurs
     this.definePoints();
 
     // Reconstruire le kite avec les nouveaux points
@@ -322,10 +332,10 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
-   * Retourne le facteur de longueur actuel de la bride NEZ->CTRL
+   * Retourne les longueurs actuelles des brides
    */
-  public getBridleControlLength(): number {
-    return this.bridleLength;
+  public getBridleLengths(): BridleLengths {
+    return { ...this.bridleLengths };
   }
 
   /**
