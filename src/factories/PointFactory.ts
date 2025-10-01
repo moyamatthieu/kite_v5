@@ -4,6 +4,8 @@
  * Responsabilité : Calculer les positions des points d'un cerf-volant delta
  */
 
+import * as THREE from 'three';
+
 /**
  * Longueurs physiques des brides (en mètres)
  */
@@ -28,14 +30,15 @@ export class PointFactory {
    * Longueurs de brides par défaut (en mètres)
    */
   private static readonly DEFAULT_BRIDLE_LENGTHS: BridleLengths = {
-    nez: 0.5,      // 50cm du NEZ au CTRL
-    inter: 0.35,   // 35cm du INTER au CTRL
-    centre: 0.3,   // 30cm du CENTRE au CTRL
+    nez: 0.68,     // 68cm du NEZ au CTRL
+    inter: 0.5,    // 50cm du INTER au CTRL
+    centre: 0.5,   // 50cm du CENTRE au CTRL
   };
 
   /**
-   * Calcule la position du point de contrôle (CTRL) par trilatération
-   * en satisfaisant les 3 contraintes de distance
+   * Calcule la position du point de contrôle (CTRL) par trilatération 3D analytique
+   * Résout l'intersection de 3 sphères centrées en NEZ, INTER, CENTRE
+   * avec rayons = longueurs de brides respectives
    */
   private static calculateControlPoint(
     nez: [number, number, number],
@@ -44,26 +47,63 @@ export class PointFactory {
     bridleLengths: BridleLengths,
     side: 'left' | 'right'
   ): [number, number, number] {
-    // Position approximative initiale (estimation)
-    // On part du principe que CTRL est légèrement en arrière et sur le côté
-    const signX = side === 'left' ? -1 : 1;
+    // Convertir en Vector3
+    const p1 = new THREE.Vector3(...nez);      // Point 1 : NEZ
+    const p2 = new THREE.Vector3(...inter);    // Point 2 : INTER
+    const p3 = new THREE.Vector3(...centre);   // Point 3 : CENTRE
 
-    // Méthode simplifiée : on calcule une position qui satisfait approximativement les 3 distances
-    // En réalité, c'est un système d'équations complexe, on utilise une approximation géométrique
+    const r1 = bridleLengths.nez;     // Rayon sphère 1
+    const r2 = bridleLengths.inter;   // Rayon sphère 2
+    const r3 = bridleLengths.centre;  // Rayon sphère 3
 
-    // Le point CTRL doit être à distance bridleLengths.nez de NEZ
-    // Pour simplifier, on suppose que CTRL est dans le plan Y-Z proche du NEZ
-    const nezVec = { x: nez[0], y: nez[1], z: nez[2] };
-    const interVec = { x: inter[0], y: inter[1], z: inter[2] };
-    const centreVec = { x: centre[0], y: centre[1], z: centre[2] };
+    // Trilatération 3D analytique
+    // Étape 1 : Créer un repère local avec p1 à l'origine
+    const ex = new THREE.Vector3().subVectors(p2, p1).normalize(); // axe X : direction p1->p2
+    const d = p2.distanceTo(p1); // distance entre p1 et p2
 
-    // Position approximative basée sur les longueurs de brides
-    // On place CTRL à une distance moyenne des 3 points d'ancrage
-    const ctrlX = signX * Math.abs(interVec.x) * 0.6; // 60% de la distance latérale
-    const ctrlY = (nezVec.y + centreVec.y) / 2; // Milieu vertical entre NEZ et CENTRE
-    const ctrlZ = bridleLengths.nez * 0.8; // En arrière du NEZ
+    // Étape 2 : Calculer composante Y du repère
+    const p3_p1 = new THREE.Vector3().subVectors(p3, p1);
+    const i = ex.dot(p3_p1); // projection de p3-p1 sur ex
+    const ey_temp = new THREE.Vector3().copy(p3_p1).addScaledVector(ex, -i);
+    const ey = ey_temp.normalize(); // axe Y : perpendiculaire à ex dans le plan
 
-    return [ctrlX, ctrlY, ctrlZ];
+    // Étape 3 : Axe Z (perpendiculaire au plan p1-p2-p3)
+    const ez = new THREE.Vector3().crossVectors(ex, ey);
+
+    // Étape 4 : Coordonnées de p3 dans le repère local
+    const j = ey.dot(p3_p1);
+
+    // Étape 5 : Résolution du système dans le repère local
+    // x = (r1² - r2² + d²) / (2d)
+    const x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+
+    // y = (r1² - r3² + i² + j²) / (2j) - (i/j) * x
+    const y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
+
+    // z² = r1² - x² - y²
+    const zSquared = r1 * r1 - x * x - y * y;
+
+    // Si z² < 0, les sphères ne se croisent pas (configuration impossible)
+    let z: number;
+    if (zSquared < 0) {
+      console.warn(`⚠️ Configuration de brides impossible (z²=${zSquared.toFixed(3)}), approximation`);
+      z = 0; // Solution dégénérée : CTRL dans le plan des 3 points
+    } else {
+      // Deux solutions possibles (devant/derrière le plan)
+      // On prend z > 0 (vers l'arrière du kite, direction +Z)
+      // IMPORTANT : Pour la symétrie, on inverse le signe selon le côté
+      const zAbs = Math.sqrt(zSquared);
+      z = side === 'left' ? zAbs : -zAbs;
+    }
+
+    // Étape 6 : Convertir les coordonnées locales en coordonnées globales
+    const result = new THREE.Vector3();
+    result.copy(p1); // Partir de p1
+    result.addScaledVector(ex, x); // Ajouter x * ex
+    result.addScaledVector(ey, y); // Ajouter y * ey
+    result.addScaledVector(ez, z); // Ajouter z * ez
+
+    return [result.x, result.y, result.z];
   }
 
   /**

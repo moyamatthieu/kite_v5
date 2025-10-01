@@ -134,8 +134,8 @@ export class UIManager {
     const bridleNezSlider = document.getElementById("bridle-nez") as HTMLInputElement;
     const bridleNezValue = document.getElementById("bridle-nez-value");
     if (bridleNezSlider && bridleNezValue) {
-      bridleNezSlider.value = "0.5";
-      bridleNezValue.textContent = "0.50m";
+      bridleNezSlider.value = "0.68";
+      bridleNezValue.textContent = "0.68m";
 
       bridleNezSlider.oninput = () => {
         const length = parseFloat(bridleNezSlider.value);
@@ -147,8 +147,8 @@ export class UIManager {
     const bridleInterSlider = document.getElementById("bridle-inter") as HTMLInputElement;
     const bridleInterValue = document.getElementById("bridle-inter-value");
     if (bridleInterSlider && bridleInterValue) {
-      bridleInterSlider.value = "0.35";
-      bridleInterValue.textContent = "0.35m";
+      bridleInterSlider.value = "0.5";
+      bridleInterValue.textContent = "0.50m";
 
       bridleInterSlider.oninput = () => {
         const length = parseFloat(bridleInterSlider.value);
@@ -160,8 +160,8 @@ export class UIManager {
     const bridleCentreSlider = document.getElementById("bridle-centre") as HTMLInputElement;
     const bridleCentreValue = document.getElementById("bridle-centre-value");
     if (bridleCentreSlider && bridleCentreValue) {
-      bridleCentreSlider.value = "0.3";
-      bridleCentreValue.textContent = "0.30m";
+      bridleCentreSlider.value = "0.5";
+      bridleCentreValue.textContent = "0.50m";
 
       bridleCentreSlider.oninput = () => {
         const length = parseFloat(bridleCentreSlider.value);

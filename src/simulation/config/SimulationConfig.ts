@@ -37,13 +37,13 @@ export const CONFIG = {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
-    angularDamping: 0.94, // Damping modéré pour stabilité (6% de perte, vs 15% avant)
-    linearDamping: 0.97, // Damping léger pour stabilité (3% de perte, vs 8% avant)
+    angularDamping: 0.80, // Damping angulaire à 0.80 (20% de perte)
+    linearDamping: 0.80, // Damping linéaire à 0.80 (20% de perte)
     angularDragCoeff: 0.1, // Résistance rotation augmentée pour moins d'oscillations
   },
   aero: {
-    liftScale: 0.5, // Portance modérée - équilibre entre vol et stabilité
-    dragScale: 0.35, // Traînée légèrement plus faible pour meilleur vol
+    liftScale: 1.0, // Portance à 1.0 (coefficient plein)
+    dragScale: 1.0, // Traînée à 1.0 (coefficient plein)
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
@@ -67,7 +67,7 @@ export const CONFIG = {
   wind: {
     defaultSpeed: 18, // km/h
     defaultDirection: 0, // degrés
-    defaultTurbulence: 3, // %
+    defaultTurbulence: 1, // % - Turbulence minimale
     turbulenceScale: 0.15,
     turbulenceFreqBase: 0.3,
     turbulenceFreqY: 1.3,

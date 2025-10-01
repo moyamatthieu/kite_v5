@@ -47,9 +47,9 @@ export class Kite extends StructuredObject implements ICreatable {
 
   // Longueurs physiques des brides (en mètres)
   private bridleLengths: BridleLengths = {
-    nez: 0.5,      // 50cm du NEZ au CTRL
-    inter: 0.35,   // 35cm du INTER au CTRL
-    centre: 0.3,   // 30cm du CENTRE au CTRL
+    nez: 0.68,     // 68cm du NEZ au CTRL
+    inter: 0.5,    // 50cm du INTER au CTRL
+    centre: 0.5,   // 50cm du CENTRE au CTRL
   };
 
   // Paramètres du cerf-volant
@@ -322,6 +322,9 @@ export class Kite extends StructuredObject implements ICreatable {
 
     console.log(`🪁 Longueurs brides: NEZ=${this.bridleLengths.nez.toFixed(2)}m, INTER=${this.bridleLengths.inter.toFixed(2)}m, CENTRE=${this.bridleLengths.centre.toFixed(2)}m`);
 
+    // Supprimer tous les enfants pour nettoyer l'ancienne géométrie
+    this.clearChildren();
+
     // Recalculer les points avec les nouvelles longueurs
     this.definePoints();
 
@@ -329,6 +332,19 @@ export class Kite extends StructuredObject implements ICreatable {
     this.buildStructure();
     this.buildSurfaces();
     this.createBridleLines();
+
+    // Recréer les marqueurs visuels aux nouvelles positions
+    this.addVisualMarkers();
+  }
+
+  /**
+   * Supprime tous les enfants du kite (géométrie, marqueurs, etc.)
+   */
+  private clearChildren(): void {
+    // Supprimer tous les enfants Three.js
+    while (this.children.length > 0) {
+      this.remove(this.children[0]);
+    }
   }
 
   /**
