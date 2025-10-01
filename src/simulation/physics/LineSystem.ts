@@ -1,61 +1,40 @@
 /**
- * LineSystem.ts - Système de gestion des lignes et contraintes du cerf-volant
+ * LineSystem.ts - Orchestrateur du système de lignes du cerf-volant
  *
  * Rôle :
- *   - Calcule les tensions, forces et torques exercés par les lignes sur le kite
- *   - Implémente la logique de contrôle via la barre (gauche/droite)
- *   - Sert à maintenir la contrainte de distance entre le kite et le pilote
+ *   - Coordonne les lignes gauche/droite du système de pilotage
+ *   - Calcule les tensions pour affichage/debug (pas de forces appliquées)
+ *   - Les contraintes de distance sont gérées par ConstraintSolver
  *
- * Dépendances principales :
- *   - Kite.ts : Accès à la géométrie et points du cerf-volant
- *   - PhysicsConstants.ts : Constantes physiques pour la tolérance et la gestion des lignes
- *   - SimulationConfig.ts : Paramètres de configuration des lignes
- *
- * Relation avec les fichiers adjacents :
- *   - PhysicsEngine.ts : Utilise LineSystem pour calculer les forces de ligne à chaque frame
- *   - ConstraintSolver.ts : Applique les contraintes de distance sur les lignes
- *
- * Utilisation typique :
- *   - Appelé par PhysicsEngine pour obtenir les forces de ligne
- *   - Sert à la visualisation et au contrôle du kite
- *
- * Voir aussi :
- *   - src/simulation/physics/PhysicsEngine.ts
- *   - src/simulation/physics/ConstraintSolver.ts
- *   - src/objects/organic/Kite.ts
+ * IMPORTANT : Les lignes sont des CONTRAINTES, pas des ressorts !
+ *   - Elles RETIENNENT le kite (distance max)
+ *   - Elles ne TIRENT PAS le kite vers le pilote
+ *   - Le ConstraintSolver.enforceLineConstraints() gère la contrainte géométrique
  */
 import * as THREE from "three";
-import { Kite } from "../../objects/organic/Kite";
+import { Kite } from "@objects/organic/Kite";
+import { Line } from "@objects/mechanical/Line";
+import { LinePhysics } from "./LinePhysics";
+import { LineFactory } from "@factories/LineFactory";
+import { ControlBarManager } from "../controllers/ControlBarManager";
 import { PhysicsConstants } from "../config/PhysicsConstants";
-import { CONFIG } from "../config/SimulationConfig";
 
-/**
- * Système de lignes et contraintes
- *
- * Gère la physique des lignes qui relient le cerf-volant au pilote
- */
 export class LineSystem {
-  public lineLength: number;
+  private leftLine: Line;
+  private rightLine: Line;
+  private physics: LinePhysics;
+  private previousLeftKitePos: THREE.Vector3 | null = null;
+  private previousRightKitePos: THREE.Vector3 | null = null;
+  private previousLeftBarPos: THREE.Vector3 | null = null;
+  private previousRightBarPos: THREE.Vector3 | null = null;
 
-  constructor(lineLength: number = CONFIG.lines.defaultLength) {
-    this.lineLength = lineLength;
+  constructor(lineLength?: number) {
+    const [left, right] = LineFactory.createLinePair(lineLength);
+    this.leftLine = left;
+    this.rightLine = right;
+    this.physics = new LinePhysics();
   }
 
-  /**
-   * Calcule comment les lignes tirent sur le cerf-volant
-   *
-   * PRINCIPE DE BASE :
-   * Les lignes sont comme des cordes : elles peuvent tirer mais pas pousser
-   * - Ligne tendue = elle tire sur le kite
-   * - Ligne molle = aucune force
-   *
-   * COMMENT LA BARRE CONTRÔLE :
-   * Quand vous tournez la barre :
-   * - Rotation à gauche = main gauche recule, main droite avance
-   * - La ligne gauche se raccourcit, la droite s'allonge
-   * - Le côté gauche du kite est tiré, il se rapproche
-   * - Cette asymétrie fait tourner le kite !
-   */
   calculateLineTensions(
     kite: Kite,
     controlRotation: number,
@@ -65,7 +44,6 @@ export class LineSystem {
     rightForce: THREE.Vector3;
     torque: THREE.Vector3;
   } {
-    // Points d'attache des lignes sur le kite (depuis la géométrie réelle)
     const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
     const ctrlRight = kite.getPoint("CTRL_DROIT");
     if (!ctrlLeft || !ctrlRight) {
@@ -75,131 +53,97 @@ export class LineSystem {
         torque: new THREE.Vector3(),
       };
     }
-    const leftAttach = ctrlLeft.clone();
-    const rightAttach = ctrlRight.clone();
 
-    // Transformer en coordonnées monde
-    const leftWorld = leftAttach
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
-    const rightWorld = rightAttach
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
+    const leftWorld = ctrlLeft.clone().applyQuaternion(kite.quaternion).add(kite.position);
+    const rightWorld = ctrlRight.clone().applyQuaternion(kite.quaternion).add(kite.position);
 
-    // On calcule où sont exactement les mains du pilote
-    // Imaginez que vous tenez une barre de 60cm de large
-    const barHalfWidth = CONFIG.controlBar.width * 0.5; // 30cm de chaque côté
-    const barRight = new THREE.Vector3(1, 0, 0);
+    const tempControlBar = new ControlBarManager(pilotPosition);
+    tempControlBar.setRotation(controlRotation);
+    const handles = tempControlBar.getHandlePositions(kite.position);
 
-    // Quand vous tournez la barre (comme un guidon de vélo) :
-    // - Tourner à gauche = votre main gauche recule, la droite avance
-    // - Tourner à droite = votre main droite recule, la gauche avance
-    const leftHandleOffset = barRight
-      .clone()
-      .multiplyScalar(-barHalfWidth)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), controlRotation);
-    const rightHandleOffset = barRight
-      .clone()
-      .multiplyScalar(barHalfWidth)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), controlRotation);
+    const leftVelocity = this.calculateVelocity(leftWorld, handles.left, this.previousLeftKitePos, this.previousLeftBarPos, 1 / 60);
+    const rightVelocity = this.calculateVelocity(rightWorld, handles.right, this.previousRightKitePos, this.previousRightBarPos, 1 / 60);
 
-    const leftHandlePos = pilotPosition.clone().add(leftHandleOffset);
-    const rightHandlePos = pilotPosition.clone().add(rightHandleOffset);
+    // Calculer tensions pour info/debug uniquement (pas de force appliquée)
+    const leftResult = this.physics.calculateTensionForce(this.leftLine, leftWorld, handles.left, leftVelocity);
+    const rightResult = this.physics.calculateTensionForce(this.rightLine, rightWorld, handles.right, rightVelocity);
 
-    // Vecteurs ligne : du kite vers le pilote
-    const leftDistance = leftWorld.distanceTo(leftHandlePos);
-    const rightDistance = rightWorld.distanceTo(rightHandlePos);
+    // Mettre à jour l'état des lignes (pour affichage)
+    this.leftLine.updateState(leftResult.currentLength, leftResult.tension, performance.now());
+    this.rightLine.updateState(rightResult.currentLength, rightResult.tension, performance.now());
 
-    const leftLineDir = leftHandlePos.clone().sub(leftWorld).normalize();
-    const rightLineDir = rightHandlePos.clone().sub(rightWorld).normalize();
+    // Mémoriser positions pour prochain frame
+    this.previousLeftKitePos = leftWorld.clone();
+    this.previousRightKitePos = rightWorld.clone();
+    this.previousLeftBarPos = handles.left.clone();
+    this.previousRightBarPos = handles.right.clone();
 
-    // PRINCIPE CLÉ : Les lignes sont des CORDES, pas des ressorts!
-    // - Ligne molle (distance < longueur) = AUCUNE force
-    // - Ligne tendue (distance > longueur) = Force proportionnelle
-    let leftForce = new THREE.Vector3();
-    let rightForce = new THREE.Vector3();
-
-    // Ligne gauche : F = k × extension (Hooke pour corde rigide)
-    if (leftDistance > this.lineLength) {
-      const extension = leftDistance - this.lineLength; // Étirement en mètres
-      const tension = Math.min(
-        CONFIG.lines.stiffness * extension,
-        CONFIG.lines.maxTension
-      );
-      leftForce = leftLineDir.multiplyScalar(tension); // Force vers le pilote
-    }
-
-    // Ligne droite : même physique
-    if (rightDistance > this.lineLength) {
-      const extension = rightDistance - this.lineLength;
-      const tension = Math.min(
-        CONFIG.lines.stiffness * extension,
-        CONFIG.lines.maxTension
-      );
-      rightForce = rightLineDir.multiplyScalar(tension);
-    }
-
-    // COUPLE ÉMERGENT : Résulte de l'asymétrie des tensions
-    // Si ligne gauche tire plus fort → rotation horaire
-    // Si ligne droite tire plus fort → rotation anti-horaire
-    let totalTorque = new THREE.Vector3();
-
-    // Couple ligne gauche (si tendue)
-    if (leftForce.length() > 0) {
-      const leftTorque = new THREE.Vector3().crossVectors(
-        leftAttach.clone().applyQuaternion(kite.quaternion), // Bras de levier
-        leftForce // Force appliquée
-      );
-      totalTorque.add(leftTorque);
-    }
-
-    // Couple ligne droite (si tendue)
-    if (rightForce.length() > 0) {
-      const rightTorque = new THREE.Vector3().crossVectors(
-        rightAttach.clone().applyQuaternion(kite.quaternion),
-        rightForce
-      );
-      totalTorque.add(rightTorque);
-    }
-
+    // ⚠️ IMPORTANT : PAS DE FORCES NI DE COUPLE APPLIQUÉS
+    // Les lignes sont des contraintes géométriques (ConstraintSolver)
+    // Le kite est retenu à distance max, pas tiré vers le pilote
     return {
-      leftForce,
-      rightForce,
-      torque: totalTorque,
+      leftForce: new THREE.Vector3(), // Force nulle
+      rightForce: new THREE.Vector3(), // Force nulle
+      torque: new THREE.Vector3(), // Couple nul
     };
   }
 
-  /**
-   * Calcule les points d'une caténaire pour l'affichage des lignes
-   */
-  calculateCatenary(
-    start: THREE.Vector3,
-    end: THREE.Vector3,
-    segments: number = PhysicsConstants.CATENARY_SEGMENTS
-  ): THREE.Vector3[] {
-    const directDistance = start.distanceTo(end);
-
-    if (directDistance >= this.lineLength) {
-      return [start, end];
+  private calculateVelocity(
+    currentKite: THREE.Vector3,
+    currentBar: THREE.Vector3,
+    previousKite: THREE.Vector3 | null,
+    previousBar: THREE.Vector3 | null,
+    deltaTime: number
+  ): THREE.Vector3 {
+    if (!previousKite || !previousBar || deltaTime <= 0) {
+      return new THREE.Vector3();
     }
+    const kiteVelocity = new THREE.Vector3().subVectors(currentKite, previousKite).divideScalar(deltaTime);
+    const barVelocity = new THREE.Vector3().subVectors(currentBar, previousBar).divideScalar(deltaTime);
+    return new THREE.Vector3().subVectors(kiteVelocity, barVelocity);
+  }
 
-    const points: THREE.Vector3[] = [];
-    const slack = this.lineLength - directDistance;
-    const sag = slack * CONFIG.lines.maxSag;
-
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const point = new THREE.Vector3().lerpVectors(start, end, t);
-      point.y -= CONFIG.lines.catenarySagFactor * sag * t * (1 - t);
-      points.push(point);
+  private calculateTorque(
+    ctrlLeft: THREE.Vector3,
+    ctrlRight: THREE.Vector3,
+    kiteQuaternion: THREE.Quaternion,
+    leftForce: THREE.Vector3,
+    rightForce: THREE.Vector3
+  ): THREE.Vector3 {
+    const totalTorque = new THREE.Vector3();
+    if (leftForce.length() > PhysicsConstants.EPSILON) {
+      const leftLever = ctrlLeft.clone().applyQuaternion(kiteQuaternion);
+      const leftTorque = new THREE.Vector3().crossVectors(leftLever, leftForce);
+      totalTorque.add(leftTorque);
     }
+    if (rightForce.length() > PhysicsConstants.EPSILON) {
+      const rightLever = ctrlRight.clone().applyQuaternion(kiteQuaternion);
+      const rightTorque = new THREE.Vector3().crossVectors(rightLever, rightForce);
+      totalTorque.add(rightTorque);
+    }
+    return totalTorque;
+  }
 
-    return points;
+  calculateCatenary(start: THREE.Vector3, end: THREE.Vector3, segments: number = PhysicsConstants.CATENARY_SEGMENTS): THREE.Vector3[] {
+    const tension = this.leftLine.getCurrentTension();
+    return this.physics.calculateCatenaryPoints(this.leftLine, start, end, tension, segments);
   }
 
   setLineLength(length: number): void {
-    this.lineLength = length;
+    const [left, right] = LineFactory.createLinePair(length);
+    this.leftLine = left;
+    this.rightLine = right;
+    this.previousLeftKitePos = null;
+    this.previousRightKitePos = null;
+    this.previousLeftBarPos = null;
+    this.previousRightBarPos = null;
+  }
+
+  get lineLength(): number {
+    return this.leftLine.config.length;
+  }
+
+  set lineLength(length: number) {
+    this.setLineLength(length);
   }
 }

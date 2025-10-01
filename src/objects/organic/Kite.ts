@@ -64,7 +64,7 @@ export class Kite extends StructuredObject implements ICreatable {
   };
 
   constructor(customParams = {}) {
-    super("Cerf-volant Delta v2", false);
+    super("Cerf-volant Delta", false);
     this.params = { ...this.params, ...customParams };
     this.frameFactory = new FrameFactory();
     this.surfaceFactory = new SurfaceFactory();

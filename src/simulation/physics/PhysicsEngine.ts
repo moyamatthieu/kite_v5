@@ -117,27 +117,22 @@ export class PhysicsEngine {
       0
     );
 
-    // PHYSIQUE ÉMERGENTE 2 : Tensions de lignes comme vraies cordes
-    // - Force UNIQUEMENT si ligne tendue (distance > longueur)
-    // - Couple émerge de l'asymétrie gauche/droite des tensions
+    // CALCUL DES TENSIONS (pour affichage/debug uniquement)
+    // Les lignes ne TIRENT PAS le kite - elles le RETIENNENT à distance max
+    // La contrainte géométrique est appliquée par ConstraintSolver dans KiteController
     const pilotPosition = this.controlBarManager.getPosition();
-    const {
-      leftForce,
-      rightForce,
-      torque: lineTorque,
-    } = this.lineSystem.calculateLineTensions(kite, newRotation, pilotPosition);
+    this.lineSystem.calculateLineTensions(kite, newRotation, pilotPosition);
 
     // Somme vectorielle de toutes les forces (2ème loi de Newton)
     const totalForce = new THREE.Vector3()
       .add(lift) // Forces aérodynamiques totales (lift + drag combinés)
       .add(drag) // (Vide - traînée intégrée dans lift)
-      .add(gravity) // Poids vers le bas
-      .add(leftForce) // Tension ligne gauche vers pilote
-      .add(rightForce); // Tension ligne droite vers pilote
+      .add(gravity); // Poids vers le bas
+      // PAS de forces de lignes - elles sont des contraintes géométriques
 
-    // Couple total = somme des moments (rotation du corps rigide)
-    // Le couple émerge NATURELLEMENT sans facteur artificiel!
-    const totalTorque = aeroTorque.clone().add(lineTorque);
+    // Couple total = moment aérodynamique uniquement
+    // Les lignes n'appliquent PAS de couple - elles contraignent la position
+    const totalTorque = aeroTorque.clone();
 
     // Intégration physique : F=ma et T=Iα pour calculer nouvelle position/orientation
     this.kiteController.update(totalForce, totalTorque, handles, deltaTime);
