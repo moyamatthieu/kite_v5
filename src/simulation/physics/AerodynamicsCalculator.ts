@@ -104,8 +104,8 @@ export class AerodynamicsCalculator {
       // C'est comme mettre votre main par la fenêtre de la voiture :
       // - Main à plat face au vent = beaucoup de force
       // - Main de profil = peu de force
-      const facing = windDir.dot(normaleMonde);
-      const cosIncidence = Math.max(0, Math.abs(facing));
+      const windDotNormal = windDir.dot(normaleMonde);
+      const cosIncidence = Math.max(0, Math.abs(windDotNormal));
 
       // Si le vent glisse sur le côté (angle = 0), pas de force
       if (cosIncidence <= PhysicsConstants.EPSILON) {
@@ -113,12 +113,14 @@ export class AerodynamicsCalculator {
       }
 
       // 4. Force perpendiculaire à la surface (pression aérodynamique)
-      const normalDir =
-        facing >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
+      // Si windDotNormal < 0, la normale pointe à l'opposé du vent (face arrière)
+      // → On l'inverse pour qu'elle pointe toujours vers le vent
+      const windFacingNormal =
+        windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
 
       // 5. Intensité = pression dynamique × surface × cos(angle)
       const forceMagnitude = dynamicPressure * surface.area * cosIncidence;
-      const force = normalDir.multiplyScalar(forceMagnitude);
+      const force = windFacingNormal.multiplyScalar(forceMagnitude);
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
