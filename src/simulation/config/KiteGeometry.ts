@@ -44,17 +44,18 @@ export class KiteGeometry {
 
   // Le cerf-volant est fait de 4 triangles de tissu
   // Chaque triangle a 3 coins (vertices) et une surface en mètres carrés
-  // NOTE: vertex order chosen so que la normale de chaque triangle ait
-  // une composante Y positive (vers le haut). Ceci favorise une portance
-  // ascendante plutôt qu'une force dirigée vers le bas due à une
-  // orientation de surface inversée.
+  //
+  // ORDRE DES VERTICES (règle main droite) :
+  // Les normales doivent pointer vers l'ARRIÈRE (Z positif) pour recevoir le vent
+  // qui vient de l'arrière (direction -Z).
+  // Order : sens horaire vu de l'arrière = normale vers l'arrière
   static readonly SURFACES = [
     {
-      // Surface haute gauche - inversion des deux derniers sommets
+      // Surface haute gauche (normale doit pointer vers arrière)
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.WHISKER_GAUCHE,
         KiteGeometry.POINTS.BORD_GAUCHE,
+        KiteGeometry.POINTS.WHISKER_GAUCHE,
       ],
       area: 0.23, // m² - Surface haute gauche
     },
@@ -62,17 +63,17 @@ export class KiteGeometry {
       // Surface basse gauche
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.SPINE_BAS,
         KiteGeometry.POINTS.WHISKER_GAUCHE,
+        KiteGeometry.POINTS.SPINE_BAS,
       ],
       area: 0.11, // m² - Surface basse gauche
     },
     {
-      // Surface haute droite - inversion symétrique
+      // Surface haute droite
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.WHISKER_DROIT,
         KiteGeometry.POINTS.BORD_DROIT,
+        KiteGeometry.POINTS.WHISKER_DROIT,
       ],
       area: 0.23, // m² - Surface haute droite
     },
@@ -80,8 +81,8 @@ export class KiteGeometry {
       // Surface basse droite
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.SPINE_BAS,
         KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.SPINE_BAS,
       ],
       area: 0.11, // m² - Surface basse droite
     },
