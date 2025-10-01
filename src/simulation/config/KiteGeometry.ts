@@ -42,6 +42,32 @@ export class KiteGeometry {
     CTRL_DROIT: new THREE.Vector3(0.15, 0.3, 0.4), // Où s'attache la ligne droite
   };
 
+  /**
+   * Calcule l'aire d'un triangle 3D à partir de ses 3 sommets
+   * Utilise la formule : Aire = 0.5 × ||AB × AC||
+   * 
+   * @param v1 Premier sommet du triangle
+   * @param v2 Deuxième sommet du triangle
+   * @param v3 Troisième sommet du triangle
+   * @returns L'aire du triangle en m²
+   */
+  private static calculateTriangleArea(
+    v1: THREE.Vector3,
+    v2: THREE.Vector3,
+    v3: THREE.Vector3
+  ): number {
+    // Créer deux vecteurs représentant deux côtés du triangle
+    const edge1 = new THREE.Vector3().subVectors(v2, v1);
+    const edge2 = new THREE.Vector3().subVectors(v3, v1);
+    
+    // Le produit vectoriel donne un vecteur perpendiculaire
+    // dont la longueur = aire du parallélogramme formé par edge1 et edge2
+    const cross = new THREE.Vector3().crossVectors(edge1, edge2);
+    
+    // L'aire du triangle = la moitié de l'aire du parallélogramme
+    return cross.length() / 2;
+  }
+
   // Le cerf-volant est fait de 4 triangles de tissu
   // Chaque triangle a 3 coins (vertices) et une surface en mètres carrés
   //
@@ -49,6 +75,9 @@ export class KiteGeometry {
   // Les normales doivent pointer vers l'ARRIÈRE (Z positif) pour recevoir le vent
   // qui vient de l'arrière (direction -Z).
   // Order : sens horaire vu de l'arrière = normale vers l'arrière
+  //
+  // NOTE : Les aires sont calculées automatiquement à partir de la géométrie réelle
+  // pour garantir la cohérence physique
   static readonly SURFACES = [
     {
       // Surface haute gauche (normale doit pointer vers arrière)
@@ -57,7 +86,11 @@ export class KiteGeometry {
         KiteGeometry.POINTS.BORD_GAUCHE,
         KiteGeometry.POINTS.WHISKER_GAUCHE,
       ],
-      area: 0.23, // m² - Surface haute gauche
+      area: KiteGeometry.calculateTriangleArea(
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.BORD_GAUCHE,
+        KiteGeometry.POINTS.WHISKER_GAUCHE
+      ),
     },
     {
       // Surface basse gauche
@@ -66,7 +99,11 @@ export class KiteGeometry {
         KiteGeometry.POINTS.WHISKER_GAUCHE,
         KiteGeometry.POINTS.SPINE_BAS,
       ],
-      area: 0.11, // m² - Surface basse gauche
+      area: KiteGeometry.calculateTriangleArea(
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_GAUCHE,
+        KiteGeometry.POINTS.SPINE_BAS
+      ),
     },
     {
       // Surface haute droite
@@ -75,7 +112,11 @@ export class KiteGeometry {
         KiteGeometry.POINTS.BORD_DROIT,
         KiteGeometry.POINTS.WHISKER_DROIT,
       ],
-      area: 0.23, // m² - Surface haute droite
+      area: KiteGeometry.calculateTriangleArea(
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.BORD_DROIT,
+        KiteGeometry.POINTS.WHISKER_DROIT
+      ),
     },
     {
       // Surface basse droite
@@ -84,9 +125,17 @@ export class KiteGeometry {
         KiteGeometry.POINTS.WHISKER_DROIT,
         KiteGeometry.POINTS.SPINE_BAS,
       ],
-      area: 0.11, // m² - Surface basse droite
+      area: KiteGeometry.calculateTriangleArea(
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.SPINE_BAS
+      ),
     },
   ];
 
-  static readonly TOTAL_AREA = 0.68; // m² - Surface totale
+  // Calcul automatique de la surface totale
+  static readonly TOTAL_AREA = KiteGeometry.SURFACES.reduce(
+    (sum, surface) => sum + surface.area,
+    0
+  );
 }
