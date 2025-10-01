@@ -5,7 +5,11 @@
       "Bash(mkdir:*)",
       "Bash(npm run dev:*)",
       "Bash(find:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(npm run build:*)",
+      "Bash(git merge:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
