@@ -130,19 +130,105 @@ export class UIManager {
       };
     }
 
-    const bridleSlider = document.getElementById(
-      "bridle-length"
-    ) as HTMLInputElement;
-    const bridleValue = document.getElementById("bridle-length-value");
-    if (bridleSlider && bridleValue) {
-      bridleSlider.value = "100";
-      bridleValue.textContent = "100%";
+    // Contrôles des brides (3 sliders indépendants)
+    const bridleNezSlider = document.getElementById("bridle-nez") as HTMLInputElement;
+    const bridleNezValue = document.getElementById("bridle-nez-value");
+    if (bridleNezSlider && bridleNezValue) {
+      bridleNezSlider.value = "0.68";
+      bridleNezValue.textContent = "0.68m";
 
-      bridleSlider.oninput = () => {
-        const percent = parseFloat(bridleSlider.value);
-        const bridleFactor = percent / 100;
-        this.physicsEngine.setBridleFactor(bridleFactor);
-        bridleValue.textContent = `${percent}%`;
+      bridleNezSlider.oninput = () => {
+        const length = parseFloat(bridleNezSlider.value);
+        this.physicsEngine.setBridleLength('nez', length);
+        bridleNezValue.textContent = `${length.toFixed(2)}m`;
+      };
+    }
+
+    const bridleInterSlider = document.getElementById("bridle-inter") as HTMLInputElement;
+    const bridleInterValue = document.getElementById("bridle-inter-value");
+    if (bridleInterSlider && bridleInterValue) {
+      bridleInterSlider.value = "0.5";
+      bridleInterValue.textContent = "0.50m";
+
+      bridleInterSlider.oninput = () => {
+        const length = parseFloat(bridleInterSlider.value);
+        this.physicsEngine.setBridleLength('inter', length);
+        bridleInterValue.textContent = `${length.toFixed(2)}m`;
+      };
+    }
+
+    const bridleCentreSlider = document.getElementById("bridle-centre") as HTMLInputElement;
+    const bridleCentreValue = document.getElementById("bridle-centre-value");
+    if (bridleCentreSlider && bridleCentreValue) {
+      bridleCentreSlider.value = "0.5";
+      bridleCentreValue.textContent = "0.50m";
+
+      bridleCentreSlider.oninput = () => {
+        const length = parseFloat(bridleCentreSlider.value);
+        this.physicsEngine.setBridleLength('centre', length);
+        bridleCentreValue.textContent = `${length.toFixed(2)}m`;
+      };
+    }
+
+    // Contrôles de damping physique
+    const linearDampingSlider = document.getElementById(
+      "linear-damping"
+    ) as HTMLInputElement;
+    const linearDampingValue = document.getElementById("linear-damping-value");
+    if (linearDampingSlider && linearDampingValue) {
+      linearDampingSlider.value = CONFIG.physics.linearDamping.toString();
+      linearDampingValue.textContent = CONFIG.physics.linearDamping.toFixed(2);
+
+      linearDampingSlider.oninput = () => {
+        const damping = parseFloat(linearDampingSlider.value);
+        CONFIG.physics.linearDamping = damping;
+        linearDampingValue.textContent = damping.toFixed(2);
+      };
+    }
+
+    const angularDampingSlider = document.getElementById(
+      "angular-damping"
+    ) as HTMLInputElement;
+    const angularDampingValue = document.getElementById("angular-damping-value");
+    if (angularDampingSlider && angularDampingValue) {
+      angularDampingSlider.value = CONFIG.physics.angularDamping.toString();
+      angularDampingValue.textContent = CONFIG.physics.angularDamping.toFixed(2);
+
+      angularDampingSlider.oninput = () => {
+        const damping = parseFloat(angularDampingSlider.value);
+        CONFIG.physics.angularDamping = damping;
+        angularDampingValue.textContent = damping.toFixed(2);
+      };
+    }
+
+    // Contrôles aérodynamiques
+    const liftScaleSlider = document.getElementById(
+      "lift-scale"
+    ) as HTMLInputElement;
+    const liftScaleValue = document.getElementById("lift-scale-value");
+    if (liftScaleSlider && liftScaleValue) {
+      liftScaleSlider.value = CONFIG.aero.liftScale.toString();
+      liftScaleValue.textContent = CONFIG.aero.liftScale.toFixed(2);
+
+      liftScaleSlider.oninput = () => {
+        const scale = parseFloat(liftScaleSlider.value);
+        CONFIG.aero.liftScale = scale;
+        liftScaleValue.textContent = scale.toFixed(2);
+      };
+    }
+
+    const dragScaleSlider = document.getElementById(
+      "drag-scale"
+    ) as HTMLInputElement;
+    const dragScaleValue = document.getElementById("drag-scale-value");
+    if (dragScaleSlider && dragScaleValue) {
+      dragScaleSlider.value = CONFIG.aero.dragScale.toString();
+      dragScaleValue.textContent = CONFIG.aero.dragScale.toFixed(2);
+
+      dragScaleSlider.oninput = () => {
+        const scale = parseFloat(dragScaleSlider.value);
+        CONFIG.aero.dragScale = scale;
+        dragScaleValue.textContent = scale.toFixed(2);
       };
     }
   }

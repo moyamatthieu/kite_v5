@@ -34,7 +34,7 @@ import { ICreatable } from "../../types/index";
 import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
-import { PointFactory } from "../../factories/PointFactory";
+import { PointFactory, BridleLengths } from "../../factories/PointFactory";
 import * as THREE from "three";
 
 export class Kite extends StructuredObject implements ICreatable {
@@ -44,6 +44,13 @@ export class Kite extends StructuredObject implements ICreatable {
   private pointsMap: Map<string, [number, number, number]> = new Map();
   private bridleLines: THREE.Group | null = null;
   private bridleLengthFactor: number = 1.0; // Facteur de longueur virtuelle des brides principales
+
+  // Longueurs physiques des brides (en mètres)
+  private bridleLengths: BridleLengths = {
+    nez: 0.68,     // 68cm du NEZ au CTRL
+    inter: 0.5,    // 50cm du INTER au CTRL
+    centre: 0.5,   // 50cm du CENTRE au CTRL
+  };
 
   // Paramètres du cerf-volant
   private params = {
@@ -71,8 +78,13 @@ export class Kite extends StructuredObject implements ICreatable {
   protected definePoints(): void {
     const { width, height, depth } = this.params;
 
-    // Utiliser PointFactory pour calculer les positions
-    this.pointsMap = PointFactory.calculateDeltaKitePoints({ width, height, depth });
+    // Utiliser PointFactory pour calculer les positions avec bridleLengths physiques
+    this.pointsMap = PointFactory.calculateDeltaKitePoints({
+      width,
+      height,
+      depth,
+      bridleLengths: this.bridleLengths
+    });
 
     // Enregistrer dans StructuredObject pour compatibilité avec le système existant
     this.pointsMap.forEach((position, name) => {
@@ -295,6 +307,51 @@ export class Kite extends StructuredObject implements ICreatable {
    */
   public getBridleLengthFactor(): number {
     return this.bridleLengthFactor;
+  }
+
+  /**
+   * Ajuste les longueurs physiques des brides (en mètres)
+   * @param lengths - Longueurs des 3 brides { nez, inter, centre }
+   */
+  public setBridleLengths(lengths: Partial<BridleLengths>): void {
+    // Mettre à jour les longueurs (merge avec les valeurs existantes)
+    this.bridleLengths = {
+      ...this.bridleLengths,
+      ...lengths
+    };
+
+    console.log(`🪁 Longueurs brides: NEZ=${this.bridleLengths.nez.toFixed(2)}m, INTER=${this.bridleLengths.inter.toFixed(2)}m, CENTRE=${this.bridleLengths.centre.toFixed(2)}m`);
+
+    // Supprimer tous les enfants pour nettoyer l'ancienne géométrie
+    this.clearChildren();
+
+    // Recalculer les points avec les nouvelles longueurs
+    this.definePoints();
+
+    // Reconstruire le kite avec les nouveaux points
+    this.buildStructure();
+    this.buildSurfaces();
+    this.createBridleLines();
+
+    // Recréer les marqueurs visuels aux nouvelles positions
+    this.addVisualMarkers();
+  }
+
+  /**
+   * Supprime tous les enfants du kite (géométrie, marqueurs, etc.)
+   */
+  private clearChildren(): void {
+    // Supprimer tous les enfants Three.js
+    while (this.children.length > 0) {
+      this.remove(this.children[0]);
+    }
+  }
+
+  /**
+   * Retourne les longueurs actuelles des brides
+   */
+  public getBridleLengths(): BridleLengths {
+    return { ...this.bridleLengths };
   }
 
   /**

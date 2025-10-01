@@ -147,6 +147,15 @@ export class PhysicsEngine {
     // Fonctionnalité désactivée dans V8 - physique émergente pure
   }
 
+  /**
+   * Ajuste une longueur de bride physique (en mètres)
+   * @param bridleName - 'nez', 'inter' ou 'centre'
+   * @param length - longueur en mètres
+   */
+  setBridleLength(bridleName: 'nez' | 'inter' | 'centre', length: number): void {
+    this.kiteController.getKite().setBridleLengths({ [bridleName]: length });
+  }
+
   setWindParams(params: Partial<WindParams>): void {
     this.windSimulator.setParams(params);
   }
