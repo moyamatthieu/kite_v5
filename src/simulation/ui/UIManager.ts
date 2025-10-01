@@ -130,18 +130,43 @@ export class UIManager {
       };
     }
 
-    const bridleCtrlSlider = document.getElementById(
-      "bridle-ctrl-length"
-    ) as HTMLInputElement;
-    const bridleCtrlValue = document.getElementById("bridle-ctrl-length-value");
-    if (bridleCtrlSlider && bridleCtrlValue) {
-      bridleCtrlSlider.value = "1.0";
-      bridleCtrlValue.textContent = "1.0";
+    // Contrôles des brides (3 sliders indépendants)
+    const bridleNezSlider = document.getElementById("bridle-nez") as HTMLInputElement;
+    const bridleNezValue = document.getElementById("bridle-nez-value");
+    if (bridleNezSlider && bridleNezValue) {
+      bridleNezSlider.value = "0.5";
+      bridleNezValue.textContent = "0.50m";
 
-      bridleCtrlSlider.oninput = () => {
-        const factor = parseFloat(bridleCtrlSlider.value);
-        this.physicsEngine.setBridleControlLength(factor);
-        bridleCtrlValue.textContent = factor.toFixed(2);
+      bridleNezSlider.oninput = () => {
+        const length = parseFloat(bridleNezSlider.value);
+        this.physicsEngine.setBridleLength('nez', length);
+        bridleNezValue.textContent = `${length.toFixed(2)}m`;
+      };
+    }
+
+    const bridleInterSlider = document.getElementById("bridle-inter") as HTMLInputElement;
+    const bridleInterValue = document.getElementById("bridle-inter-value");
+    if (bridleInterSlider && bridleInterValue) {
+      bridleInterSlider.value = "0.35";
+      bridleInterValue.textContent = "0.35m";
+
+      bridleInterSlider.oninput = () => {
+        const length = parseFloat(bridleInterSlider.value);
+        this.physicsEngine.setBridleLength('inter', length);
+        bridleInterValue.textContent = `${length.toFixed(2)}m`;
+      };
+    }
+
+    const bridleCentreSlider = document.getElementById("bridle-centre") as HTMLInputElement;
+    const bridleCentreValue = document.getElementById("bridle-centre-value");
+    if (bridleCentreSlider && bridleCentreValue) {
+      bridleCentreSlider.value = "0.3";
+      bridleCentreValue.textContent = "0.30m";
+
+      bridleCentreSlider.oninput = () => {
+        const length = parseFloat(bridleCentreSlider.value);
+        this.physicsEngine.setBridleLength('centre', length);
+        bridleCentreValue.textContent = `${length.toFixed(2)}m`;
       };
     }
 

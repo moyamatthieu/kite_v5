@@ -148,11 +148,12 @@ export class PhysicsEngine {
   }
 
   /**
-   * Ajuste la longueur physique des brides NEZ->CTRL (déplace les points de contrôle)
-   * @param factor - 0.5 = proche du NEZ, 1.0 = normal, 1.5 = loin du NEZ
+   * Ajuste une longueur de bride physique (en mètres)
+   * @param bridleName - 'nez', 'inter' ou 'centre'
+   * @param length - longueur en mètres
    */
-  setBridleControlLength(factor: number): void {
-    this.kiteController.getKite().setBridleControlLength(factor);
+  setBridleLength(bridleName: 'nez' | 'inter' | 'centre', length: number): void {
+    this.kiteController.getKite().setBridleLengths({ [bridleName]: length });
   }
 
   setWindParams(params: Partial<WindParams>): void {
