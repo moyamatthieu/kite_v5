@@ -59,10 +59,11 @@ export const CONFIG = {
   },
   lines: {
     defaultLength: 15, // m - Longueur par défaut
-    stiffness: 25000, // N/m - Rigidité renforcée pour mieux maintenir le kite
-    maxTension: 1000, // N - Tension max augmentée pour éviter rupture
-    maxSag: 0.008, // Affaissement réduit pour lignes plus tendues
-    catenarySagFactor: 3, // Facteur de forme caténaire ajusté
+    stiffness: 2200, // N/m - Rigidité réaliste Dyneema (EA/L, corrigé de 25000)
+    preTension: 75, // N - Tension minimale toujours présente
+    maxTension: 800, // N - Tension max avant rupture (~80% charge nominale)
+    dampingCoeff: 0.05, // Coefficient d'amortissement interne (0-1)
+    linearMassDensity: 0.0005, // kg/m - Masse linéique pour calcul caténaire
   },
   wind: {
     defaultSpeed: 18, // km/h
