@@ -37,8 +37,8 @@ export const CONFIG = {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
-    angularDamping: 0.85, // Amortissement angulaire équilibré
-    linearDamping: 0.92, // Friction air réaliste (8% de perte par frame)
+    angularDamping: 1.0, // DÉSACTIVÉ - Laissé à la physique pure (Phase 1)
+    linearDamping: 1.0, // DÉSACTIVÉ - Laissé à la physique pure (Phase 1)
     angularDragCoeff: 0.1, // Résistance rotation augmentée pour moins d'oscillations
   },
   aero: {
