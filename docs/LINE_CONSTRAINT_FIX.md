@@ -149,10 +149,12 @@ Le `ConstraintSolver` implémente l'algorithme **Position-Based Dynamics** :
    - Vitesse radiale annulée (kite ne s'éloigne pas)
    - Vitesse tangentielle conservée (rotation libre)
 
-3. **Contrôle asymétrique** :
-   - Barre tournée → une ligne plus courte que l'autre
-   - Différence de contrainte → rotation du kite
-   - Couple émerge de la géométrie, pas d'une force directe
+3. **Contrôle par rotation de la barre** :
+   - Barre tournée → **Les poignées se déplacent dans l'espace 3D**
+   - Les deux lignes gardent leur longueur identique (ex: 15m chacune)
+   - Contraintes simultanées : `distance(kite, poignée_gauche) ≤ 15m` ET `distance(kite, poignée_droite) ≤ 15m`
+   - Le kite doit satisfaire les deux contraintes → **Rotation émerge de la géométrie**
+   - Pas de "ligne plus courte", seulement des positions de poignées différentes
 
 ## Références
 
