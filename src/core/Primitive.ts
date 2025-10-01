@@ -153,7 +153,7 @@ export class Primitive {
       // Triangle simple
       indices.push(0, 1, 2);
     }
-    
+
     if (points.length === 4) {
       // Quad - utiliser une triangulation qui préserve la manifold
       // Pour un cube, on utilise toujours la même diagonale (0,2)
@@ -161,7 +161,7 @@ export class Primitive {
       indices.push(0, 1, 2);  // Premier triangle
       indices.push(0, 2, 3);  // Deuxième triangle
     }
-    
+
     if (points.length > 4) {
       // Fan triangulation pour plus de points
       for (let i = 1; i < points.length - 1; i++) {
@@ -178,5 +178,34 @@ export class Primitive {
     // En inversant si nécessaire
     const mat = this.createMaterial(material);
     return new THREE.Mesh(geometry, mat);
+  }
+
+  /**
+   * Créer une flèche de debug (ArrowHelper)
+   *
+   * @param direction - Direction normalisée de la flèche
+   * @param origin - Point d'origine de la flèche
+   * @param length - Longueur de la flèche
+   * @param color - Couleur (hex) de la flèche
+   * @param headLength - Longueur de la tête de flèche (optionnel)
+   * @param headWidth - Largeur de la tête de flèche (optionnel)
+   * @returns THREE.ArrowHelper configuré
+   */
+  static arrow(
+    direction: THREE.Vector3,
+    origin: THREE.Vector3,
+    length: number,
+    color: number,
+    headLength?: number,
+    headWidth?: number
+  ): THREE.ArrowHelper {
+    return new THREE.ArrowHelper(
+      direction,
+      origin,
+      length,
+      color,
+      headLength,
+      headWidth
+    );
   }
 }

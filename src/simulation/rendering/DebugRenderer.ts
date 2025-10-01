@@ -36,6 +36,7 @@ import { AerodynamicsCalculator } from "../physics/AerodynamicsCalculator";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { RenderManager } from "./RenderManager";
 import { CONFIG } from "../config/SimulationConfig";
+import { Primitive } from "@core/Primitive";
 
 /**
  * Palette de couleurs améliorée pour les vecteurs de debug
@@ -241,7 +242,7 @@ export class DebugRenderer {
 
     // Vecteur de vitesse du kite (vert vif)
     if (this.vectorVisibility.velocity && kiteState.velocity.length() > 0.1) {
-      const velocityArrow = new THREE.ArrowHelper(
+      const velocityArrow = Primitive.arrow(
         kiteState.velocity.clone().normalize(),
         centerWorld,
         kiteState.velocity.length() * VECTOR_SCALES.velocity,
@@ -259,7 +260,7 @@ export class DebugRenderer {
 
     // Vecteur de vent apparent (cyan)
     if (this.vectorVisibility.apparentWind && relativeWind.length() > 0.1) {
-      const apparentWindArrow = new THREE.ArrowHelper(
+      const apparentWindArrow = Primitive.arrow(
         relativeWind.clone().normalize(),
         centerWorld,
         relativeWind.length() * VECTOR_SCALES.apparentWind,
@@ -281,7 +282,7 @@ export class DebugRenderer {
       if (this.vectorVisibility.globalForces) {
         // Portance globale (bleu royal)
         if (lift.length() > 0.01) {
-          const liftArrow = new THREE.ArrowHelper(
+          const liftArrow = Primitive.arrow(
             lift.clone().normalize(),
             centerWorld,
             Math.sqrt(lift.length()) * VECTOR_SCALES.globalLift,
@@ -296,7 +297,7 @@ export class DebugRenderer {
         // Résultante globale (blanc) - somme de toutes les surfaces
         const globalResultant = surfaceForces.reduce((sum, sf) => sum.add(sf.resultant.clone()), new THREE.Vector3());
         if (globalResultant.length() > 0.01) {
-          const resultantArrow = new THREE.ArrowHelper(
+          const resultantArrow = Primitive.arrow(
             globalResultant.clone().normalize(),
             centerWorld,
             Math.sqrt(globalResultant.length()) * VECTOR_SCALES.globalResultant,
@@ -407,7 +408,7 @@ export class DebugRenderer {
 
       // Portance locale (bleu ciel profond)
       if (lift.length() > 0.01) {
-        const liftArrow = new THREE.ArrowHelper(
+        const liftArrow = Primitive.arrow(
           lift.clone().normalize(),
           centerWorld,
           Math.sqrt(lift.length()) * VECTOR_SCALES.surfaceLift,
@@ -421,7 +422,7 @@ export class DebugRenderer {
 
       // Traînée (rouge vif)
       if (drag.length() > 0.01) {
-        const dragArrow = new THREE.ArrowHelper(
+        const dragArrow = Primitive.arrow(
           drag.clone().normalize(),
           centerWorld,
           Math.sqrt(drag.length()) * VECTOR_SCALES.surfaceDrag,
@@ -435,7 +436,7 @@ export class DebugRenderer {
 
       // Friction (gris moyen)
       if (friction && friction.length() > 0.01) {
-        const frictionArrow = new THREE.ArrowHelper(
+        const frictionArrow = Primitive.arrow(
           friction.clone().normalize(),
           centerWorld,
           Math.sqrt(friction.length()) * VECTOR_SCALES.surfaceFriction,
@@ -449,7 +450,7 @@ export class DebugRenderer {
 
       // Résultante locale (jaune vif)
       if (resultant.length() > 0.01) {
-        const resultantArrow = new THREE.ArrowHelper(
+        const resultantArrow = Primitive.arrow(
           resultant.clone().normalize(),
           centerWorld,
           Math.sqrt(resultant.length()) * VECTOR_SCALES.surfaceResultant,
