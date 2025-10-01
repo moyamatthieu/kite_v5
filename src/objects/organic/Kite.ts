@@ -228,6 +228,69 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
+   * Met à jour la visualisation des brides selon leurs tensions
+   * Couleurs : vert (molle) → jaune (moyenne) → rouge (tendue)
+   *
+   * @param tensions - Tensions des 6 brides en Newtons
+   */
+  public updateBridleVisualization(tensions: {
+    leftNez: number;
+    leftInter: number;
+    leftCentre: number;
+    rightNez: number;
+    rightInter: number;
+    rightCentre: number;
+  }): void {
+    if (!this.bridleLines) return;
+
+    // Mapping nom ligne → tension
+    const tensionMap = new Map<string, number>([
+      ["Bridle_CTRL_GAUCHE_NEZ", tensions.leftNez],
+      ["Bridle_CTRL_GAUCHE_INTER_GAUCHE", tensions.leftInter],
+      ["Bridle_CTRL_GAUCHE_CENTRE", tensions.leftCentre],
+      ["Bridle_CTRL_DROIT_NEZ", tensions.rightNez],
+      ["Bridle_CTRL_DROIT_INTER_DROIT", tensions.rightInter],
+      ["Bridle_CTRL_DROIT_CENTRE", tensions.rightCentre],
+    ]);
+
+    // Mettre à jour couleur de chaque bride
+    this.bridleLines.children.forEach((line) => {
+      if (line instanceof THREE.Line) {
+        const tension = tensionMap.get(line.name) ?? 0;
+        const material = line.material as THREE.LineBasicMaterial;
+
+        // Seuils de tension (N)
+        const lowThreshold = 20; // Molle
+        const highThreshold = 100; // Tendue
+
+        if (tension < lowThreshold) {
+          // Vert : bride molle
+          material.color.setHex(0x00ff00);
+          material.opacity = 0.5;
+        } else if (tension < highThreshold) {
+          // Jaune : tension moyenne
+          // Interpolation vert → jaune
+          const t = (tension - lowThreshold) / (highThreshold - lowThreshold);
+          const r = Math.floor(t * 255);
+          const g = 255;
+          const b = 0;
+          material.color.setRGB(r / 255, g / 255, b / 255);
+          material.opacity = 0.6 + t * 0.2; // 0.6 → 0.8
+        } else {
+          // Rouge : bride tendue
+          // Interpolation jaune → rouge
+          const t = Math.min((tension - highThreshold) / 100, 1);
+          const r = 255;
+          const g = Math.floor((1 - t) * 255);
+          const b = 0;
+          material.color.setRGB(r / 255, g / 255, b / 255);
+          material.opacity = 0.8 + t * 0.2; // 0.8 → 1.0
+        }
+      }
+    });
+  }
+
+  /**
    * Construit les surfaces avec SurfaceFactory
    */
   protected buildSurfaces(): void {
