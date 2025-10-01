@@ -44,6 +44,7 @@ export class Kite extends StructuredObject implements ICreatable {
   private pointsMap: Map<string, [number, number, number]> = new Map();
   private bridleLines: THREE.Group | null = null;
   private bridleLengthFactor: number = 1.0; // Facteur de longueur virtuelle des brides principales
+  private bridleLength: number = 1.0; // Facteur longueur bride NEZ->CTRL (1.0 = défaut, 0.5-1.5)
 
   // Paramètres du cerf-volant
   private params = {
@@ -71,8 +72,13 @@ export class Kite extends StructuredObject implements ICreatable {
   protected definePoints(): void {
     const { width, height, depth } = this.params;
 
-    // Utiliser PointFactory pour calculer les positions
-    this.pointsMap = PointFactory.calculateDeltaKitePoints({ width, height, depth });
+    // Utiliser PointFactory pour calculer les positions avec bridleLength
+    this.pointsMap = PointFactory.calculateDeltaKitePoints({
+      width,
+      height,
+      depth,
+      bridleLength: this.bridleLength
+    });
 
     // Enregistrer dans StructuredObject pour compatibilité avec le système existant
     this.pointsMap.forEach((position, name) => {
@@ -295,6 +301,31 @@ export class Kite extends StructuredObject implements ICreatable {
    */
   public getBridleLengthFactor(): number {
     return this.bridleLengthFactor;
+  }
+
+  /**
+   * Ajuste la longueur physique de la bride NEZ->CTRL (déplace les points de contrôle)
+   * @param factor - Facteur de longueur (0.5 = proche du NEZ, 1.0 = normal, 1.5 = loin du NEZ)
+   */
+  public setBridleControlLength(factor: number): void {
+    // Limiter la valeur entre 0.5 et 1.5
+    this.bridleLength = Math.max(0.5, Math.min(1.5, factor));
+    console.log(`🪁 Longueur bride NEZ->CTRL: ${this.bridleLength.toFixed(2)}x`);
+
+    // Recalculer les points avec la nouvelle longueur
+    this.definePoints();
+
+    // Reconstruire le kite avec les nouveaux points
+    this.buildStructure();
+    this.buildSurfaces();
+    this.createBridleLines();
+  }
+
+  /**
+   * Retourne le facteur de longueur actuel de la bride NEZ->CTRL
+   */
+  public getBridleControlLength(): number {
+    return this.bridleLength;
   }
 
   /**

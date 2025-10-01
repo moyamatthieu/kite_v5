@@ -147,6 +147,14 @@ export class PhysicsEngine {
     // Fonctionnalité désactivée dans V8 - physique émergente pure
   }
 
+  /**
+   * Ajuste la longueur physique des brides NEZ->CTRL (déplace les points de contrôle)
+   * @param factor - 0.5 = proche du NEZ, 1.0 = normal, 1.5 = loin du NEZ
+   */
+  setBridleControlLength(factor: number): void {
+    this.kiteController.getKite().setBridleControlLength(factor);
+  }
+
   setWindParams(params: Partial<WindParams>): void {
     this.windSimulator.setParams(params);
   }

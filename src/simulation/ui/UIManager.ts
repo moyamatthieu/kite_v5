@@ -130,19 +130,18 @@ export class UIManager {
       };
     }
 
-    const bridleSlider = document.getElementById(
-      "bridle-length"
+    const bridleCtrlSlider = document.getElementById(
+      "bridle-ctrl-length"
     ) as HTMLInputElement;
-    const bridleValue = document.getElementById("bridle-length-value");
-    if (bridleSlider && bridleValue) {
-      bridleSlider.value = "100";
-      bridleValue.textContent = "100%";
+    const bridleCtrlValue = document.getElementById("bridle-ctrl-length-value");
+    if (bridleCtrlSlider && bridleCtrlValue) {
+      bridleCtrlSlider.value = "1.0";
+      bridleCtrlValue.textContent = "1.0";
 
-      bridleSlider.oninput = () => {
-        const percent = parseFloat(bridleSlider.value);
-        const bridleFactor = percent / 100;
-        this.physicsEngine.setBridleFactor(bridleFactor);
-        bridleValue.textContent = `${percent}%`;
+      bridleCtrlSlider.oninput = () => {
+        const factor = parseFloat(bridleCtrlSlider.value);
+        this.physicsEngine.setBridleControlLength(factor);
+        bridleCtrlValue.textContent = factor.toFixed(2);
       };
     }
 

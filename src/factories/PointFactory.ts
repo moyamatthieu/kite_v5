@@ -8,6 +8,7 @@ export interface KiteParams {
   width: number;   // Envergure
   height: number;  // Hauteur
   depth: number;   // Profondeur whiskers
+  bridleLength?: number;  // Facteur longueur bride NEZ->CTRL (1.0 = défaut, 0.5 = court, 1.5 = long)
 }
 
 /**
@@ -18,7 +19,7 @@ export class PointFactory {
    * Calcule toutes les positions des points anatomiques d'un cerf-volant delta
    */
   static calculateDeltaKitePoints(params: KiteParams): Map<string, [number, number, number]> {
-    const { width, height, depth } = params;
+    const { width, height, depth, bridleLength = 1.0 } = params;
 
     // Logique métier extraite de Kite.ts
     const centreY = height / 4;
@@ -26,6 +27,15 @@ export class PointFactory {
     const interGaucheX = ratio * (-width / 2);
     const interDroitX = ratio * (width / 2);
     const fixRatio = 2 / 3;
+
+    // Points de contrôle ajustés selon bridleLength
+    // Position par défaut: NEZ = (0, height, 0), offset vers l'arrière de 0.4m en Z
+    // bridleLength modifie la distance NEZ->CTRL :
+    // - 1.0 = position standard (0.4m derrière le NEZ)
+    // - 0.5 = plus proche du NEZ (0.2m derrière)
+    // - 1.5 = plus loin du NEZ (0.6m derrière)
+    const ctrlOffsetZ = 0.4 * bridleLength;
+    const ctrlY = height * 0.4; // Y reste constant
 
     // Retourner la Map exactement comme dans le code original
     return new Map<string, [number, number, number]>([
@@ -50,9 +60,9 @@ export class PointFactory {
       ["WHISKER_GAUCHE", [-width / 4, 0.1, -depth]],
       ["WHISKER_DROIT", [width / 4, 0.1, -depth]],
 
-      // Points de contrôle (bridage)
-      ["CTRL_GAUCHE", [-width * 0.15, height * 0.4, 0.4]],
-      ["CTRL_DROIT", [width * 0.15, height * 0.4, 0.4]],
+      // Points de contrôle (bridage) - AJUSTABLES
+      ["CTRL_GAUCHE", [-width * 0.15, ctrlY, ctrlOffsetZ]],
+      ["CTRL_DROIT", [width * 0.15, ctrlY, ctrlOffsetZ]],
 
       // Points d'ancrage des brides
       ["BRIDE_GAUCHE_A", [0, height, 0]],
