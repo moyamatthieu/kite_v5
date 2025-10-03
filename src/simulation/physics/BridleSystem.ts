@@ -255,12 +255,13 @@ export class BridleSystem {
    * Met à jour les longueurs des brides
    *
    * @param newLengths - Nouvelles longueurs (partial update)
+   * @deprecated Utilisez PhysicsEngine.setBridleLength() à la place
    */
   setBridleLengths(newLengths: Partial<BridleLengths>): void {
-    // Note: Pour l'instant, les brides sont immutables après création.
-    // Pour changer les longueurs, il faudrait recréer les instances Line.
-    // Cette méthode est un placeholder pour future implémentation.
-    console.warn("⚠️ BridleSystem.setBridleLengths() not yet implemented");
+    // Note: Les instances Line sont immuables. Pour changer les longueurs,
+    // il faut recréer BridleSystem avec les nouvelles longueurs.
+    // Cette méthode est dépréciée - utilisez PhysicsEngine.setBridleLength()
+    console.warn("⚠️ BridleSystem.setBridleLengths() est déprécié. Utilisez PhysicsEngine.setBridleLength() à la place");
     console.log("   Nouvelles longueurs demandées:", newLengths);
   }
 

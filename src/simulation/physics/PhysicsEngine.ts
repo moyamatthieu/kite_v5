@@ -159,7 +159,14 @@ export class PhysicsEngine {
    * @param length - longueur en mètres
    */
   setBridleLength(bridleName: 'nez' | 'inter' | 'centre', length: number): void {
+    // Mettre à jour le kite avec les nouvelles longueurs
     this.kiteController.getKite().setBridleLengths({ [bridleName]: length });
+
+    // Recréer BridleSystem avec les nouvelles longueurs pour la cohérence physique
+    const kite = this.kiteController.getKite();
+    this.bridleSystem = new BridleSystem(kite.getBridleLengths());
+
+    console.log(`🔧 BridleSystem recréé avec longueurs: ${bridleName}=${length.toFixed(2)}m`);
   }
 
   setWindParams(params: Partial<WindParams>): void {
@@ -185,5 +192,20 @@ export class PhysicsEngine {
 
   getControlBarManager(): ControlBarManager {
     return this.controlBarManager;
+  }
+
+  /**
+   * Définit le facteur de lissage des forces physiques
+   * @param smoothing - Facteur entre 0.0 (pas de lissage) et 1.0 (lissage maximum)
+   */
+  setForceSmoothing(smoothing: number): void {
+    this.kiteController.setForceSmoothing(smoothing);
+  }
+
+  /**
+   * Retourne le facteur de lissage actuel des forces
+   */
+  getForceSmoothing(): number {
+    return this.kiteController.getForceSmoothing();
   }
 }

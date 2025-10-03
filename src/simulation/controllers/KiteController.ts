@@ -52,7 +52,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private readonly FORCE_SMOOTHING = 0.8; // Lissage léger (25% nouvelle valeur, 75% ancienne)
+  private forceSmoothing: number = 0.8; // Lissage des forces (0.0 = pas de lissage, 1.0 = lissage max)
 
   constructor(kite: Kite) {
     this.kite = kite;
@@ -85,8 +85,8 @@ export class KiteController {
 
     // Lisser les forces pour éviter les sauts brusques (lerp)
     // 85% ancienne valeur + 15% nouvelle valeur = transition douce
-    this.smoothedForce.lerp(validForces, this.FORCE_SMOOTHING);
-    this.smoothedTorque.lerp(validTorque, this.FORCE_SMOOTHING);
+    this.smoothedForce.lerp(validForces, this.forceSmoothing);
+    this.smoothedTorque.lerp(validTorque, this.forceSmoothing);
 
     // Utiliser les forces lissées pour la physique
     const newPosition = this.integratePhysics(this.smoothedForce, deltaTime);
@@ -293,5 +293,20 @@ export class KiteController {
       accelValue: this.lastAccelMagnitude,
       velocityValue: this.lastVelocityMagnitude,
     };
+  }
+
+  /**
+   * Définit le facteur de lissage des forces physiques
+   * @param smoothing - Facteur entre 0.0 (pas de lissage) et 1.0 (lissage maximum)
+   */
+  setForceSmoothing(smoothing: number): void {
+    this.forceSmoothing = Math.max(0.0, Math.min(1.0, smoothing));
+  }
+
+  /**
+   * Retourne le facteur de lissage actuel des forces
+   */
+  getForceSmoothing(): number {
+    return this.forceSmoothing;
   }
 }

@@ -231,6 +231,22 @@ export class UIManager {
         dragScaleValue.textContent = scale.toFixed(2);
       };
     }
+
+    // Contrôle du lissage des forces physiques
+    const forceSmoothingSlider = document.getElementById(
+      "force-smoothing"
+    ) as HTMLInputElement;
+    const forceSmoothingValue = document.getElementById("force-smoothing-value");
+    if (forceSmoothingSlider && forceSmoothingValue) {
+      forceSmoothingSlider.value = this.physicsEngine.getForceSmoothing().toString();
+      forceSmoothingValue.textContent = this.physicsEngine.getForceSmoothing().toFixed(2);
+
+      forceSmoothingSlider.oninput = () => {
+        const smoothing = parseFloat(forceSmoothingSlider.value);
+        this.physicsEngine.setForceSmoothing(smoothing);
+        forceSmoothingValue.textContent = smoothing.toFixed(2);
+      };
+    }
   }
 
   updatePlayButton(isPlaying: boolean): void {
