@@ -100,27 +100,50 @@ export class AerodynamicsCalculator {
         .clone()
         .applyQuaternion(kiteOrientation);
 
-      // Maintenant on vérifie sous quel angle le vent frappe ce triangle
-      // C'est comme mettre votre main par la fenêtre de la voiture :
-      // - Main à plat face au vent = beaucoup de force
-      // - Main de profil = peu de force
+      // Calcul de l'angle d'incidence pour une plaque plane (cerf-volant)
+      // α = angle entre la direction du vent et la surface
       const windDotNormal = windDir.dot(normaleMonde);
-      const cosIncidence = Math.max(0, Math.abs(windDotNormal));
+      const cosTheta = Math.abs(windDotNormal); // cos(θ) où θ = angle vent-normale
+
+      // Pour une plaque : sin(α) = cos(θ) et cos(α) = sin(θ)
+      const sinAlpha = cosTheta;
+      const cosAlpha = Math.sqrt(1 - sinAlpha * sinAlpha); // sin²+cos²=1
 
       // Si le vent glisse sur le côté (angle = 0), pas de force
-      if (cosIncidence <= PhysicsConstants.EPSILON) {
+      if (sinAlpha <= PhysicsConstants.EPSILON) {
         return;
       }
 
-      // 4. Force perpendiculaire à la surface (pression aérodynamique)
-      // Si windDotNormal < 0, la normale pointe à l'opposé du vent (face arrière)
-      // → On l'inverse pour qu'elle pointe toujours vers le vent
-      const windFacingNormal =
-        windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
+      // MODÈLE PHYSIQUE POUR PLAQUE PLANE (Hoerner, "Fluid Dynamic Drag")
+      // Coefficients sans dimension pour plaque plane :
+      const CL = sinAlpha * cosAlpha; // Coefficient de portance ∝ sin(α)cos(α)
+      const CD = sinAlpha * sinAlpha;  // Coefficient de traînée ∝ sin²(α)
 
-      // 5. Intensité = pression dynamique × surface × cos(angle)
-      const forceMagnitude = dynamicPressure * surface.area * cosIncidence;
-      const force = windFacingNormal.multiplyScalar(forceMagnitude);
+      // Direction de portance : perpendiculaire au vent, dans le plan vent-normale
+      // Direction de traînée : parallèle au vent
+
+      // Vecteur perpendiculaire au vent dans le plan (vent, normale)
+      const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
+
+      // Lift perpendiculaire au vent (vers le haut pour un kite)
+      const liftDir = new THREE.Vector3()
+        .crossVectors(windDir, new THREE.Vector3().crossVectors(windFacingNormal, windDir))
+        .normalize();
+
+      // Si liftDir invalide (vent parallèle à normale), utiliser normale
+      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
+        liftDir.copy(windFacingNormal);
+      }
+
+      // Forces aérodynamiques décomposées
+      const liftMagnitude = dynamicPressure * surface.area * CL;
+      const dragMagnitude = dynamicPressure * surface.area * CD;
+
+      const lift = liftDir.clone().multiplyScalar(liftMagnitude);
+      const drag = windDir.clone().multiplyScalar(dragMagnitude);
+
+      // Force totale = lift + drag
+      const force = new THREE.Vector3().add(lift).add(drag);
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
@@ -142,17 +165,8 @@ export class AerodynamicsCalculator {
 
       totalForce.add(force);
 
-      // Décomposition correcte selon la physique des cerfs-volants (méthode NASA)
-      // La force normale sur la surface se décompose en :
-      // - Drag : composante parallèle au vent (dans la direction du vent)
-      // - Lift : composante perpendiculaire au vent
-
-      // Projection de la force sur la direction du vent = drag
-      const dragComponent = force.dot(windDir);
-      const drag = windDir.clone().multiplyScalar(dragComponent);
-
-      // Composante perpendiculaire au vent = lift
-      const lift = force.clone().sub(drag);
+      // Lift et drag déjà calculés correctement ci-dessus avec le modèle plaque plane
+      // Pas besoin de recalculer par décomposition vectorielle
 
       // Friction (négligeable pour l'air, nulle)
       const friction = new THREE.Vector3();

@@ -63,14 +63,14 @@ Configured in both `vite.config.ts` and `tsconfig.json`. Always prefer aliases i
 
 **Simulation System** (`src/simulation/`):
 - `SimulationApp.ts`: Main orchestrator (CRITICAL - changes affect whole app)
-- `simulation.ts`: Compatibility entry point that re-exports SimulationApp
+- `index.ts`: Main entry point that re-exports SimulationApp
 - Modular subsystems:
-  - `physics/`: PhysicsEngine, WindSimulator, LineSystem, ConstraintSolver, AerodynamicsCalculator
+  - `physics/`: PhysicsEngine, WindSimulator, LineSystem, LinePhysics, BridleSystem, ConstraintSolver, AerodynamicsCalculator
   - `controllers/`: KiteController, ControlBarManager, InputHandler
   - `rendering/`: RenderManager, DebugRenderer
   - `config/`: SimulationConfig, PhysicsConstants, KiteGeometry
   - `ui/`: UIManager
-  - `types/`: WindTypes, PhysicsTypes
+  - `types/`: WindTypes, PhysicsTypes, BridleTypes
 
 **Objects** (`src/objects/organic/`):
 - `Kite.ts`: Main kite 3D model (example of StructuredObject pattern)
@@ -153,35 +153,22 @@ Trust instructions here first. Search the codebase only when:
 - [src/factories/FrameFactory.ts](src/factories/FrameFactory.ts) (factory examples)
 - [src/core/StructuredObject.ts](src/core/StructuredObject.ts) (core abstraction)
 
-## Current Work: Line Physics Refactoring
+## Recent Work & Technical Debt
 
-**Branch**: `feature/line-physics-refactor`  
-**Status**: Phase 0 - Analysis Complete  
-**Documentation**: 
-- [docs/LINE_PHYSICS_AUDIT_2025-10-01.md](docs/LINE_PHYSICS_AUDIT_2025-10-01.md) - Audit approfondi
-- [docs/LINE_PHYSICS_REFACTOR_ANALYSIS.md](docs/LINE_PHYSICS_REFACTOR_ANALYSIS.md) - Plan détaillé
+**Latest**: Bridles implemented as physical lines (merged to main)
+- See [docs/BRIDLES_AS_LINES_DESIGN.md](docs/BRIDLES_AS_LINES_DESIGN.md)
+- New files: `BridleSystem.ts`, `BridleTypes.ts` in `src/simulation/physics/`
+- 6 physical bridle lines with PBD constraints integrated into PhysicsEngine
 
-### Context
-The current line physics system has several issues:
-- **Stiffness 11× too high** (25000 vs 2200 N/m) - unrealistic rigidity
-- **No pre-tension** - discontinuity when lines go slack (0N → large force)
-- **Non-physical catenary** - uses parabola instead of real physics
-- **Code duplication** - handle positions calculated in multiple places
-- **Mixed responsibilities** - physics, rendering, and orchestration in same files
+**Available Documentation** (check before major changes):
+- [docs/LINE_PHYSICS_AUDIT_2025-10-01.md](docs/LINE_PHYSICS_AUDIT_2025-10-01.md) - Line physics analysis
+- [docs/DAMPING_AUDIT_2025-10-01.md](docs/DAMPING_AUDIT_2025-10-01.md) - Damping system analysis
+- [docs/OOP_LINE_ARCHITECTURE.md](docs/OOP_LINE_ARCHITECTURE.md) - Line system architecture
+- [docs/AUTO_MASS_CALCULATION.md](docs/AUTO_MASS_CALCULATION.md) - Mass distribution
 
-### Refactoring Plan (4 Phases)
-1. **Phase 1**: Fix config parameters (stiffness, add preTension, damping)
-2. **Phase 2**: Extract `LinePhysics.ts` (pure physics model)
-3. **Phase 3**: Refactor `LineSystem.ts` (lightweight orchestrator)
-4. **Phase 4**: Improve `ConstraintSolver.ts` (adaptive convergence)
-
-### Key Changes Coming
-- `SimulationConfig.ts`: `stiffness: 2200`, `preTension: 75`, `dampingCoeff: 0.05`
-- `PhysicsConstants.ts`: `LINE_CONSTRAINT_TOLERANCE: 0.01` (was 0.0005)
-- New file: `src/simulation/physics/LinePhysics.ts`
-- Refactored: `LineSystem.ts` to delegate physics calculations
-
-**When working on line physics**, always check these docs first to understand current architecture and planned changes.
+**Active Branches**:
+- `feature/damping-improvements` - Damping system refinements
+- `feature/line-physics-audit` - Line physics investigation
 
 ---
 

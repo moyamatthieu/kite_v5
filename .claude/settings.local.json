@@ -13,7 +13,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git fetch:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

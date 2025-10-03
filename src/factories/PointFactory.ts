@@ -70,6 +70,12 @@ export class PointFactory {
     // Étape 3 : Axe Z (perpendiculaire au plan p1-p2-p3)
     const ez = new THREE.Vector3().crossVectors(ex, ey);
 
+    // IMPORTANT : Pour garantir la symétrie, ez doit toujours pointer vers l'arrière (+Z global)
+    // Si ez.z < 0, on inverse la direction
+    if (ez.z < 0) {
+      ez.negate();
+    }
+
     // Étape 4 : Coordonnées de p3 dans le repère local
     const j = ey.dot(p3_p1);
 
@@ -91,9 +97,8 @@ export class PointFactory {
     } else {
       // Deux solutions possibles (devant/derrière le plan)
       // On prend z > 0 (vers l'arrière du kite, direction +Z)
-      // IMPORTANT : Pour la symétrie, on inverse le signe selon le côté
-      const zAbs = Math.sqrt(zSquared);
-      z = side === 'left' ? zAbs : -zAbs;
+      // Pour garantir la SYMÉTRIE, les deux côtés doivent avoir le même Z
+      z = Math.sqrt(zSquared);
     }
 
     // Étape 6 : Convertir les coordonnées locales en coordonnées globales
