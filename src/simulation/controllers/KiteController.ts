@@ -52,7 +52,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private forceSmoothing: number = 0.8; // Lissage des forces (0.0 = pas de lissage, 1.0 = lissage max)
+  private forceSmoothingRate: number = 5.0; // Taux de lissage en 1/s (plus élevé = lissage plus rapide)
 
   constructor(kite: Kite) {
     this.kite = kite;
@@ -83,10 +83,11 @@ export class KiteController {
     const validForces = this.validateForces(forces);
     const validTorque = this.validateTorque(torque);
 
-    // Lisser les forces pour éviter les sauts brusques (lerp)
-    // 85% ancienne valeur + 15% nouvelle valeur = transition douce
-    this.smoothedForce.lerp(validForces, this.forceSmoothing);
-    this.smoothedTorque.lerp(validTorque, this.forceSmoothing);
+    // Lissage exponentiel des forces (indépendant du framerate)
+    // smoothingFactor = 1 - e^(-rate × dt)
+    const smoothingFactor = 1 - Math.exp(-this.forceSmoothingRate * deltaTime);
+    this.smoothedForce.lerp(validForces, smoothingFactor);
+    this.smoothedTorque.lerp(validTorque, smoothingFactor);
 
     // Utiliser les forces lissées pour la physique
     const newPosition = this.integratePhysics(this.smoothedForce, deltaTime);
@@ -172,7 +173,8 @@ export class KiteController {
     deltaTime: number
   ): THREE.Vector3 {
     // Newton : accélération = Force / masse
-    const acceleration = forces.divideScalar(CONFIG.kite.mass);
+    // IMPORTANT: clone() pour ne pas modifier le vecteur forces en place!
+    const acceleration = forces.clone().divideScalar(CONFIG.kite.mass);
     this.lastAccelMagnitude = acceleration.length();
 
     // Sécurité : limiter pour éviter l'explosion numérique
@@ -184,9 +186,13 @@ export class KiteController {
     }
 
     // Intégration d'Euler : v(t+dt) = v(t) + a·dt
-    this.state.velocity.add(acceleration.multiplyScalar(deltaTime));
-    // Amortissement : simule la résistance de l'air
-    this.state.velocity.multiplyScalar(CONFIG.physics.linearDamping);
+    // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier acceleration!
+    this.state.velocity.add(acceleration.clone().multiplyScalar(deltaTime));
+
+    // Amortissement exponentiel : v(t) = v₀ × e^(-c×dt)
+    // Formule physiquement correcte, indépendante du framerate
+    const linearDampingFactor = Math.exp(-CONFIG.physics.linearDampingCoeff * deltaTime);
+    this.state.velocity.multiplyScalar(linearDampingFactor);
     this.lastVelocityMagnitude = this.state.velocity.length();
 
     // Garde-fou vitesse max (réalisme physique)
@@ -225,7 +231,8 @@ export class KiteController {
     const effectiveTorque = torque.clone().add(dampTorque);
 
     // Dynamique rotationnelle : α = T / I
-    const angularAcceleration = effectiveTorque.divideScalar(
+    // IMPORTANT: clone() pour ne pas modifier effectiveTorque en place!
+    const angularAcceleration = effectiveTorque.clone().divideScalar(
       CONFIG.kite.inertia
     );
 
@@ -239,10 +246,14 @@ export class KiteController {
     }
 
     // Mise à jour de la vitesse angulaire
+    // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier angularAcceleration!
     this.state.angularVelocity.add(
-      angularAcceleration.multiplyScalar(deltaTime)
+      angularAcceleration.clone().multiplyScalar(deltaTime)
     );
-    this.state.angularVelocity.multiplyScalar(CONFIG.physics.angularDamping);
+
+    // Amortissement angulaire exponentiel : ω(t) = ω₀ × e^(-c×dt)
+    const angularDampingFactor = Math.exp(-CONFIG.physics.angularDampingCoeff * deltaTime);
+    this.state.angularVelocity.multiplyScalar(angularDampingFactor);
 
     // Limiter la vitesse angulaire
     this.hasExcessiveAngular = this.state.angularVelocity.length() > PhysicsConstants.MAX_ANGULAR_VELOCITY;
@@ -296,17 +307,17 @@ export class KiteController {
   }
 
   /**
-   * Définit le facteur de lissage des forces physiques
-   * @param smoothing - Facteur entre 0.0 (pas de lissage) et 1.0 (lissage maximum)
+   * Définit le taux de lissage des forces physiques
+   * @param rate - Taux en 1/s (valeurs typiques: 1-10, plus élevé = lissage plus rapide)
    */
-  setForceSmoothing(smoothing: number): void {
-    this.forceSmoothing = Math.max(0.0, Math.min(1.0, smoothing));
+  setForceSmoothing(rate: number): void {
+    this.forceSmoothingRate = Math.max(0.1, Math.min(20, rate));
   }
 
   /**
-   * Retourne le facteur de lissage actuel des forces
+   * Retourne le taux de lissage actuel des forces (en 1/s)
    */
   getForceSmoothing(): number {
-    return this.forceSmoothing;
+    return this.forceSmoothingRate;
   }
 }

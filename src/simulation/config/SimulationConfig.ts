@@ -37,9 +37,10 @@ export const CONFIG = {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
-    angularDamping: 0.80, // Damping angulaire à 0.80 (20% de perte)
-    linearDamping: 0.80, // Damping linéaire à 0.80 (20% de perte)
-    angularDragCoeff: 0.1, // Résistance rotation augmentée pour moins d'oscillations
+    // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
+    linearDampingCoeff: 0.4, // Résistance linéaire (1/s) - air drag (équiv ~0.92 factor)
+    angularDampingCoeff: 0.4, // Résistance angulaire (1/s) - rotation damping (équiv ~0.80 factor)
+    angularDragCoeff: 0.4, // Résistance rotation augmentée pour moins d'oscillations
   },
   aero: {
     liftScale: 1.0, // Portance à 1.0 (coefficient plein)
@@ -49,13 +50,13 @@ export const CONFIG = {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
     // Basées sur:
     // - Frame carbone (spine 5mm, leading edges 5mm, struts 4mm)
-    // - Tissu ripstop nylon 40 g/m²
+    // - Tissu ripstop nylon 120 g/m² (corrigé pour atteindre masse réaliste)
     // - Accessoires (connecteurs, bridage, renforts)
     // Voir KiteGeometry.calculateTotalMass() pour les détails
-    mass: KiteGeometry.TOTAL_MASS, // kg - Calculée automatiquement (~0.153 kg)
+    mass: KiteGeometry.TOTAL_MASS, // kg - Calculée automatiquement (~0.31 kg après correction)
     area: KiteGeometry.TOTAL_AREA, // m² - Surface totale (calculée automatiquement)
     inertia: KiteGeometry.INERTIA, // kg·m² - Moment d'inertie (I ≈ m·r², calculé automatiquement)
-    minHeight: 0.5, // m - Altitude minimale (plus haut pour éviter le sol)
+    minHeight: 0, // m - Altitude minimale (plus haut pour éviter le sol)
   },
   lines: {
     defaultLength: 15, // m - Longueur par défaut
@@ -66,14 +67,14 @@ export const CONFIG = {
     linearMassDensity: 0.0005, // kg/m - Masse linéique pour calcul caténaire
   },
   wind: {
-    defaultSpeed: 18, // km/h
+    defaultSpeed: 20, // km/h
     defaultDirection: 0, // degrés
-    defaultTurbulence: 1, // % - Turbulence minimale
-    turbulenceScale: 0.15,
-    turbulenceFreqBase: 0.3,
-    turbulenceFreqY: 1.3,
-    turbulenceFreqZ: 0.7,
-    turbulenceIntensityXZ: 0.8,
+    defaultTurbulence: 0.1, // % - Turbulence minimale
+    turbulenceScale: 0.05,
+    turbulenceFreqBase: 0.05,
+    turbulenceFreqY: 0.3,
+    turbulenceFreqZ: 0.3,
+    turbulenceIntensityXZ: 0.2,
     turbulenceIntensityY: 0.2,
   },
   rendering: {

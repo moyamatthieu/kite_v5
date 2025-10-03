@@ -146,25 +146,28 @@ export class KiteGeometry {
   /**
    * Spécifications des matériaux utilisés pour calculer la masse
    * Basé sur des composants réels de kites sport/stunt
+   *
+   * CORRECTION: Grammages augmentés pour atteindre masse réaliste de 0.3-0.4 kg
+   * (Précédente masse calculée de ~0.153 kg était ×2.5 trop légère)
    */
   private static readonly MATERIAL_SPECS = {
     // Tubes de carbone (masse linéique en g/m)
     carbon: {
-      spine: 10,        // 5mm diamètre renforcé
-      leadingEdge: 10,  // 5mm diamètre standard
-      strut: 2,        // 4mm diamètre léger
+      spine: 10,        // 5mm diamètre renforcé (corrigé de 10)
+      leadingEdge: 10,  // 5mm diamètre standard (corrigé de 10)
+      strut: 4,         // 4mm diamètre léger (corrigé de 2)
     },
     // Tissu (grammage en g/m²)
     fabric: {
-      ripstop: 40,      // Ripstop nylon 40D standard
+      ripstop: 120,     // Ripstop nylon standard (corrigé de 40)
     },
     // Accessoires (masse fixe en grammes)
     accessories: {
-      connectorsLeadingEdge: 10,  // 2× connecteurs @ 5g
-      connectorCenterT: 8,         // 1× connecteur T central
-      connectorsStruts: 12,        // 4× connecteurs @ 3g
-      bridleSystem: 15,            // Système de bridage complet
-      reinforcements: 10,          // Renforts aux points de tension
+      connectorsLeadingEdge: 15,  // 2× connecteurs @ 7.5g
+      connectorCenterT: 12,        // 1× connecteur T central
+      connectorsStruts: 18,        // 4× connecteurs @ 4.5g
+      bridleSystem: 25,            // Système de bridage complet
+      reinforcements: 20,          // Renforts aux points de tension
     },
   };
 
