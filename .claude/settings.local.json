@@ -15,7 +15,9 @@
       "Bash(git fetch:*)",
       "Bash(curl:*)",
       "Bash(cat:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(cloc:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
