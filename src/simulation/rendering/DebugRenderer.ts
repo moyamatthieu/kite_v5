@@ -37,6 +37,7 @@ import { PhysicsConstants } from "../config/PhysicsConstants";
 import { RenderManager } from "./RenderManager";
 import { CONFIG } from "../config/SimulationConfig";
 import { Primitive } from "@core/Primitive";
+import { KiteGeometry } from "../config/KiteGeometry";
 
 /**
  * Palette de couleurs améliorée pour les vecteurs de debug
@@ -55,6 +56,9 @@ const DEBUG_COLORS = {
   surfaceDrag: 0xff4444,     // Rouge vif - Traînée
   surfaceFriction: 0xaaaaaa, // Gris moyen - Friction
   surfaceResultant: 0xffdd00,// Jaune vif - Résultante locale
+  
+  // Masse distribuée
+  surfaceMass: 0xff00ff,     // Magenta - Force gravitationnelle par surface
 };
 
 /**
@@ -69,6 +73,7 @@ const VECTOR_SCALES = {
   surfaceDrag: 0.35,
   surfaceFriction: 0.25,
   surfaceResultant: 0.45,
+  surfaceMass: 3.0,  // Amplifier pour visibilité (gravité ~0.8N par surface)
 };
 
 /**
@@ -110,6 +115,7 @@ interface VectorVisibility {
   apparentWind: boolean;
   globalForces: boolean;
   surfaceForces: boolean;
+  surfaceMass: boolean;  // Afficher forces gravitationnelles distribuées
 }
 
 export class DebugRenderer {
@@ -121,6 +127,7 @@ export class DebugRenderer {
     apparentWind: true,
     globalForces: true,
     surfaceForces: true,
+    surfaceMass: false,  // Désactivé par défaut (peut surcharger l'affichage)
   };
 
   constructor(renderManager: RenderManager) {
@@ -196,6 +203,10 @@ export class DebugRenderer {
               <input type="checkbox" id="toggle-surface-forces" checked style="margin-right: 8px; cursor: pointer;">
               <span style="color: #ffdd00;">●</span> Forces surfaces
             </label>
+            <label style="display: flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" id="toggle-surface-mass" style="margin-right: 8px; cursor: pointer;">
+              <span style="color: #ff00ff;">●</span> Masse distribuée
+            </label>
           </div>
         `;
 
@@ -216,6 +227,10 @@ export class DebugRenderer {
 
         document.getElementById("toggle-surface-forces")?.addEventListener("change", (e) => {
           this.vectorVisibility.surfaceForces = (e.target as HTMLInputElement).checked;
+        });
+
+        document.getElementById("toggle-surface-mass")?.addEventListener("change", (e) => {
+          this.vectorVisibility.surfaceMass = (e.target as HTMLInputElement).checked;
         });
       }
     }
@@ -313,6 +328,11 @@ export class DebugRenderer {
       // Afficher les forces par surface (si activé)
       if (this.vectorVisibility.surfaceForces) {
         this.displaySurfaceForces(surfaceForces, kite);
+      }
+
+      // Afficher les vecteurs de masse distribuée (si activé)
+      if (this.vectorVisibility.surfaceMass) {
+        this.displaySurfaceMass(kite);
       }
 
       this.updateDebugDisplay(kiteState, kitePosition, { lift, drag }, physicsEngine);
@@ -463,4 +483,58 @@ export class DebugRenderer {
       }
     });
   }
+
+  /**
+   * Affiche les vecteurs de force gravitationnelle pour chaque surface
+   * Visualise la masse distribuée (physique émergente)
+   */
+  private displaySurfaceMass(kite: Kite): void {
+    // Pour chaque surface avec sa masse
+    KiteGeometry.SURFACES_WITH_MASS.forEach((surface: any, surfaceIndex: number) => {
+      // Centre géométrique de la surface (coordonnées locales)
+      const centre = surface.vertices[0]
+        .clone()
+        .add(surface.vertices[1])
+        .add(surface.vertices[2])
+        .divideScalar(3);
+
+      // Transformer en coordonnées monde
+      const centerWorld = kite.localToWorld(centre.clone());
+
+      // Force gravitationnelle = m × g (vers le bas)
+      const gravityForce = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
+      const forceMagnitude = gravityForce.length();
+
+      // Afficher flèche magenta pointant vers le bas
+      if (forceMagnitude > 0.01) {
+        const gravityArrow = Primitive.arrow(
+          gravityForce.clone().normalize(),
+          centerWorld,
+          forceMagnitude * VECTOR_SCALES.surfaceMass,
+          DEBUG_COLORS.surfaceMass,
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
+        );
+        this.renderManager.addObject(gravityArrow);
+        this.debugArrows.push(gravityArrow);
+
+        // Optionnel : Ajouter une sphère pour montrer la masse
+        // Taille proportionnelle à la masse
+        const sphereRadius = surface.mass * 0.2; // 0.2m pour 1kg
+        const massIndicator = new THREE.Mesh(
+          new THREE.SphereGeometry(sphereRadius, 8, 8),
+          new THREE.MeshBasicMaterial({
+            color: DEBUG_COLORS.surfaceMass,
+            transparent: true,
+            opacity: 0.3,
+            wireframe: true
+          })
+        );
+        massIndicator.position.copy(centerWorld);
+        this.renderManager.addObject(massIndicator);
+        this.debugArrows.push(massIndicator as any); // Pour cleanup
+      }
+    });
+  }
 }
+
