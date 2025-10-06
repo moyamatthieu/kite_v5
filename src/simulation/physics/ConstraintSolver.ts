@@ -304,11 +304,15 @@ export class ConstraintSolver {
       }
     };
 
-    // Résoudre toutes les brides (1 passe suffit généralement)
-    // Les brides sont courtes et rigides, convergence rapide
-    bridles.forEach(({ start, end, length }) => {
-      solveBridle(start, end, length);
-    });
+    // CORRECTION AUDIT #6 : Brides résolues en 2 passes au lieu d'1
+    // Système sur-contraint (6 contraintes, 2 points CTRL) nécessite itération
+    // Cohérent avec lignes principales (également 2 passes)
+    // Améliore convergence et stabilité géométrique
+    for (let pass = 0; pass < 2; pass++) {
+      bridles.forEach(({ start, end, length }) => {
+        solveBridle(start, end, length);
+      });
+    }
   }
 
   /**
