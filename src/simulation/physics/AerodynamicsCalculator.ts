@@ -115,35 +115,25 @@ export class AerodynamicsCalculator {
       }
 
       // MODÈLE PHYSIQUE POUR PLAQUE PLANE (Hoerner, "Fluid Dynamic Drag")
-      // Coefficients sans dimension pour plaque plane :
-      const CL = sinAlpha * cosAlpha; // Coefficient de portance ∝ sin(α)cos(α)
-      const CD = sinAlpha * sinAlpha;  // Coefficient de traînée ∝ sin²(α)
-
-      // Direction de portance : perpendiculaire au vent, dans le plan vent-normale
-      // Direction de traînée : parallèle au vent
-
-      // Vecteur perpendiculaire au vent dans le plan (vent, normale)
+      // Pour une plaque plane frappée par un fluide :
+      // - Force NORMALE à la surface (perpendiculaire)
+      // - Magnitude : F_n = q × A × sin²(α)
+      // où α = angle d'incidence (angle entre vent et surface)
+      
+      // Coefficient de force normale pour plaque plane
+      const CN = sinAlpha * sinAlpha; // ∝ sin²(α)
+      
+      // Direction : normale à la surface, orientée face au vent
       const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
-
-      // Lift perpendiculaire au vent (vers le haut pour un kite)
-      const liftDir = new THREE.Vector3()
-        .crossVectors(windDir, new THREE.Vector3().crossVectors(windFacingNormal, windDir))
-        .normalize();
-
-      // Si liftDir invalide (vent parallèle à normale), utiliser normale
-      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
-        liftDir.copy(windFacingNormal);
-      }
-
-      // Forces aérodynamiques décomposées
-      const liftMagnitude = dynamicPressure * surface.area * CL;
-      const dragMagnitude = dynamicPressure * surface.area * CD;
-
-      const lift = liftDir.clone().multiplyScalar(liftMagnitude);
-      const drag = windDir.clone().multiplyScalar(dragMagnitude);
-
-      // Force totale = lift + drag
-      const force = new THREE.Vector3().add(lift).add(drag);
+      
+      // Force normale = pression dynamique × aire × coefficient
+      const normalForceMagnitude = dynamicPressure * surface.area * CN;
+      const force = windFacingNormal.clone().multiplyScalar(normalForceMagnitude);
+      
+      // Pour le debug, on peut décomposer en "lift" et "drag" conceptuels
+      // mais la vraie force appliquée est la force normale
+      const lift = force.clone(); // Pour compatibilité avec le code existant
+      const drag = new THREE.Vector3(); // Déjà intégré dans la force normale
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
