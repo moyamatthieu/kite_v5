@@ -39,8 +39,8 @@ export const CONFIG = {
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
     linearDampingCoeff: 0.4, // Résistance linéaire (1/s) - air drag (équiv ~0.92 factor)
-    angularDampingCoeff: 0.4, // Résistance angulaire (1/s) - rotation damping (équiv ~0.80 factor)
-    angularDragCoeff: 0.4, // Résistance rotation augmentée pour moins d'oscillations
+    // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
+    angularDragFactor: 2, // Facteur sans dimension pour résistance aéro angulaire (0.5-2.0 typique)
   },
   aero: {
     liftScale: 1.0, // Portance à 1.0 (coefficient plein)

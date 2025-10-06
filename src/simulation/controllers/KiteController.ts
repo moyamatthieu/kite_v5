@@ -224,10 +224,11 @@ export class KiteController {
    * Met à jour l'orientation du cerf-volant - Dynamique du corps rigide
    */
   private updateOrientation(torque: THREE.Vector3, deltaTime: number): void {
-    // Couple d'amortissement (résistance à la rotation dans l'air)
+    // Couple d'amortissement (résistance aérodynamique à la rotation)
+    // τ_drag = -I × k_drag × ω  (unités correctes: kg·m² × 1/s × rad/s = N·m)
     const dampTorque = this.state.angularVelocity
       .clone()
-      .multiplyScalar(-CONFIG.physics.angularDragCoeff);
+      .multiplyScalar(-CONFIG.kite.inertia * CONFIG.physics.angularDragFactor);
     const effectiveTorque = torque.clone().add(dampTorque);
 
     // Dynamique rotationnelle : α = T / I
@@ -251,9 +252,8 @@ export class KiteController {
       angularAcceleration.clone().multiplyScalar(deltaTime)
     );
 
-    // Amortissement angulaire exponentiel : ω(t) = ω₀ × e^(-c×dt)
-    const angularDampingFactor = Math.exp(-CONFIG.physics.angularDampingCoeff * deltaTime);
-    this.state.angularVelocity.multiplyScalar(angularDampingFactor);
+    // Note: Amortissement déjà appliqué via dampTorque ci-dessus
+    // Pas de damping exponentiel supplémentaire pour éviter sur-amortissement
 
     // Limiter la vitesse angulaire
     this.hasExcessiveAngular = this.state.angularVelocity.length() > PhysicsConstants.MAX_ANGULAR_VELOCITY;

@@ -194,13 +194,13 @@ export class UIManager {
     ) as HTMLInputElement;
     const angularDampingValue = document.getElementById("angular-damping-value");
     if (angularDampingSlider && angularDampingValue) {
-      angularDampingSlider.value = CONFIG.physics.angularDampingCoeff.toString();
-      angularDampingValue.textContent = CONFIG.physics.angularDampingCoeff.toFixed(2);
+      angularDampingSlider.value = CONFIG.physics.angularDragFactor.toString();
+      angularDampingValue.textContent = CONFIG.physics.angularDragFactor.toFixed(2);
 
       angularDampingSlider.oninput = () => {
-        const damping = parseFloat(angularDampingSlider.value);
-        CONFIG.physics.angularDampingCoeff = damping;
-        angularDampingValue.textContent = damping.toFixed(2);
+        const dragFactor = parseFloat(angularDampingSlider.value);
+        CONFIG.physics.angularDragFactor = dragFactor;
+        angularDampingValue.textContent = dragFactor.toFixed(2);
       };
     }
 
