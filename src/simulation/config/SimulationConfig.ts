@@ -38,9 +38,9 @@ export const CONFIG = {
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
-    linearDampingCoeff: 0.4, // Résistance linéaire (1/s) - air drag (équiv ~0.92 factor)
+    linearDampingCoeff: 0.15, // Résistance linéaire réduite (0.4 était trop fort - perte 14%/s au lieu de 33%/s)
     // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
-    angularDragFactor: 2, // Facteur sans dimension pour résistance aéro angulaire (0.5-2.0 typique)
+    angularDragFactor: 2.0, // Ajusté pour cohérence avec inertie corrigée (×8) - ratio damping/aero ≈ 80%
   },
   aero: {
     liftScale: 1.0, // Portance à 1.0 (coefficient plein)
@@ -60,7 +60,7 @@ export const CONFIG = {
   },
   lines: {
     defaultLength: 15, // m - Longueur par défaut
-    stiffness: 2200, // N/m - Rigidité réaliste Dyneema (EA/L, corrigé de 25000)
+    stiffness: 1200, // N/m - Rigidité réduite pour plus de souplesse (2200 était trop rigide)
     preTension: 75, // N - Tension minimale toujours présente
     maxTension: 800, // N - Tension max avant rupture (~80% charge nominale)
     dampingCoeff: 0.05, // Coefficient d'amortissement interne (0-1)
@@ -69,7 +69,7 @@ export const CONFIG = {
   wind: {
     defaultSpeed: 20, // km/h
     defaultDirection: 0, // degrés
-    defaultTurbulence: 0.1, // % - Turbulence minimale
+    defaultTurbulence: 0.001, // % - Turbulence minimale
     turbulenceScale: 0.05,
     turbulenceFreqBase: 0.05,
     turbulenceFreqY: 0.3,

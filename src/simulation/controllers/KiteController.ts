@@ -52,7 +52,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private forceSmoothingRate: number = 5.0; // Taux de lissage en 1/s (plus élevé = lissage plus rapide)
+  private forceSmoothingRate: number = 20.0; // Taux de lissage en 1/s (20 au lieu de 5 pour temps de réponse 0.05s au lieu de 0.2s)
 
   constructor(kite: Kite) {
     this.kite = kite;

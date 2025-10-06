@@ -281,12 +281,14 @@ export class KiteGeometry {
    * @returns Moment d'inertie en kg·m²
    */
   static calculateInertia(): number {
-    // Rayon de giration ≈ envergure / 4 (approximation pour forme delta)
+    // Rayon de giration correct pour forme delta wing
+    // Formule réaliste : r = wingspan / √2 (au lieu de /4)
+    // Référence : géométrie d'un triangle isocèle
     const wingspan =
       KiteGeometry.POINTS.BORD_GAUCHE.distanceTo(
         KiteGeometry.POINTS.BORD_DROIT
-      ) / 2;
-    const radiusOfGyration = wingspan / 2;
+      );
+    const radiusOfGyration = wingspan / Math.sqrt(2);  // ≈ 1.167 m au lieu de 0.4125 m
 
     return KiteGeometry.TOTAL_MASS * radiusOfGyration * radiusOfGyration;
   }
