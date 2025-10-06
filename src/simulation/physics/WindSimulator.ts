@@ -116,17 +116,24 @@ export class WindSimulator {
     if (this.params.turbulence > 0) {
       const turbIntensity =
         (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
-      const freq = 0.5;
+      const freq = CONFIG.wind.turbulenceFreqBase;
 
+      // Utiliser les mêmes intensités et fréquences que getApparentWind() pour cohérence
       windVector.x +=
-        Math.sin(this.time * freq) * this.windSpeedMs * turbIntensity;
+        Math.sin(this.time * freq) * 
+        this.windSpeedMs * 
+        turbIntensity *
+        CONFIG.wind.turbulenceIntensityXZ;
       windVector.y +=
-        Math.sin(this.time * freq * 1.3) *
+        Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
         this.windSpeedMs *
         turbIntensity *
-        0.3;
+        CONFIG.wind.turbulenceIntensityY;
       windVector.z +=
-        Math.cos(this.time * freq * 0.7) * this.windSpeedMs * turbIntensity;
+        Math.cos(this.time * freq * CONFIG.wind.turbulenceFreqZ) * 
+        this.windSpeedMs * 
+        turbIntensity *
+        CONFIG.wind.turbulenceIntensityXZ;
     }
 
     return windVector;

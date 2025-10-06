@@ -62,6 +62,7 @@ export class Simulation {
   private setupKite(): void {
     this.kite = new Kite();
     const pilot = this.controlBar.position.clone();
+    // Position initiale : 95% de la longueur de ligne pour avoir lignes légèrement tendues
     const initialDistance = CONFIG.lines.defaultLength * 0.95;
 
     const kiteY = 7;

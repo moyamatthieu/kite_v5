@@ -216,21 +216,14 @@ export class AerodynamicsCalculator {
     const lift = globalLift.multiplyScalar(CONFIG.aero.liftScale);
     const drag = globalDrag.multiplyScalar(CONFIG.aero.dragScale);
 
-    // Mise à l'échelle du couple
-    const baseTotalMag = Math.max(
-      PhysicsConstants.EPSILON,
-      totalForce.length()
-    );
-    const scaledTotalMag = lift.clone().add(drag).length();
-    const torqueScale = Math.max(
-      0.1,
-      Math.min(3, scaledTotalMag / baseTotalMag)
-    );
+    // NOTE: Si liftScale = dragScale = 1.0, le couple n'a pas besoin de scaling
+    // Le couple est déjà calculé correctement par somme des τ = r × F individuels
+    // Pas de scaling artificiel appliqué - physique pure
 
     return {
       lift,
       drag,
-      torque: totalTorque.multiplyScalar(torqueScale),
+      torque: totalTorque,  // Pas de scaling - physique pure
       leftForce, // Exposer les forces pour analyse
       rightForce, // Permet de voir l'asymétrie émergente
       surfaceForces, // Forces individuelles par surface pour debug

@@ -186,4 +186,25 @@ export class PhysicsEngine {
   getControlBarManager(): ControlBarManager {
     return this.controlBarManager;
   }
+
+  /**
+   * Retourne les longueurs actuelles des brides du kite
+   */
+  getBridleLengths() {
+    return this.kiteController.getKite().getBridleLengths();
+  }
+
+  /**
+   * Définit le taux de lissage des forces (en 1/s)
+   */
+  setForceSmoothing(rate: number): void {
+    this.kiteController.setForceSmoothing(rate);
+  }
+
+  /**
+   * Retourne le taux de lissage des forces actuel
+   */
+  getForceSmoothing(): number {
+    return this.kiteController.getForceSmoothing();
+  }
 }
