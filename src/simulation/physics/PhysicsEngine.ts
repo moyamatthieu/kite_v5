@@ -136,10 +136,10 @@ export class PhysicsEngine {
 
     // Somme vectorielle de toutes les forces (2ème loi de Newton)
     const totalForce = new THREE.Vector3()
-      .add(lift) // Forces aérodynamiques totales (lift + drag combinés)
-      .add(drag) // (Vide - traînée intégrée dans lift)
+      .add(lift) // Portance perpendiculaire au vent
+      .add(drag) // Traînée parallèle au vent
       .add(gravity); // Poids vers le bas
-      // PAS de forces de lignes - elles sont des contraintes géométriques
+      // Note: Les lignes n'appliquent PAS de forces - elles sont des contraintes géométriques (PBD)
 
     // Couple total = moment aérodynamique uniquement
     // Les lignes n'appliquent PAS de couple - elles contraignent la position
@@ -207,5 +207,12 @@ export class PhysicsEngine {
    */
   getForceSmoothing(): number {
     return this.kiteController.getForceSmoothing();
+  }
+
+  /**
+   * Retourne les longueurs actuelles des brides
+   */
+  getBridleLengths() {
+    return this.kiteController.getKite().getBridleLengths();
   }
 }

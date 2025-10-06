@@ -131,11 +131,14 @@ export class UIManager {
     }
 
     // Contrôles des brides (3 sliders indépendants)
+    // Récupérer les valeurs actuelles depuis le Kite
+    const currentBridleLengths = this.physicsEngine.getBridleLengths();
+    
     const bridleNezSlider = document.getElementById("bridle-nez") as HTMLInputElement;
     const bridleNezValue = document.getElementById("bridle-nez-value");
     if (bridleNezSlider && bridleNezValue) {
-      bridleNezSlider.value = "0.68";
-      bridleNezValue.textContent = "0.68m";
+      bridleNezSlider.value = currentBridleLengths.nez.toString();
+      bridleNezValue.textContent = `${currentBridleLengths.nez.toFixed(2)}m`;
 
       bridleNezSlider.oninput = () => {
         const length = parseFloat(bridleNezSlider.value);
@@ -147,8 +150,8 @@ export class UIManager {
     const bridleInterSlider = document.getElementById("bridle-inter") as HTMLInputElement;
     const bridleInterValue = document.getElementById("bridle-inter-value");
     if (bridleInterSlider && bridleInterValue) {
-      bridleInterSlider.value = "0.5";
-      bridleInterValue.textContent = "0.50m";
+      bridleInterSlider.value = currentBridleLengths.inter.toString();
+      bridleInterValue.textContent = `${currentBridleLengths.inter.toFixed(2)}m`;
 
       bridleInterSlider.oninput = () => {
         const length = parseFloat(bridleInterSlider.value);
@@ -160,8 +163,8 @@ export class UIManager {
     const bridleCentreSlider = document.getElementById("bridle-centre") as HTMLInputElement;
     const bridleCentreValue = document.getElementById("bridle-centre-value");
     if (bridleCentreSlider && bridleCentreValue) {
-      bridleCentreSlider.value = "0.5";
-      bridleCentreValue.textContent = "0.50m";
+      bridleCentreSlider.value = currentBridleLengths.centre.toString();
+      bridleCentreValue.textContent = `${currentBridleLengths.centre.toFixed(2)}m`;
 
       bridleCentreSlider.oninput = () => {
         const length = parseFloat(bridleCentreSlider.value);
@@ -176,12 +179,12 @@ export class UIManager {
     ) as HTMLInputElement;
     const linearDampingValue = document.getElementById("linear-damping-value");
     if (linearDampingSlider && linearDampingValue) {
-      linearDampingSlider.value = CONFIG.physics.linearDamping.toString();
-      linearDampingValue.textContent = CONFIG.physics.linearDamping.toFixed(2);
+      linearDampingSlider.value = CONFIG.physics.linearDampingCoeff.toString();
+      linearDampingValue.textContent = CONFIG.physics.linearDampingCoeff.toFixed(2);
 
       linearDampingSlider.oninput = () => {
         const damping = parseFloat(linearDampingSlider.value);
-        CONFIG.physics.linearDamping = damping;
+        CONFIG.physics.linearDampingCoeff = damping;
         linearDampingValue.textContent = damping.toFixed(2);
       };
     }
@@ -191,12 +194,12 @@ export class UIManager {
     ) as HTMLInputElement;
     const angularDampingValue = document.getElementById("angular-damping-value");
     if (angularDampingSlider && angularDampingValue) {
-      angularDampingSlider.value = CONFIG.physics.angularDamping.toString();
-      angularDampingValue.textContent = CONFIG.physics.angularDamping.toFixed(2);
+      angularDampingSlider.value = CONFIG.physics.angularDampingCoeff.toString();
+      angularDampingValue.textContent = CONFIG.physics.angularDampingCoeff.toFixed(2);
 
       angularDampingSlider.oninput = () => {
         const damping = parseFloat(angularDampingSlider.value);
-        CONFIG.physics.angularDamping = damping;
+        CONFIG.physics.angularDampingCoeff = damping;
         angularDampingValue.textContent = damping.toFixed(2);
       };
     }
