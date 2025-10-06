@@ -136,10 +136,10 @@ export class PhysicsEngine {
 
     // Somme vectorielle de toutes les forces (2ème loi de Newton)
     const totalForce = new THREE.Vector3()
-      .add(lift) // Portance perpendiculaire au vent
-      .add(drag) // Traînée parallèle au vent
+      .add(lift) // Forces aérodynamiques totales (lift + drag combinés)
+      .add(drag) // (Vide - traînée intégrée dans lift)
       .add(gravity); // Poids vers le bas
-      // Note: Les lignes n'appliquent PAS de forces - elles sont des contraintes géométriques (PBD)
+      // PAS de forces de lignes - elles sont des contraintes géométriques
 
     // Couple total = moment aérodynamique uniquement
     // Les lignes n'appliquent PAS de couple - elles contraignent la position
@@ -159,14 +159,7 @@ export class PhysicsEngine {
    * @param length - longueur en mètres
    */
   setBridleLength(bridleName: 'nez' | 'inter' | 'centre', length: number): void {
-    // Mettre à jour le kite avec les nouvelles longueurs
     this.kiteController.getKite().setBridleLengths({ [bridleName]: length });
-
-    // Recréer BridleSystem avec les nouvelles longueurs pour la cohérence physique
-    const kite = this.kiteController.getKite();
-    this.bridleSystem = new BridleSystem(kite.getBridleLengths());
-
-    console.log(`🔧 BridleSystem recréé avec longueurs: ${bridleName}=${length.toFixed(2)}m`);
   }
 
   setWindParams(params: Partial<WindParams>): void {
@@ -192,27 +185,5 @@ export class PhysicsEngine {
 
   getControlBarManager(): ControlBarManager {
     return this.controlBarManager;
-  }
-
-  /**
-   * Définit le facteur de lissage des forces physiques
-   * @param smoothing - Facteur entre 0.0 (pas de lissage) et 1.0 (lissage maximum)
-   */
-  setForceSmoothing(smoothing: number): void {
-    this.kiteController.setForceSmoothing(smoothing);
-  }
-
-  /**
-   * Retourne le facteur de lissage actuel des forces
-   */
-  getForceSmoothing(): number {
-    return this.kiteController.getForceSmoothing();
-  }
-
-  /**
-   * Retourne les longueurs actuelles des brides
-   */
-  getBridleLengths() {
-    return this.kiteController.getKite().getBridleLengths();
   }
 }

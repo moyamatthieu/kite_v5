@@ -32,7 +32,7 @@ export class InputHandler {
   private keysPressed = new Set<string>();
   private rotationSpeed: number = 2.5;
   private returnSpeed: number = 3.0;
-  private maxRotation: number = Math.PI / 6;
+  private maxRotation: number = Math.PI / 4; // 45° au lieu de 30°
 
   constructor() {
     this.setupKeyboardControls();

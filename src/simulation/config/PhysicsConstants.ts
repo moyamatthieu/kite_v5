@@ -32,10 +32,6 @@ export class PhysicsConstants {
   static readonly MAX_FORCE = 1000; // Force max en Newtons (comme soulever 100kg)
   static readonly MAX_VELOCITY = 30; // Vitesse max : 30 m/s = 108 km/h
   static readonly MAX_ANGULAR_VELOCITY = 25; // Rotation max : presque 1 tour par seconde
-  // CORRECTION AUDIT #13 : MAX_ACCELERATION augmenté de 100 à 500 m/s²
-  // Calcul cohérent : a_max = F_max/m = 1000N / 0.31kg ≈ 3226 m/s²
-  // Limite à 500 pour sécurité numérique tout en permettant forces réalistes
-  // Ancienne valeur (100) bridait les forces à seulement 31N (3% du max!)
-  static readonly MAX_ACCELERATION = 500; // m/s² - Cohérent avec MAX_FORCE et masse kite
+  static readonly MAX_ACCELERATION = 100; // Le kite ne peut pas accélérer plus vite qu'une voiture de sport
   static readonly MAX_ANGULAR_ACCELERATION = 20; // La rotation ne peut pas s'emballer
 }

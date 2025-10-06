@@ -52,10 +52,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  // CORRECTION AUDIT #10 : Taux de lissage augmenté de 5.0 à 20.0 (1/s)
-  // Réduit le lag de 200ms à 50ms pour meilleure réactivité aux rafales
-  // Objectif long terme : supprimer complètement après stabilisation PBD
-  private forceSmoothingRate: number = 20.0; // Taux de lissage en 1/s (plus élevé = lissage plus rapide)
+  private forceSmoothingRate: number = 5.0; // Taux de lissage en 1/s (plus élevé = lissage plus rapide)
 
   constructor(kite: Kite) {
     this.kite = kite;
@@ -192,11 +189,10 @@ export class KiteController {
     // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier acceleration!
     this.state.velocity.add(acceleration.clone().multiplyScalar(deltaTime));
 
-    // CORRECTION AUDIT #4 : Amortissement linéaire SUPPRIMÉ
-    // L'amortissement est géré par la traînée aérodynamique dans AerodynamicsCalculator
-    // Pas besoin d'amortissement supplémentaire ici (évite double pénalité)
-    // const linearDampingFactor = Math.exp(-CONFIG.physics.linearDampingCoeff * deltaTime);
-    // this.state.velocity.multiplyScalar(linearDampingFactor);
+    // Amortissement exponentiel : v(t) = v₀ × e^(-c×dt)
+    // Formule physiquement correcte, indépendante du framerate
+    const linearDampingFactor = Math.exp(-CONFIG.physics.linearDampingCoeff * deltaTime);
+    this.state.velocity.multiplyScalar(linearDampingFactor);
     this.lastVelocityMagnitude = this.state.velocity.length();
 
     // Garde-fou vitesse max (réalisme physique)

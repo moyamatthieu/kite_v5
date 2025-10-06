@@ -118,6 +118,13 @@ Configured in both `vite.config.ts` and `tsconfig.json`. Always prefer aliases i
 - Document reasoning briefly in PR/commit messages (2-5 lines)
 - Provide at least 1 test/validation or build verification (`npm run build`) before considering tasks complete
 
+**No Test Pollution:**
+- NEVER create standalone test scripts in the project root or src/
+- Use `npm run dev` for manual testing via the UI
+- For quick verification, use inline console.log or browser DevTools
+- Manual test files belong in `tests/manual/` if absolutely needed (rare)
+- Clean up any temporary test code before committing
+
 ## Dependencies
 
 **Critical dependencies:**
