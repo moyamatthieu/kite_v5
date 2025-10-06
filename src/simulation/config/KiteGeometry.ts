@@ -78,6 +78,8 @@ export class KiteGeometry {
   //
   // NOTE : Les aires sont calculées automatiquement à partir de la géométrie réelle
   // pour garantir la cohérence physique
+  //
+  // NOTE : Les masses sont calculées après, voir SURFACES_WITH_MASS ci-dessous
   static readonly SURFACES = [
     {
       // Surface haute gauche (normale doit pointer vers arrière)
@@ -273,6 +275,48 @@ export class KiteGeometry {
    * Basée sur la géométrie réelle et les matériaux standards
    */
   static readonly TOTAL_MASS = KiteGeometry.calculateTotalMass();
+
+  /**
+   * Distribution de la masse sur les surfaces
+   * Chaque surface porte une fraction de la masse totale proportionnelle à son aire
+   * 
+   * Modèle physique :
+   * - Masse de tissu (fabric) : Distribuée proportionnellement à l'aire
+   * - Masse de frame : Distribuée uniformément sur les 4 surfaces
+   * - Masse d'accessoires : Distribuée uniformément sur les 4 surfaces
+   * 
+   * @returns Masse de chaque surface en kg
+   */
+  static calculateSurfaceMasses(): number[] {
+    const fabricMass = KiteGeometry.calculateFabricMass();
+    const frameMass = KiteGeometry.calculateFrameMass();
+    const accessoriesMass = KiteGeometry.calculateAccessoriesMass();
+    
+    // La masse de frame + accessoires est répartie uniformément
+    const uniformMassPerSurface = (frameMass + accessoriesMass) / KiteGeometry.SURFACES.length;
+    
+    // La masse de tissu est répartie proportionnellement à l'aire
+    return KiteGeometry.SURFACES.map(surface => {
+      const fabricMassRatio = surface.area / KiteGeometry.TOTAL_AREA;
+      const surfaceFabricMass = fabricMass * fabricMassRatio;
+      return surfaceFabricMass + uniformMassPerSurface;
+    });
+  }
+
+  /**
+   * Masses précalculées pour chaque surface (en kg)
+   * Index correspond à l'index dans SURFACES
+   */
+  static readonly SURFACE_MASSES = KiteGeometry.calculateSurfaceMasses();
+
+  /**
+   * Surfaces enrichies avec leur masse individuelle
+   * Utilisées par AerodynamicsCalculator pour appliquer la gravité distribuée
+   */
+  static readonly SURFACES_WITH_MASS = KiteGeometry.SURFACES.map((surface, index) => ({
+    ...surface,
+    mass: KiteGeometry.SURFACE_MASSES[index],
+  }));
 
   /**
    * Calcule le moment d'inertie approximatif du cerf-volant

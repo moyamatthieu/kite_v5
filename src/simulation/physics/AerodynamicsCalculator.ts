@@ -85,7 +85,7 @@ export class AerodynamicsCalculator {
 
     // On examine chaque triangle du cerf-volant un par un
     // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
-    KiteGeometry.SURFACES.forEach((surface, surfaceIndex) => {
+    KiteGeometry.SURFACES_WITH_MASS.forEach((surface, surfaceIndex) => {
       // Pour comprendre comment le vent frappe ce triangle,
       // on doit savoir dans quelle direction il "regarde"
       // (comme l'orientation d'un panneau solaire)
@@ -130,6 +130,15 @@ export class AerodynamicsCalculator {
       const normalForceMagnitude = dynamicPressure * surface.area * CN;
       const force = windFacingNormal.clone().multiplyScalar(normalForceMagnitude);
       
+      // GRAVITÉ DISTRIBUÉE (émergente, pas scriptée !)
+      // Chaque surface porte une fraction de la masse totale
+      // La gravité est appliquée au centre géométrique de chaque surface
+      // → Couple gravitationnel émerge naturellement de r × F_gravity
+      const gravityForce = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
+      
+      // Force totale sur cette surface = aéro + gravité
+      const totalSurfaceForce = force.clone().add(gravityForce);
+      
       // Pour le debug, on peut décomposer en "lift" et "drag" conceptuels
       // mais la vraie force appliquée est la force normale
       const lift = force.clone(); // Pour compatibilité avec le code existant
@@ -148,12 +157,12 @@ export class AerodynamicsCalculator {
       const isLeft = centre.x < 0; // Négatif = gauche, Positif = droite
 
       if (isLeft) {
-        leftForce.add(force); // On additionne à la force totale gauche
+        leftForce.add(totalSurfaceForce); // Force totale (aéro + gravité)
       } else {
-        rightForce.add(force); // On additionne à la force totale droite
+        rightForce.add(totalSurfaceForce); // Force totale (aéro + gravité)
       }
 
-      totalForce.add(force);
+      totalForce.add(totalSurfaceForce);
 
       // Lift et drag déjà calculés correctement ci-dessus avec le modèle plaque plane
       // Pas besoin de recalculer par décomposition vectorielle
@@ -180,8 +189,11 @@ export class AerodynamicsCalculator {
       // Imaginez une porte : si vous poussez près des gonds, elle tourne peu
       // Si vous poussez loin des gonds, elle tourne beaucoup
       // Ici, plus la force est loin du centre, plus elle fait tourner
+      //
+      // IMPORTANT : Le couple inclut TOUTE la force (aéro + gravité)
+      // → Couple gravitationnel émerge naturellement !
       const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
-      const torque = new THREE.Vector3().crossVectors(centreWorld, force);
+      const torque = new THREE.Vector3().crossVectors(centreWorld, totalSurfaceForce);
       totalTorque.add(torque);
 
     // console.log("Surface Index:", surfaceIndex);

@@ -105,20 +105,16 @@ export class PhysicsEngine {
       deltaTime
     );
 
-    // PHYSIQUE ÉMERGENTE 1 : Forces aéro calculées par surface
-    // Le couple émerge de la différence gauche/droite naturelle
+    // PHYSIQUE ÉMERGENTE : Forces aéro + gravité distribuée calculées par surface
+    // - Chaque surface porte une fraction de la masse (fabric + frame + accessoires)
+    // - Gravité appliquée au centre géométrique de chaque surface
+    // - Le couple gravitationnel émerge naturellement de r × F_gravity
+    // - Le couple total émerge de la différence gauche/droite naturelle
     const {
       lift,
       drag,
-      torque: aeroTorque,
+      torque: totalTorque,  // Inclut déjà couple aéro + couple gravitationnel !
     } = AerodynamicsCalculator.calculateForces(apparentWind, kite.quaternion);
-
-    // Force constante vers le bas (F = mg)
-    const gravity = new THREE.Vector3(
-      0,
-      -CONFIG.kite.mass * CONFIG.physics.gravity,
-      0
-    );
 
     // CALCUL DES TENSIONS (pour affichage/debug uniquement)
     // Les lignes ne TIRENT PAS le kite - elles le RETIENNENT à distance max
@@ -135,15 +131,16 @@ export class PhysicsEngine {
     kite.updateBridleVisualization(bridleTensions);
 
     // Somme vectorielle de toutes les forces (2ème loi de Newton)
+    // Les forces incluent DÉJÀ la gravité distribuée sur chaque surface
     const totalForce = new THREE.Vector3()
-      .add(lift) // Forces aérodynamiques totales (lift + drag combinés)
-      .add(drag) // (Vide - traînée intégrée dans lift)
-      .add(gravity); // Poids vers le bas
+      .add(lift) // Forces aérodynamiques + gravité combinées
+      .add(drag); // (Vide - traînée intégrée dans lift)
       // PAS de forces de lignes - elles sont des contraintes géométriques
+      // PAS de gravité globale - elle est distribuée par surface
 
-    // Couple total = moment aérodynamique uniquement
+    // Couple total = moment aérodynamique + moment gravitationnel (émergent)
     // Les lignes n'appliquent PAS de couple - elles contraignent la position
-    const totalTorque = aeroTorque.clone();
+    // L'orientation émerge de l'équilibre des forces distribuées + contraintes
 
     // Intégration physique : F=ma et T=Iα pour calculer nouvelle position/orientation
     this.kiteController.update(totalForce, totalTorque, handles, deltaTime);
