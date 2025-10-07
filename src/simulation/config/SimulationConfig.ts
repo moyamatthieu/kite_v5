@@ -38,13 +38,13 @@ export const CONFIG = {
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
-    linearDampingCoeff: 0.15, // Résistance linéaire réduite (0.4 était trop fort - perte 14%/s au lieu de 33%/s)
+    linearDampingCoeff: 2.5, // 🔧 PHASE 2: Augmenté (0.15 → 2.5) pour friction réaliste ~4%/frame
     // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
-    angularDragFactor: 2.0, // Ajusté pour cohérence avec inertie corrigée (×8) - ratio damping/aero ≈ 80%
+    angularDragFactor: 0.5, // 🔧 PHASE 2: Réduit (2.0 → 0.5) pour rotation moins freinée
   },
   aero: {
-    liftScale: 1.0, // Portance à 1.0 (coefficient plein)
-    dragScale: 1.0, // Traînée à 1.0 (coefficient plein)
+    liftScale: 2.0, // 🔧 PHASE 1: Augmenté (×2) pour compenser masse doublée
+    dragScale: 1.5, // 🔧 PHASE 1: Augmenté (×1.5) pour équilibre forces
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie

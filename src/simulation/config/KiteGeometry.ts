@@ -404,7 +404,12 @@ export class KiteGeometry {
       );
     const radiusOfGyration = wingspan / Math.sqrt(2);  // ≈ 1.167 m au lieu de 0.4125 m
 
-    return KiteGeometry.TOTAL_MASS * radiusOfGyration * radiusOfGyration;
+    const physicalInertia = KiteGeometry.TOTAL_MASS * radiusOfGyration * radiusOfGyration;
+    
+    // 🔧 PHASE 1: Factor 0.3 pour compromis réalisme/jouabilité
+    // Inertie physique (0.422 kg·m²) trop élevée → rotation trop lente
+    // Factor 0.3 ramène à ~0.127 kg·m² (acceptable, 2.4× l'ancien 0.053)
+    return physicalInertia * 0.3;
   }
 
   /**

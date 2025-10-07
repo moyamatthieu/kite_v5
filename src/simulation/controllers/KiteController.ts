@@ -52,7 +52,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private forceSmoothingRate: number = 20.0; // Taux de lissage en 1/s (20 au lieu de 5 pour temps de réponse 0.05s au lieu de 0.2s)
+  private forceSmoothingRate: number = 0.1; // 🔧 PHASE 1: Quasi-désactivé (0.1) pour restaurer réactivité
 
   constructor(kite: Kite) {
     this.kite = kite;
@@ -65,8 +65,9 @@ export class KiteController {
     this.previousPosition = kite.position.clone();
     this.kite.userData.lineLength = CONFIG.lines.defaultLength;
 
-    // Initialiser les forces lissées
-    this.smoothedForce = new THREE.Vector3();
+    // Initialiser les forces lissées avec gravité initiale (évite chute au démarrage)
+    const initialGravity = new THREE.Vector3(0, -CONFIG.kite.mass * 9.81, 0);
+    this.smoothedForce = initialGravity.clone();
     this.smoothedTorque = new THREE.Vector3();
   }
 
@@ -95,7 +96,7 @@ export class KiteController {
     // 🔴 BUG FIX #3 : Résolution ITÉRATIVE des contraintes pour convergence
     // Les contraintes lignes ↔ brides s'influencent mutuellement
     // Une seule passe n'est pas suffisante - il faut itérer jusqu'à convergence
-    const MAX_CONSTRAINT_ITERATIONS = 3;  // 3 passes généralement suffisantes
+    const MAX_CONSTRAINT_ITERATIONS = 2;  // 🔧 PHASE 3: Réduit (3 → 2) pour moins de sur-contrainte
     
     for (let iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; iter++) {
       // Appliquer les contraintes de lignes (Position-Based Dynamics)
