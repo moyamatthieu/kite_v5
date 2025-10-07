@@ -54,6 +54,8 @@ export class PhysicsEngine {
   private bridleSystem: BridleSystem;
   private kiteController: KiteController;
   private controlBarManager: ControlBarManager;
+  private lastLogTime: number = 0;
+  private readonly LOG_INTERVAL: number = 1000; // Log toutes les 1000ms (1 seconde)
 
   constructor(kite: Kite, controlBarPosition: THREE.Vector3) {
     this.windSimulator = new WindSimulator();
@@ -109,6 +111,7 @@ export class PhysicsEngine {
       deltaTime
     );
 
+
     // PHYSIQUE ÉMERGENTE : Forces aéro + gravité distribuée calculées par surface
     // - Chaque surface porte une fraction de la masse (fabric + frame + accessoires)
     // - Gravité appliquée au centre géométrique de chaque surface
@@ -119,13 +122,41 @@ export class PhysicsEngine {
       drag,
       gravity,  // 🔴 BUG FIX #1 : Gravité retournée séparément (purement verticale)
       torque: totalTorque,  // Inclut déjà couple aéro + couple gravitationnel !
-    } = AerodynamicsCalculator.calculateForces(apparentWind, kite.quaternion);
+    } = AerodynamicsCalculator.calculateForces(
+      apparentWind, 
+      kite.quaternion,
+      kite.position,
+      kiteState.velocity,
+      kiteState.angularVelocity
+    );
+
+    // 📊 LOG COMPLET toutes les secondes
+    const currentTime = Date.now();
+    if (currentTime - this.lastLogTime >= this.LOG_INTERVAL) {
+      this.lastLogTime = currentTime;
+      console.log('\n═══════════════════════════════════════════════════════');
+      console.log('📊 ÉTAT COMPLET DU KITE');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`📍 Position: (${kite.position.x.toFixed(2)}, ${kite.position.y.toFixed(2)}, ${kite.position.z.toFixed(2)}) m`);
+      console.log(`🎯 Distance au pilote: ${kite.position.length().toFixed(2)} m`);
+      console.log(`💨 Vent apparent: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s`);
+      console.log(`🚀 Vitesse kite: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s`);
+      console.log(`🔄 Vitesse angulaire: (${kiteState.angularVelocity.x.toFixed(2)}, ${kiteState.angularVelocity.y.toFixed(2)}, ${kiteState.angularVelocity.z.toFixed(2)}) rad/s | Mag: ${kiteState.angularVelocity.length().toFixed(2)} rad/s`);
+      console.log('───────────────────────────────────────────────────────');
+      console.log(`⬆️  Portance: (${lift.x.toFixed(2)}, ${lift.y.toFixed(2)}, ${lift.z.toFixed(2)}) N | Mag: ${lift.length().toFixed(2)} N`);
+      console.log(`🌪️  Traînée: (${drag.x.toFixed(2)}, ${drag.y.toFixed(2)}, ${drag.z.toFixed(2)}) N | Mag: ${drag.length().toFixed(2)} N`);
+      console.log(`⚖️  Gravité: (${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)}, ${gravity.z.toFixed(2)}) N | Mag: ${gravity.length().toFixed(2)} N`);
+      const totalForceCalc = new THREE.Vector3().add(lift).add(drag).add(gravity);
+      console.log(`📐 Force totale: (${totalForceCalc.x.toFixed(2)}, ${totalForceCalc.y.toFixed(2)}, ${totalForceCalc.z.toFixed(2)}) N | Mag: ${totalForceCalc.length().toFixed(2)} N`);
+      console.log(`🔃 Couple total: (${totalTorque.x.toFixed(2)}, ${totalTorque.y.toFixed(2)}, ${totalTorque.z.toFixed(2)}) N⋅m | Mag: ${totalTorque.length().toFixed(2)} N⋅m`);
+      console.log('═══════════════════════════════════════════════════════\n');
+    }
 
     // CALCUL DES TENSIONS (pour affichage/debug uniquement)
     // Les lignes ne TIRENT PAS le kite - elles le RETIENNENT à distance max
     // La contrainte géométrique est appliquée par ConstraintSolver dans KiteController
     const pilotPosition = this.controlBarManager.getPosition();
-    this.lineSystem.calculateLineTensions(kite, newRotation, pilotPosition);
+    this.lineSystem.calculateLineTensions(kite, this.controlBarManager.getRotation(), pilotPosition);
 
     // CALCUL DES TENSIONS DES BRIDES (pour affichage/debug uniquement)
     // Les brides sont des contraintes INTERNES au kite

@@ -39,7 +39,7 @@ export class PhysicsConstants {
   // Limites de sécurité physique (éviter explosions numériques)
   static readonly MAX_FORCE = 1000; // N - Force maximale (équivalent ~100kg)
   static readonly MAX_VELOCITY = 30; // m/s - Vitesse maximale kite (108 km/h)
-  static readonly MAX_ANGULAR_VELOCITY = 25; // rad/s - Vitesse rotation maximale (~4 tours/s)
+  static readonly MAX_ANGULAR_VELOCITY = 15; // rad/s - Limite élevée pour permettre convergence naturelle
   static readonly MAX_ACCELERATION = 100; // m/s² - Accélération maximale (~10G)
-  static readonly MAX_ANGULAR_ACCELERATION = 20; // rad/s² - Accélération angulaire maximale
+  static readonly MAX_ANGULAR_ACCELERATION = 5; // rad/s² - Accélération angulaire réaliste
 }

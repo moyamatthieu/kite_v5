@@ -1,6 +1,13 @@
 /**
- * SimulationConfig.ts - Configuration globale de la simulation Kite
- *
+ * SimulationConfig.ts - Configuration     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
+  linearDampingCoeff: 1.5, // 🔧 RÉALISTE: Friction aérodynamique modérée pour stabilisation naturelle
+    // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
+  angularDragFactor: 5.0, // 🔧 STABILITÉ CRITIQUE: Très fort amortissement pour éviter rotation excessive
+  },le de la simulation K  wind: {
+    defaultSpeed: 25, // km/h - Vitesse réaliste pour cerf-volant sport (15-30 km/h typique)
+    defaultDirection: 0, // degrés
+    defaultTurbulence: 5, // % - Turbulence réaliste pour conditions normales
+    turbulenceScale: 0.05,*
  * Rôle :
  *   - Définit tous les paramètres physiques, aérodynamiques, géométriques et environnementaux
  *   - Sert de source unique de vérité pour les réglages du monde virtuel
@@ -39,13 +46,13 @@ export const CONFIG = {
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
-    linearDampingCoeff: 2.5, // 🔧 PHASE 2: Augmenté (0.15 → 2.5) pour friction réaliste ~4%/frame
+  linearDampingCoeff: 0.8, // 🔧 VIVACITÉ: Réduit pour plus de réactivité
     // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
-    angularDragFactor: 0.5, // 🔧 PHASE 2: Réduit (2.0 → 0.5) pour rotation moins freinée
+  angularDragFactor: 4.0, // 🔧 VIVACITÉ: Réduit pour plus de mouvement dynamique
   },
   aero: {
-    liftScale: 2.5, // 🔧 CORRECTED: Réduit (4.0 → 2.5) pour forces réalistes avec formules CL/CD
-    dragScale: 1.5, // 🔧 PHASE 1: Augmenté (×1.5) pour équilibre forces
+  liftScale: 1.2, // 🔧 VIVACITÉ: Augmenté pour compenser vent faible (20 km/h)
+  dragScale: 0.8, // 🔧 VIVACITÉ: Augmenté proportionnellement
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
@@ -68,9 +75,9 @@ export const CONFIG = {
     linearMassDensity: 0.0005, // kg/m - Masse linéique pour calcul caténaire
   },
   wind: {
-    defaultSpeed: 20, // km/h
+    defaultSpeed: 20, // km/h - Vitesse idéale pour cerf-volant
     defaultDirection: 0, // degrés
-    defaultTurbulence: 10, // % - Turbulence réaliste (0.001 → 10)
+    defaultTurbulence: 0.001, // % - Turbulence réaliste (0.001 → 10)
     turbulenceScale: 0.05,
     turbulenceFreqBase: 0.05,
     turbulenceFreqY: 0.3,
@@ -122,6 +129,6 @@ export const CONFIG = {
   },
   kiteInertia: {
     gyrationDivisor: Math.sqrt(2), // Sans unité - Diviseur pour rayon de giration (wingspan / √2)
-    inertiaFactor: 0.3, // Sans unité - Facteur ajustement inertie pour jouabilité (compromis réalisme/fun)
+    inertiaFactor: 0.5, // Sans unité - Facteur ajustement inertie (compromis stabilité/réactivité)
   },
 };

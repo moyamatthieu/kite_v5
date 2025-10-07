@@ -52,7 +52,10 @@ export class AerodynamicsCalculator {
    */
   static calculateForces(
     apparentWind: THREE.Vector3,
-    kiteOrientation: THREE.Quaternion
+    kiteOrientation: THREE.Quaternion,
+    kitePosition?: THREE.Vector3,
+    kiteVelocity?: THREE.Vector3,
+    angularVelocity?: THREE.Vector3
   ): {
     lift: THREE.Vector3;
     drag: THREE.Vector3;
@@ -99,6 +102,20 @@ export class AerodynamicsCalculator {
     // On examine chaque triangle du cerf-volant un par un
     // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
     KiteGeometry.SURFACES_WITH_MASS.forEach((surface, surfaceIndex) => {
+      // 🔴 DÉSACTIVATION TEMPORAIRE du vent apparent local pour debug
+      // Le calcul local peut réduire trop fortement le vent perçu en rotation
+      
+      // Utiliser le vent apparent GLOBAL pour toutes les surfaces
+      const localApparentWind = apparentWind.clone();
+      const localWindSpeed = localApparentWind.length();
+      
+      if (localWindSpeed < 0.1) {
+        return; // Pas de vent sur cette surface
+      }
+      
+      const localWindDir = localApparentWind.clone().normalize();
+      const localDynamicPressure = 0.5 * CONFIG.physics.airDensity * localWindSpeed * localWindSpeed;
+      
       // Pour comprendre comment le vent frappe ce triangle,
       // on doit savoir dans quelle direction il "regarde"
       // (comme l'orientation d'un panneau solaire)
@@ -115,7 +132,7 @@ export class AerodynamicsCalculator {
 
       // Calcul de l'angle d'incidence pour une plaque plane (cerf-volant)
       // α = angle entre la direction du vent et la surface
-      const windDotNormal = windDir.dot(normaleMonde);
+      const windDotNormal = localWindDir.dot(normaleMonde);
       const cosTheta = Math.abs(windDotNormal); // cos(θ) où θ = angle vent-normale
 
       // Pour une plaque : sin(α) = cos(θ) et cos(α) = sin(θ)
@@ -148,7 +165,7 @@ export class AerodynamicsCalculator {
       // DIRECTION LIFT : Perpendiculaire au vent, dans le plan (vent, normale)
       // Méthode : liftDir = normalize(windFacingNormal - (windFacingNormal·windDir)×windDir)
       const liftDir = windFacingNormal.clone()
-        .sub(windDir.clone().multiplyScalar(windFacingNormal.dot(windDir)))
+        .sub(localWindDir.clone().multiplyScalar(windFacingNormal.dot(localWindDir)))
         .normalize();
       
       // Vérifier validité (éviter division par zéro si vent // normale)
@@ -157,11 +174,11 @@ export class AerodynamicsCalculator {
       }
       
       // DIRECTION DRAG : Parallèle au vent
-      const dragDir = windDir.clone();
+      const dragDir = localWindDir.clone();
       
-      // FORCES AÉRODYNAMIQUES (AVANT scaling)
-      const liftMagnitude = dynamicPressure * surface.area * CL;
-      const dragMagnitude = dynamicPressure * surface.area * CD;
+      // FORCES AÉRODYNAMIQUES (AVANT scaling) avec pression dynamique LOCALE
+      const liftMagnitude = localDynamicPressure * surface.area * CL;
+      const dragMagnitude = localDynamicPressure * surface.area * CD;
       
       const liftForce = liftDir.clone().multiplyScalar(liftMagnitude);
       const dragForce = dragDir.clone().multiplyScalar(dragMagnitude);
@@ -235,18 +252,18 @@ export class AerodynamicsCalculator {
       // Séparation couples aéro et gravité pour scaling cohérent :
       // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
       // - Couple gravité : physique pure, pas de scaling
-      const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
+      const centreWorldForTorque = centre.clone().applyQuaternion(kiteOrientation);
       
       // Couple aérodynamique (lift + drag)
-      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, aeroForce);
+      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorldForTorque, aeroForce);
       aeroTorque.add(aeroTorqueSurface);
       
       // Couple gravitationnel (émergent de la distribution de masse)
-      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, gravity);
+      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorldForTorque, gravity);
       gravityTorque.add(gravityTorqueSurface);
       
       // Couple total pour cette surface
-      const torque = new THREE.Vector3().crossVectors(centreWorld, totalSurfaceForce);
+      const torque = new THREE.Vector3().crossVectors(centreWorldForTorque, totalSurfaceForce);
       totalTorque.add(torque);
 
     // console.log("Surface Index:", surfaceIndex);

@@ -269,13 +269,15 @@ export class KiteController {
     // Note: Amortissement déjà appliqué via dampTorque ci-dessus
     // Pas de damping exponentiel supplémentaire pour éviter sur-amortissement
 
-    // Limiter la vitesse angulaire
-    this.hasExcessiveAngular = this.state.angularVelocity.length() > PhysicsConstants.MAX_ANGULAR_VELOCITY;
-    if (this.hasExcessiveAngular) {
-      this.state.angularVelocity
-        .normalize()
-        .multiplyScalar(PhysicsConstants.MAX_ANGULAR_VELOCITY);
-    }
+    // 🔧 DÉSACTIVATION TEMPORAIRE : Limiter la vitesse angulaire
+    // Cause des positions impossibles car empêche la convergence naturelle
+    // this.hasExcessiveAngular = this.state.angularVelocity.length() > PhysicsConstants.MAX_ANGULAR_VELOCITY;
+    // if (this.hasExcessiveAngular) {
+    //   this.state.angularVelocity
+    //     .normalize()
+    //     .multiplyScalar(PhysicsConstants.MAX_ANGULAR_VELOCITY);
+    // }
+    this.hasExcessiveAngular = false; // Toujours faux pour l'instant
 
     // Appliquer la rotation
     if (this.state.angularVelocity.length() > PhysicsConstants.EPSILON) {

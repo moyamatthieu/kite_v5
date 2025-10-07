@@ -49,7 +49,7 @@ export class Kite extends StructuredObject implements ICreatable {
 
   // Longueurs physiques des brides (en mètres)
   private bridleLengths: BridleLengths = {
-    nez: 0.6,    // 60cm du NEZ au CTRL
+    nez: 0.70,   // 70cm du NEZ au CTRL (ajusté pour meilleur comportement)
     inter: 0.6,    // 60cm du INTER au CTRL
     centre: 0.6,   // 60cm du CENTRE au CTRL
   };
