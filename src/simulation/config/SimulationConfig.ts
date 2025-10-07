@@ -109,7 +109,7 @@ export const CONFIG = {
   },
   initialization: {
     initialKiteY: 7.0, // m - Altitude initiale du kite
-    initialDistanceFactor: 0.95, // Sans unité - Facteur de distance initiale (95% de longueur ligne)
+    initialDistanceFactor: 0.99, // Sans unité - Facteur de distance initiale (95% de longueur ligne)
   },
   visualization: {
     lineWidth: 2, // pixels - Largeur des lignes de contrôle

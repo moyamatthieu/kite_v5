@@ -50,15 +50,15 @@ export class Kite extends StructuredObject implements ICreatable {
   // Longueurs physiques des brides (en mètres)
   private bridleLengths: BridleLengths = {
     nez: 0.70,   // 70cm du NEZ au CTRL (ajusté pour meilleur comportement)
-    inter: 0.6,    // 60cm du INTER au CTRL
-    centre: 0.6,   // 60cm du CENTRE au CTRL
+    inter: 0.65,   // 65cm du INTER au CTRL (allongé pour équilibrer le pitch)
+    centre: 0.68,  // 68cm du CENTRE au CTRL (plus long pour remonter l'arrière)
   };
 
   // Paramètres du cerf-volant
   private params = {
     width: 1.65, // Envergure
     height: 0.65, // Hauteur
-    depth: 0.15, // Profondeur whiskers
+    depth: 0.10, // Profondeur whiskers
     frameDiameter: 0.01,
     frameColor: "#2a2a2a",
     sailColor: "#ff3333",
