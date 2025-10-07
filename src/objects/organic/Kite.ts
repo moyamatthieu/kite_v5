@@ -29,13 +29,15 @@
  *   - src/factories/PointFactory.ts
  */
 
+import * as THREE from "three";
+
 import { StructuredObject } from "../../core/StructuredObject";
 import { ICreatable } from "../../types/index";
 import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
 import { PointFactory, BridleLengths } from "../../factories/PointFactory";
-import * as THREE from "three";
+import { CONFIG } from "../../simulation/config/SimulationConfig";
 
 export class Kite extends StructuredObject implements ICreatable {
   private frameFactory: FrameFactory;
@@ -259,9 +261,9 @@ export class Kite extends StructuredObject implements ICreatable {
         const tension = tensionMap.get(line.name) ?? 0;
         const material = line.material as THREE.LineBasicMaterial;
 
-        // Seuils de tension (N)
-        const lowThreshold = 20; // Molle
-        const highThreshold = 100; // Tendue
+        // Seuils de tension (N) - centralisés dans CONFIG
+        const lowThreshold = CONFIG.debug.bridleTensionLow;
+        const highThreshold = CONFIG.debug.bridleTensionHigh;
 
         if (tension < lowThreshold) {
           // Vert : bride molle

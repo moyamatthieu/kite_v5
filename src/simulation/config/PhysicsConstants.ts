@@ -21,17 +21,25 @@
  *   - src/simulation/config/SimulationConfig.ts
  */
 export class PhysicsConstants {
-  static readonly EPSILON = 1e-4; // Un tout petit nombre pour dire "presque zéro"
-  static readonly CONTROL_DEADZONE = 0.01; // La barre ne réagit pas si vous la bougez très peu
-  static readonly LINE_CONSTRAINT_TOLERANCE = 0.0005; // Les lignes peuvent s'étirer de 5mm max (marge d'erreur)
-  static readonly LINE_TENSION_FACTOR = 0.99; // Les lignes restent un peu plus courtes pour rester tendues
-  static readonly GROUND_FRICTION = 0.95; // Le sol freine le kite de 5% s'il le touche
-  static readonly CATENARY_SEGMENTS = 5; // Nombre de points pour dessiner la courbe des lignes
+  // Tolérances numériques
+  static readonly EPSILON = 1e-4; // Sans unité - Seuil pour "presque zéro" (comparaisons flottants)
+  static readonly EPSILON_FINE = 1e-6; // Sans unité - Seuil fin pour calculs précis (LinePhysics)
 
-  // Limites de sécurité - pour que la simulation ne devienne pas folle
-  static readonly MAX_FORCE = 1000; // Force max en Newtons (comme soulever 100kg)
-  static readonly MAX_VELOCITY = 30; // Vitesse max : 30 m/s = 108 km/h
-  static readonly MAX_ANGULAR_VELOCITY = 25; // Rotation max : presque 1 tour par seconde
-  static readonly MAX_ACCELERATION = 100; // Le kite ne peut pas accélérer plus vite qu'une voiture de sport
-  static readonly MAX_ANGULAR_ACCELERATION = 20; // La rotation ne peut pas s'emballer
+  // Contrôles et contraintes
+  static readonly CONTROL_DEADZONE = 0.01; // rad - Zone morte pour input barre de contrôle
+  static readonly LINE_CONSTRAINT_TOLERANCE = 0.0005; // m - Tolérance contraintes lignes (0.5mm)
+  static readonly LINE_TENSION_FACTOR = 0.99; // Sans unité - Facteur tension lignes (99% = légèrement tendues)
+
+  // Sol et friction
+  static readonly GROUND_FRICTION = 0.95; // Sans unité - Facteur friction sol (5% perte vitesse)
+
+  // Rendu caténaire
+  static readonly CATENARY_SEGMENTS = 5; // Sans unité - Nombre segments pour courbe caténaire
+
+  // Limites de sécurité physique (éviter explosions numériques)
+  static readonly MAX_FORCE = 1000; // N - Force maximale (équivalent ~100kg)
+  static readonly MAX_VELOCITY = 30; // m/s - Vitesse maximale kite (108 km/h)
+  static readonly MAX_ANGULAR_VELOCITY = 25; // rad/s - Vitesse rotation maximale (~4 tours/s)
+  static readonly MAX_ACCELERATION = 100; // m/s² - Accélération maximale (~10G)
+  static readonly MAX_ANGULAR_ACCELERATION = 20; // rad/s² - Accélération angulaire maximale
 }

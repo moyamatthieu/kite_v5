@@ -5,7 +5,9 @@
  */
 
 import * as THREE from "three";
+
 import { Kite } from "../objects/organic/Kite";
+
 import { RenderManager } from "./rendering/RenderManager";
 import { DebugRenderer } from "./rendering/DebugRenderer";
 import { PhysicsEngine } from "./physics/PhysicsEngine";
@@ -63,14 +65,11 @@ export class Simulation {
     this.kite = new Kite();
     const pilot = this.controlBar.position.clone();
     // Position initiale : 95% de la longueur de ligne pour avoir lignes légèrement tendues
-    const initialDistance = CONFIG.lines.defaultLength * 0.95;
+    const initialDistance = CONFIG.lines.defaultLength * CONFIG.initialization.initialDistanceFactor;
 
-    const kiteY = 7;
+    const kiteY = CONFIG.initialization.initialKiteY;
     const dy = kiteY - pilot.y;
-    const horizontal = Math.max(
-      0.1,
-      Math.sqrt(Math.max(0, initialDistance * initialDistance - dy * dy))
-    );
+    const horizontal = this.calculateHorizontalDistance(initialDistance, dy);
 
     this.kite.position.set(pilot.x, kiteY, pilot.z - horizontal);
     this.kite.rotation.set(0, 0, 0);
@@ -87,8 +86,8 @@ export class Simulation {
     this.controlBar.position.copy(CONFIG.controlBar.position);
 
     const barGeometry = new THREE.CylinderGeometry(
-      0.02,
-      0.02,
+      CONFIG.controlBar.barRadius,
+      CONFIG.controlBar.barRadius,
       CONFIG.controlBar.width
     );
     const barMaterial = new THREE.MeshStandardMaterial({
@@ -97,10 +96,14 @@ export class Simulation {
       roughness: 0.3,
     });
     const bar = new THREE.Mesh(barGeometry, barMaterial);
-    bar.rotation.z = Math.PI / 2;
+    bar.rotation.z = CONFIG.controlBar.barRotation;
     this.controlBar.add(bar);
 
-    const handleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.15);
+    const handleGeometry = new THREE.CylinderGeometry(
+      CONFIG.controlBar.handleRadius,
+      CONFIG.controlBar.handleRadius,
+      CONFIG.controlBar.handleLength
+    );
     const handleMaterial = new THREE.MeshStandardMaterial({
       color: 0x8b4513,
       roughness: 0.6,
@@ -115,23 +118,39 @@ export class Simulation {
     rightHandle.position.set(halfWidth, 0, 0);
     this.controlBar.add(rightHandle);
 
-    const pilotGeometry = new THREE.BoxGeometry(0.4, 1.6, 0.3);
+    const pilotGeometry = new THREE.BoxGeometry(
+      CONFIG.pilot.width,
+      CONFIG.pilot.height,
+      CONFIG.pilot.depth
+    );
     const pilotMaterial = new THREE.MeshStandardMaterial({
       color: 0x4a4a4a,
       roughness: 0.8,
     });
     const pilot = new THREE.Mesh(pilotGeometry, pilotMaterial);
-    pilot.position.set(0, 0.8, 8.5);
+    pilot.position.set(0, CONFIG.pilot.offsetY, CONFIG.pilot.offsetZ);
     pilot.castShadow = true;
 
     this.renderManager.addObject(this.controlBar);
     this.renderManager.addObject(pilot);
   }
 
+  /**
+   * Calcule la distance horizontale via Pythagore
+   * Évite la duplication de code (utilisé dans setupKite et resetSimulation)
+   */
+  private calculateHorizontalDistance(hypotenuse: number, vertical: number): number {
+    const minHorizontal = 0.1; // m - Distance horizontale minimale pour éviter kite au-dessus du pilote
+    return Math.max(
+      minHorizontal,
+      Math.sqrt(Math.max(0, hypotenuse * hypotenuse - vertical * vertical))
+    );
+  }
+
   private createControlLines(): void {
     const lineMaterial = new THREE.LineBasicMaterial({
       color: 0x333333,
-      linewidth: 2,
+      linewidth: CONFIG.visualization.lineWidth,
     });
 
     const leftGeometry = new THREE.BufferGeometry();
@@ -189,15 +208,12 @@ export class Simulation {
     const currentLineLength =
       this.physicsEngine.getLineSystem().lineLength ||
       CONFIG.lines.defaultLength;
-    const initialDistance = currentLineLength * 0.95;
+    const initialDistance = currentLineLength * CONFIG.initialization.initialDistanceFactor;
 
     const pilot = this.controlBar.position.clone();
-    const kiteY = 7;
+    const kiteY = CONFIG.initialization.initialKiteY;
     const dy = kiteY - pilot.y;
-    const horizontal = Math.max(
-      0.1,
-      Math.sqrt(Math.max(0, initialDistance * initialDistance - dy * dy))
-    );
+    const horizontal = this.calculateHorizontalDistance(initialDistance, dy);
     this.kite.position.set(pilot.x, kiteY, pilot.z - horizontal);
 
     this.kite.rotation.set(0, 0, 0);

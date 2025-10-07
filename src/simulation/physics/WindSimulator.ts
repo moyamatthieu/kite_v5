@@ -22,6 +22,7 @@
  *   - src/simulation/config/SimulationConfig.ts
  */
 import * as THREE from "three";
+
 import { WindParams } from "../types";
 import { CONFIG } from "../config/SimulationConfig";
 
@@ -52,6 +53,41 @@ export class WindSimulator {
   }
 
   /**
+   * Calcule les turbulences du vent
+   * Méthode extraite pour éviter la duplication de code
+   */
+  private calculateTurbulence(baseWindVector: THREE.Vector3): THREE.Vector3 {
+    if (this.params.turbulence <= 0) {
+      return baseWindVector.clone();
+    }
+
+    const turbIntensity =
+      (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
+    const freq = CONFIG.wind.turbulenceFreqBase;
+
+    const turbulenceVector = baseWindVector.clone();
+
+    // Utiliser des sinus pour créer des variations douces et naturelles
+    turbulenceVector.x +=
+      Math.sin(this.time * freq) *
+      this.windSpeedMs *
+      turbIntensity *
+      CONFIG.wind.turbulenceIntensityXZ;
+    turbulenceVector.y +=
+      Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
+      this.windSpeedMs *
+      turbIntensity *
+      CONFIG.wind.turbulenceIntensityY;
+    turbulenceVector.z +=
+      Math.cos(this.time * freq * CONFIG.wind.turbulenceFreqZ) *
+      this.windSpeedMs *
+      turbIntensity *
+      CONFIG.wind.turbulenceIntensityXZ;
+
+    return turbulenceVector;
+  }
+
+  /**
    * Calcule le vent que "ressent" le cerf-volant
    * C'est comme quand vous mettez la main par la fenêtre d'une voiture :
    * - Si la voiture roule vite, vous sentez plus de vent
@@ -64,37 +100,13 @@ export class WindSimulator {
   ): THREE.Vector3 {
     this.time += deltaTime;
 
-    const windVector = new THREE.Vector3(
+    const baseWindVector = new THREE.Vector3(
       Math.sin(this.windRad) * this.windSpeedMs,
       0,
       -Math.cos(this.windRad) * this.windSpeedMs
     );
 
-    // Ajouter des rafales aléatoires mais réalistes
-    // Les turbulences font bouger le vent de façon imprévisible
-    // Comme les tourbillons qu'on sent parfois dehors
-    if (this.params.turbulence > 0) {
-      const turbIntensity =
-        (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
-      const freq = CONFIG.wind.turbulenceFreqBase; // Fréquence des changements
-
-      // On utilise des sinus pour créer des variations douces et naturelles
-      windVector.x +=
-        Math.sin(this.time * freq) *
-        this.windSpeedMs *
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityXZ;
-      windVector.y +=
-        Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
-        this.windSpeedMs *
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityY;
-      windVector.z +=
-        Math.cos(this.time * freq * CONFIG.wind.turbulenceFreqZ) *
-        this.windSpeedMs *
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityXZ;
-    }
+    const windVector = this.calculateTurbulence(baseWindVector);
 
     // Le vent apparent = vent réel - vitesse du kite
     // Si le kite va vite vers l'avant, il "crée" du vent de face
@@ -110,36 +122,13 @@ export class WindSimulator {
    * Obtient le vecteur de vent à une position donnée
    */
   getWindAt(_position: THREE.Vector3): THREE.Vector3 {
-    const windVector = new THREE.Vector3(
+    const baseWindVector = new THREE.Vector3(
       Math.sin(this.windRad) * this.windSpeedMs,
       0,
       -Math.cos(this.windRad) * this.windSpeedMs
     );
 
-    if (this.params.turbulence > 0) {
-      const turbIntensity =
-        (this.params.turbulence / 100) * CONFIG.wind.turbulenceScale;
-      const freq = CONFIG.wind.turbulenceFreqBase;
-
-      // Utiliser les mêmes intensités et fréquences que getApparentWind() pour cohérence
-      windVector.x +=
-        Math.sin(this.time * freq) * 
-        this.windSpeedMs * 
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityXZ;
-      windVector.y +=
-        Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
-        this.windSpeedMs *
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityY;
-      windVector.z +=
-        Math.cos(this.time * freq * CONFIG.wind.turbulenceFreqZ) * 
-        this.windSpeedMs * 
-        turbIntensity *
-        CONFIG.wind.turbulenceIntensityXZ;
-    }
-
-    return windVector;
+    return this.calculateTurbulence(baseWindVector);
   }
 
   setParams(params: Partial<WindParams>): void {

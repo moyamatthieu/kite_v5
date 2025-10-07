@@ -26,6 +26,7 @@
  *   - src/simulation/physics/LineSystem.ts
  */
 import * as THREE from "three";
+
 import { Kite } from "../../objects/organic/Kite";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";

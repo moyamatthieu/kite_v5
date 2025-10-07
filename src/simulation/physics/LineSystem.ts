@@ -14,10 +14,12 @@
 import * as THREE from "three";
 import { Kite } from "@objects/organic/Kite";
 import { Line } from "@objects/mechanical/Line";
-import { LinePhysics } from "./LinePhysics";
 import { LineFactory } from "@factories/LineFactory";
+
 import { ControlBarManager } from "../controllers/ControlBarManager";
 import { PhysicsConstants } from "../config/PhysicsConstants";
+
+import { LinePhysics } from "./LinePhysics";
 
 export class LineSystem {
   private leftLine: Line;

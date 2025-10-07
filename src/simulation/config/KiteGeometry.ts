@@ -397,6 +397,10 @@ export class KiteGeometry {
    * @returns Moment d'inertie en kg·m²
    */
   static calculateInertia(): number {
+    // Constantes pour calcul d'inertie (éviter dépendance circulaire avec CONFIG)
+    const GYRATION_DIVISOR = Math.sqrt(2); // wingspan / √2 pour forme delta (triangle isocèle)
+    const INERTIA_FACTOR = 0.3; // Facteur ajustement pour compromis réalisme/jouabilité
+
     // Rayon de giration correct pour forme delta wing
     // Formule réaliste : r = wingspan / √2 (au lieu de /4)
     // Référence : géométrie d'un triangle isocèle
@@ -404,14 +408,14 @@ export class KiteGeometry {
       KiteGeometry.POINTS.BORD_GAUCHE.distanceTo(
         KiteGeometry.POINTS.BORD_DROIT
       );
-    const radiusOfGyration = wingspan / Math.sqrt(2);  // ≈ 1.167 m au lieu de 0.4125 m
+    const radiusOfGyration = wingspan / GYRATION_DIVISOR;  // ≈ 1.167 m au lieu de 0.4125 m
 
     const physicalInertia = KiteGeometry.TOTAL_MASS * radiusOfGyration * radiusOfGyration;
-    
+
     // 🔧 PHASE 1: Factor 0.3 pour compromis réalisme/jouabilité
     // Inertie physique (0.422 kg·m²) trop élevée → rotation trop lente
     // Factor 0.3 ramène à ~0.127 kg·m² (acceptable, 2.4× l'ancien 0.053)
-    return physicalInertia * 0.3;
+    return physicalInertia * INERTIA_FACTOR;
   }
 
   /**

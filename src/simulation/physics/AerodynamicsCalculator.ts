@@ -25,6 +25,7 @@
  *   - src/simulation/types/PhysicsTypes.ts
  */
 import * as THREE from "three";
+
 import { KiteGeometry } from "../config/KiteGeometry";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
@@ -77,20 +78,20 @@ export class AerodynamicsCalculator {
       0.5 * CONFIG.physics.airDensity * windSpeed * windSpeed;
 
     // Forces séparées pour gauche et droite
-    let leftForce = new THREE.Vector3();
-    let rightForce = new THREE.Vector3();
-    let totalForce = new THREE.Vector3();
-    let totalTorque = new THREE.Vector3();
+    const leftForce = new THREE.Vector3();
+    const rightForce = new THREE.Vector3();
+    const totalForce = new THREE.Vector3();
+    const totalTorque = new THREE.Vector3();
     
     // 🔴 BUG FIX #4 : Accumuler lift/drag SÉPARÉMENT avec coefficients corrects
     // Utiliser formules plaque plane : CL = sin(α)×cos(α), CD = sin²(α)
-    let totalLift = new THREE.Vector3();      // Portance totale
-    let totalDrag = new THREE.Vector3();      // Traînée totale
-    let gravityForce = new THREE.Vector3();   // Gravité séparée
+    const totalLift = new THREE.Vector3();      // Portance totale
+    const totalDrag = new THREE.Vector3();      // Traînée totale
+    const gravityForce = new THREE.Vector3();   // Gravité séparée
     
     // Séparation couples aéro et gravité pour scaling cohérent
-    let aeroTorque = new THREE.Vector3();
-    let gravityTorque = new THREE.Vector3();
+    const aeroTorque = new THREE.Vector3();
+    const gravityTorque = new THREE.Vector3();
     
     // Collection des forces par surface pour le debug
     const surfaceForces: SurfaceForce[] = [];
@@ -333,7 +334,7 @@ export class AerodynamicsCalculator {
 
     // Calcul approximatif de l'angle d'attaque
     const windDir = apparentWind.clone().normalize();
-    let weightedNormal = new THREE.Vector3();
+    const weightedNormal = new THREE.Vector3();
 
     KiteGeometry.SURFACES.forEach((surface) => {
       const edge1 = surface.vertices[1].clone().sub(surface.vertices[0]);

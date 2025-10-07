@@ -21,6 +21,7 @@
  *   - src/simulation/physics/PhysicsEngine.ts
  */
 import { PhysicsConstants } from "../config/PhysicsConstants";
+import { CONFIG } from "../config/SimulationConfig";
 
 /**
  * Gestionnaire des entrées utilisateur
@@ -30,9 +31,9 @@ import { PhysicsConstants } from "../config/PhysicsConstants";
 export class InputHandler {
   private currentRotation: number = 0;
   private keysPressed = new Set<string>();
-  private rotationSpeed: number = 2.5;
-  private returnSpeed: number = 3.0;
-  private maxRotation: number = Math.PI / 4; // 45° au lieu de 30°
+  private rotationSpeed: number = CONFIG.input.rotationSpeed;
+  private returnSpeed: number = CONFIG.input.returnSpeed;
+  private maxRotation: number = CONFIG.input.maxRotation;
 
   constructor() {
     this.setupKeyboardControls();

@@ -5,10 +5,11 @@
  * Compatible avec buildSurfaces() de StructuredObject
  */
 
+import * as THREE from "three";
+
 import { BaseFactory, FactoryParams } from "../base/BaseFactory";
 import { StructuredObject } from "../core/StructuredObject";
 import { ICreatable } from "../types/index";
-import * as THREE from "three";
 
 export interface SurfaceParams extends FactoryParams {
   points?: Array<[string, number[]]>; // Points nommés pour la surface

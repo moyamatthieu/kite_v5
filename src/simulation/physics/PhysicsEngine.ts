@@ -31,15 +31,17 @@
  *   - src/objects/organic/Kite.ts
  */
 import * as THREE from "three";
+
 import { Kite } from "../../objects/organic/Kite";
-import { WindSimulator } from "./WindSimulator";
-import { LineSystem } from "./LineSystem";
-import { BridleSystem } from "./BridleSystem";
-import { AerodynamicsCalculator } from "./AerodynamicsCalculator";
 import { KiteController } from "../controllers/KiteController";
 import { ControlBarManager } from "../controllers/ControlBarManager";
 import { WindParams } from "../types";
 import { CONFIG } from "../config/SimulationConfig";
+
+import { WindSimulator } from "./WindSimulator";
+import { LineSystem } from "./LineSystem";
+import { BridleSystem } from "./BridleSystem";
+import { AerodynamicsCalculator } from "./AerodynamicsCalculator";
 
 /**
  * Moteur physique principal
@@ -89,10 +91,8 @@ export class PhysicsEngine {
     // Limiter le pas de temps pour éviter l'instabilité numérique
     deltaTime = Math.min(deltaTime, CONFIG.physics.deltaTimeMax);
 
-    // Interpoler la rotation de la barre (lissage des commandes)
-    const currentRotation = this.controlBarManager.getRotation();
-    const newRotation = currentRotation + (targetBarRotation - currentRotation);
-    this.controlBarManager.setRotation(newRotation);
+    // Appliquer directement la rotation de la barre (pas de lissage, déjà géré par InputHandler)
+    this.controlBarManager.setRotation(targetBarRotation);
 
     // Récupérer l'état actuel du système
     const kite = this.kiteController.getKite();

@@ -29,15 +29,17 @@
  *   - src/simulation/rendering/RenderManager.ts
  */
 import * as THREE from "three";
+import { Primitive } from "@core/Primitive";
+
 import { Kite } from "../../objects/organic/Kite";
 import { KiteState, SurfaceForce } from "../types";
 import { PhysicsEngine } from "../physics/PhysicsEngine";
 import { AerodynamicsCalculator } from "../physics/AerodynamicsCalculator";
 import { PhysicsConstants } from "../config/PhysicsConstants";
-import { RenderManager } from "./RenderManager";
 import { CONFIG } from "../config/SimulationConfig";
-import { Primitive } from "@core/Primitive";
 import { KiteGeometry } from "../config/KiteGeometry";
+
+import { RenderManager } from "./RenderManager";
 
 /**
  * Palette de couleurs améliorée pour les vecteurs de debug
@@ -256,7 +258,7 @@ export class DebugRenderer {
     const centerWorld = kite.localToWorld(centerLocal.clone());
 
     // Vecteur de vitesse du kite (vert vif)
-    if (this.vectorVisibility.velocity && kiteState.velocity.length() > 0.1) {
+    if (this.vectorVisibility.velocity && kiteState.velocity.length() > CONFIG.debug.minVelocityDisplay) {
       const velocityArrow = Primitive.arrow(
         kiteState.velocity.clone().normalize(),
         centerWorld,
@@ -274,7 +276,7 @@ export class DebugRenderer {
     const relativeWind = wind.clone().sub(kiteState.velocity);
 
     // Vecteur de vent apparent (cyan)
-    if (this.vectorVisibility.apparentWind && relativeWind.length() > 0.1) {
+    if (this.vectorVisibility.apparentWind && relativeWind.length() > CONFIG.debug.minVelocityDisplay) {
       const apparentWindArrow = Primitive.arrow(
         relativeWind.clone().normalize(),
         centerWorld,
@@ -287,7 +289,7 @@ export class DebugRenderer {
       this.debugArrows.push(apparentWindArrow);
     }
 
-    if (relativeWind.length() > 0.1) {
+    if (relativeWind.length() > CONFIG.debug.minVelocityDisplay) {
       const { lift, drag, surfaceForces } = AerodynamicsCalculator.calculateForces(
         relativeWind,
         kite.quaternion
@@ -296,7 +298,7 @@ export class DebugRenderer {
       // Forces globales (si activé)
       if (this.vectorVisibility.globalForces) {
         // Portance globale (bleu royal)
-        if (lift.length() > 0.01) {
+        if (lift.length() > CONFIG.debug.minVectorLength) {
           const liftArrow = Primitive.arrow(
             lift.clone().normalize(),
             centerWorld,
@@ -311,7 +313,7 @@ export class DebugRenderer {
 
         // Résultante globale (blanc) - somme de toutes les surfaces
         const globalResultant = surfaceForces.reduce((sum, sf) => sum.add(sf.resultant.clone()), new THREE.Vector3());
-        if (globalResultant.length() > 0.01) {
+        if (globalResultant.length() > CONFIG.debug.minVectorLength) {
           const resultantArrow = Primitive.arrow(
             globalResultant.clone().normalize(),
             centerWorld,
@@ -427,7 +429,7 @@ export class DebugRenderer {
       kite.localToWorld(centerWorld);
 
       // Portance locale (bleu ciel profond)
-      if (lift.length() > 0.01) {
+      if (lift.length() > CONFIG.debug.minVectorLength) {
         const liftArrow = Primitive.arrow(
           lift.clone().normalize(),
           centerWorld,
@@ -441,7 +443,7 @@ export class DebugRenderer {
       }
 
       // Traînée (rouge vif)
-      if (drag.length() > 0.01) {
+      if (drag.length() > CONFIG.debug.minVectorLength) {
         const dragArrow = Primitive.arrow(
           drag.clone().normalize(),
           centerWorld,
@@ -455,7 +457,7 @@ export class DebugRenderer {
       }
 
       // Friction (gris moyen)
-      if (friction && friction.length() > 0.01) {
+      if (friction && friction.length() > CONFIG.debug.minVectorLength) {
         const frictionArrow = Primitive.arrow(
           friction.clone().normalize(),
           centerWorld,
@@ -469,7 +471,7 @@ export class DebugRenderer {
       }
 
       // Résultante locale (jaune vif)
-      if (resultant.length() > 0.01) {
+      if (resultant.length() > CONFIG.debug.minVectorLength) {
         const resultantArrow = Primitive.arrow(
           resultant.clone().normalize(),
           centerWorld,
@@ -506,7 +508,7 @@ export class DebugRenderer {
       const forceMagnitude = gravityForce.length();
 
       // Afficher flèche magenta pointant vers le bas
-      if (forceMagnitude > 0.01) {
+      if (forceMagnitude > CONFIG.debug.minVectorLength) {
         const gravityArrow = Primitive.arrow(
           gravityForce.clone().normalize(),
           centerWorld,

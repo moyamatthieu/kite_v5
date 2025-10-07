@@ -24,6 +24,7 @@
  *   - src/simulation/config/KiteGeometry.ts
  */
 import * as THREE from "three";
+
 import { KiteGeometry } from "./KiteGeometry";
 
 /**
@@ -87,5 +88,40 @@ export const CONFIG = {
   controlBar: {
     width: 0.6, // m - Largeur de la barre
     position: new THREE.Vector3(0, 1.2, 8), // Position initiale
+    barRadius: 0.02, // m - Rayon du cylindre de la barre
+    barRotation: Math.PI / 2, // rad - Rotation pour orientation horizontale
+    handleRadius: 0.03, // m - Rayon des poignées
+    handleLength: 0.15, // m - Longueur des poignées
+  },
+  pilot: {
+    width: 0.4, // m - Largeur du corps du pilote
+    height: 1.6, // m - Hauteur du corps du pilote
+    depth: 0.3, // m - Profondeur du corps du pilote
+    offsetY: 0.8, // m - Décalage vertical par rapport à la barre
+    offsetZ: 8.5, // m - Distance derrière la barre
+  },
+  initialization: {
+    initialKiteY: 7.0, // m - Altitude initiale du kite
+    initialDistanceFactor: 0.95, // Sans unité - Facteur de distance initiale (95% de longueur ligne)
+  },
+  visualization: {
+    lineWidth: 2, // pixels - Largeur des lignes de contrôle
+  },
+  debug: {
+    // Seuils de tension des brides pour couleurs visuelles
+    bridleTensionLow: 20, // N - Seuil tension molle (vert)
+    bridleTensionHigh: 100, // N - Seuil tension élevée (rouge)
+    // Seuils pour vecteurs debug
+    minVectorLength: 0.01, // m - Longueur minimale pour afficher un vecteur
+    minVelocityDisplay: 0.1, // m/s - Vitesse minimale pour afficher vecteur vitesse
+  },
+  input: {
+    rotationSpeed: 2.5, // rad/s - Vitesse de rotation de la barre (input utilisateur)
+    returnSpeed: 3.0, // rad/s - Vitesse de retour au centre de la barre
+    maxRotation: Math.PI / 4, // rad - Rotation maximale de la barre (45°)
+  },
+  kiteInertia: {
+    gyrationDivisor: Math.sqrt(2), // Sans unité - Diviseur pour rayon de giration (wingspan / √2)
+    inertiaFactor: 0.3, // Sans unité - Facteur ajustement inertie pour jouabilité (compromis réalisme/fun)
   },
 };

@@ -27,6 +27,7 @@
  *   - src/simulation/controllers/ControlBarManager.ts
  */
 import * as THREE from "three";
+
 import { Kite } from "../../objects/organic/Kite";
 import { KiteState, HandlePositions } from "../types";
 import { PhysicsConstants } from "../config/PhysicsConstants";
@@ -52,7 +53,12 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private forceSmoothingRate: number = 0.1; // 🔧 PHASE 1: Quasi-désactivé (0.1) pour restaurer réactivité
+  private forceSmoothingRate: number = KiteController.DEFAULT_FORCE_SMOOTHING_RATE; // 🔧 PHASE 1: Quasi-désactivé pour restaurer réactivité
+
+  // Constantes pour éviter les facteurs magiques
+  private static readonly DEFAULT_FORCE_SMOOTHING_RATE = 0.1;
+  private static readonly MIN_FORCE_SMOOTHING_RATE = 0.1;
+  private static readonly MAX_FORCE_SMOOTHING_RATE = 20.0;
 
   constructor(kite: Kite) {
     this.kite = kite;
@@ -66,7 +72,7 @@ export class KiteController {
     this.kite.userData.lineLength = CONFIG.lines.defaultLength;
 
     // Initialiser les forces lissées avec gravité initiale (évite chute au démarrage)
-    const initialGravity = new THREE.Vector3(0, -CONFIG.kite.mass * 9.81, 0);
+    const initialGravity = new THREE.Vector3(0, -CONFIG.kite.mass * CONFIG.physics.gravity, 0);
     this.smoothedForce = initialGravity.clone();
     this.smoothedTorque = new THREE.Vector3();
   }
@@ -319,7 +325,10 @@ export class KiteController {
    * @param rate - Taux en 1/s (valeurs typiques: 1-10, plus élevé = lissage plus rapide)
    */
   setForceSmoothing(rate: number): void {
-    this.forceSmoothingRate = Math.max(0.1, Math.min(20, rate));
+    this.forceSmoothingRate = Math.max(
+      KiteController.MIN_FORCE_SMOOTHING_RATE,
+      Math.min(KiteController.MAX_FORCE_SMOOTHING_RATE, rate)
+    );
   }
 
   /**

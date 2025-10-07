@@ -31,9 +31,11 @@
 import * as THREE from "three";
 import { Kite } from "@objects/organic/Kite";
 import { Line } from "@objects/mechanical/Line";
-import { LinePhysics } from "./LinePhysics";
 import { BridleFactory } from "@factories/BridleFactory";
+
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
+
+import { LinePhysics } from "./LinePhysics";
 
 /**
  * Système de gestion des brides

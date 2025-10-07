@@ -25,6 +25,7 @@
  *   - src/objects/organic/Kite.ts
  */
 import * as THREE from "three";
+
 import { Kite } from "../../objects/organic/Kite";
 import { HandlePositions } from "../types";
 import { BridleLengths } from "../types/BridleTypes";

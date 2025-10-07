@@ -23,6 +23,7 @@
  */
 
 import { Line, LineConfig, LineAttachments } from "@objects/mechanical/Line";
+
 import { BridleLengths, BridleAttachment, BridleSide, BridlePosition } from "../simulation/types/BridleTypes";
 
 /**

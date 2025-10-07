@@ -24,6 +24,7 @@
  */
 
 import * as THREE from 'three';
+
 import { MaterialConfig } from '../types/index';
 
 /**

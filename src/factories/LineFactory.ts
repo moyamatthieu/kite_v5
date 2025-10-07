@@ -32,6 +32,7 @@
  */
 
 import { Line, LineConfig, LineAttachments } from '@objects/mechanical/Line';
+
 import { CONFIG } from '@/simulation/config/SimulationConfig';
 
 /**

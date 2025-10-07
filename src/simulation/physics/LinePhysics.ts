@@ -34,6 +34,7 @@
 
 import { Vector3 } from 'three';
 import { Line } from '@objects/mechanical/Line';
+import { PhysicsConstants } from '../config/PhysicsConstants';
 
 /**
  * Résultat d'un calcul de force de tension
@@ -74,8 +75,8 @@ export class LinePhysics {
   /** Constante gravitationnelle (m/s²) */
   private static readonly GRAVITY = 9.81;
 
-  /** Epsilon pour éviter division par zéro */
-  private static readonly EPSILON = 1e-6;
+  /** Epsilon fin pour calculs de précision (réutilise PhysicsConstants) */
+  private static readonly EPSILON = PhysicsConstants.EPSILON_FINE;
 
   /**
    * Calcule la force de tension dans une ligne
