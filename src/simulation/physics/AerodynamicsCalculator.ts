@@ -55,6 +55,7 @@ export class AerodynamicsCalculator {
   ): {
     lift: THREE.Vector3;
     drag: THREE.Vector3;
+    gravity: THREE.Vector3;  // 🔴 BUG FIX #1 : Gravité retournée séparément
     torque: THREE.Vector3;
     leftForce?: THREE.Vector3;
     rightForce?: THREE.Vector3;
@@ -65,6 +66,7 @@ export class AerodynamicsCalculator {
       return {
         lift: new THREE.Vector3(),
         drag: new THREE.Vector3(),
+        gravity: new THREE.Vector3(),  // 🔴 BUG FIX #1 : Retourner gravité même si vent nul
         torque: new THREE.Vector3(),
         surfaceForces: [],
       };
@@ -79,6 +81,15 @@ export class AerodynamicsCalculator {
     let rightForce = new THREE.Vector3();
     let totalForce = new THREE.Vector3();
     let totalTorque = new THREE.Vector3();
+    
+    // 🔴 BUG FIX #1 : Séparer forces aéro et gravité AVANT décomposition lift/drag
+    // La gravité ne doit PAS être décomposée en lift/drag (elle est purement verticale)
+    let aeroForce = new THREE.Vector3();      // Forces aérodynamiques uniquement
+    let gravityForce = new THREE.Vector3();   // Gravité séparée
+    
+    // Séparation couples aéro et gravité pour scaling cohérent
+    let aeroTorque = new THREE.Vector3();
+    let gravityTorque = new THREE.Vector3();
     
     // Collection des forces par surface pour le debug
     const surfaceForces: SurfaceForce[] = [];
@@ -134,15 +145,21 @@ export class AerodynamicsCalculator {
       // Chaque surface porte une fraction de la masse totale
       // La gravité est appliquée au centre géométrique de chaque surface
       // → Couple gravitationnel émerge naturellement de r × F_gravity
-      const gravityForce = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
+      const gravity = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
+      
+      // 🔴 BUG FIX #1 : Accumuler aéro et gravité SÉPARÉMENT
+      aeroForce.add(force);           // Forces aéro uniquement
+      gravityForce.add(gravity);      // Gravité séparée
       
       // Force totale sur cette surface = aéro + gravité
-      const totalSurfaceForce = force.clone().add(gravityForce);
+      const totalSurfaceForce = force.clone().add(gravity);
       
-      // Pour le debug, on peut décomposer en "lift" et "drag" conceptuels
-      // mais la vraie force appliquée est la force normale
-      const lift = force.clone(); // Pour compatibilité avec le code existant
-      const drag = new THREE.Vector3(); // Déjà intégré dans la force normale
+      // Pour le debug : décomposition lift/drag depuis la force normale
+      // Lift = composante perpendiculaire au vent
+      // Drag = composante parallèle au vent
+      const dragMagnitude = force.dot(windDir); // Projection sur direction vent
+      const drag = windDir.clone().multiplyScalar(dragMagnitude);
+      const lift = force.clone().sub(drag); // Lift = force - drag
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
@@ -190,9 +207,20 @@ export class AerodynamicsCalculator {
       // Si vous poussez loin des gonds, elle tourne beaucoup
       // Ici, plus la force est loin du centre, plus elle fait tourner
       //
-      // IMPORTANT : Le couple inclut TOUTE la force (aéro + gravité)
-      // → Couple gravitationnel émerge naturellement !
+      // SÉPARATION couples aéro et gravité pour scaling cohérent :
+      // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
+      // - Couple gravité : physique pure, pas de scaling
       const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
+      
+      // Couple aérodynamique (force normale uniquement)
+      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, force);
+      aeroTorque.add(aeroTorqueSurface);
+      
+      // Couple gravitationnel (émergent de la distribution de masse)
+      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, gravity);
+      gravityTorque.add(gravityTorqueSurface);
+      
+      // Couple total pour cette surface
       const torque = new THREE.Vector3().crossVectors(centreWorld, totalSurfaceForce);
       totalTorque.add(torque);
 
@@ -208,24 +236,31 @@ export class AerodynamicsCalculator {
     // Si rightForce > leftForce → rotation vers la gauche
     // AUCUN facteur artificiel nécessaire!
 
-    // Décomposition globale lift/drag selon la direction du vent
-    // Somme de toutes les forces par surface
-    const globalDragComponent = totalForce.dot(windDir);
+    // 🔴 BUG FIX #1 : Décomposition lift/drag CORRECTE (sur forces aéro uniquement)
+    // La gravité est purement verticale, elle ne doit PAS être décomposée en lift/drag
+    const globalDragComponent = aeroForce.dot(windDir);
     const globalDrag = windDir.clone().multiplyScalar(globalDragComponent);
-    const globalLift = totalForce.clone().sub(globalDrag);
+    const globalLift = aeroForce.clone().sub(globalDrag);
 
-    // Application des facteurs de configuration
+    // Application des facteurs de configuration aux forces
     const lift = globalLift.multiplyScalar(CONFIG.aero.liftScale);
     const drag = globalDrag.multiplyScalar(CONFIG.aero.dragScale);
 
-    // NOTE: Si liftScale = dragScale = 1.0, le couple n'a pas besoin de scaling
-    // Le couple est déjà calculé correctement par somme des τ = r × F individuels
-    // Pas de scaling artificiel appliqué - physique pure
+    // CORRECTION CRITIQUE : Scaling cohérent du couple aérodynamique
+    // Le couple DOIT être scalé proportionnellement aux forces aéro pour cohérence physique
+    // Si les forces sont doublées (scale=2), le couple doit l'être aussi
+    // MAIS la gravité reste inchangée (physique pure)
+    const averageAeroScale = (CONFIG.aero.liftScale + CONFIG.aero.dragScale) / 2;
+    const scaledAeroTorque = aeroTorque.multiplyScalar(averageAeroScale);
+    
+    // Couple total = couple aéro scalé + couple gravité (non scalé)
+    const finalTorque = scaledAeroTorque.clone().add(gravityTorque);
 
     return {
       lift,
       drag,
-      torque: totalTorque,  // Pas de scaling - physique pure
+      gravity: gravityForce,  // 🔴 BUG FIX #1 : Retourner gravité séparément
+      torque: finalTorque,  // Couple cohérent avec forces scalées
       leftForce, // Exposer les forces pour analyse
       rightForce, // Permet de voir l'asymétrie émergente
       surfaceForces, // Forces individuelles par surface pour debug

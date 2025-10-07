@@ -3,7 +3,7 @@
 
 ## Repository Overview
 
-**Kite Simulator** is an autonomous web-based kite physics simulation built with TypeScript and Three.js. It simulates realistic kite flight dynamics using emergent physics-based behavior—no scripted animations. This is a standalone version extracted from a larger project, designed to be lightweight and self-contained.
+**Kite Simulator** is an autonomous web-based kite physics simulation built with TypeScript and Three.js. It simulates realistic kite flight dynamics using emergent physics-based behavior—no scripted animations. 
 
 **Key facts:**
 - Language: TypeScript (ES modules), French/English comments coexist
@@ -18,10 +18,10 @@
 
 ```bash
 npm install          # Install dependencies (ALWAYS first)
-npm run dev          # Start dev server (primary dev command)
+npm run dev          # ne pas lancer, serveur en arriere plan 
 npm run build        # Build production bundle
 npm run preview      # Preview production build
-./test.sh            # Quick test script with usage info
+
 ```
 
 **Notes:**
@@ -122,21 +122,7 @@ src/
 
 ## Critical Development Rules
 
-### 1. Physics-Based Behavior ONLY (MANDATORY)
-
-**Pas de comportements scriptés:** Never implement hard-coded or animated "tricks". Everything must emerge from the physics system:
-- Collisions, wind forces, force differences, constraints, local interactions
-- Favor physical rules and solvers (constraint, dynamics, aerodynamics) over procedural scripts
-- Example: Kite rotation emerges from differential tensions in left/right lines, not scripted animation
-
-**Understanding PBD (Position-Based Dynamics):**
-- Lines and bridles are **constraints**, not force generators
-- They enforce maximum distance between attachment points
-- `ConstraintSolver` applies geometric corrections AFTER force integration
-- Tension values are calculated for display/debug only (they don't apply forces)
-- Actual forces come from: aerodynamics (lift/drag) + gravity only
-
-### 2. Clean Code Standards (As Applied Here)
+### 1. Clean Code Standards (As Applied Here)
 
 1. **One level of indentation** per function where feasible—prefer early returns
 2. **Avoid `else`** when a guard clause suffices
@@ -144,11 +130,9 @@ src/
 4. **Descriptive names**, avoid abbreviations (except common Three.js short names like `pos`, `rot`)
 5. **Small micro-classes** with single responsibility (see `Line.ts` as pure data object)
 
-### 3. Sequential Thinking for Non-Trivial Tasks (REQUIRED)
+### 2. Sequential Thinking for Non-Trivial Tasks (REQUIRED)
 
 - Decompose tasks, form hypotheses, verify, iterate
-- Document reasoning briefly in PR/commit messages (2-5 lines)
-- Provide at least **1 test/validation** or `npm run build` verification before considering tasks complete
 
 ## Critical Files & Dependencies
 
@@ -158,19 +142,6 @@ src/
 - `src/types/index.ts` — global type changes are wide-reaching
 - `vite.config.ts` & `tsconfig.json` — keep path aliases synchronized
 - `src/core/StructuredObject.ts` — base class for all 3D objects
-
-**Dependencies:**
-- `three@0.160.0` — **pinned version**, API changes across versions may break code
-- `three-bvh-csg@0.0.17` — advanced geometry operations
-
-## Validation Before Submitting Changes
-
-1. `npm install`
-2. `npm run build` — must complete without TypeScript errors
-3. `npm run dev` — verify server starts on http://localhost:3001
-4. **Smoke test controls:** ↑↓ arrow keys (rotate bar), mouse orbit, R key (reset)
-5. Verify path aliases resolve (no relative paths replacing aliases)
-6. **Keep French in comments where present**
 
 ## Controls
 
@@ -196,43 +167,8 @@ src/
 - New total: 0.5288 m² (22% reduction from incorrect values)
 - Impact: Aerodynamic forces now physically accurate
 - See `CHANGELOG_surfaces.md` for validation details
+current development tasks and testing checklist
 
-**Available documentation** (check before major physics changes):
-- `docs/LINE_PHYSICS_AUDIT_2025-10-01.md` — line physics analysis
-- `docs/DAMPING_AUDIT_2025-10-01.md` — damping system analysis  
-- `docs/OOP_LINE_ARCHITECTURE.md` — line system architecture
-- `docs/AUTO_MASS_CALCULATION.md` — mass distribution
-- `docs/BRIDLES_CONFIGURATION.md` — **guide de configuration des brides** (NEW)
-- `docs/TENSION_FORCES_DESIGN.md` — **mécanisme de plaquage et physique PBD** (NEW)
-- `CHANGELOG_surfaces.md` — surface area correction details
-- `TODO_TENSION_FORCES.md` — current development tasks and testing checklist
-
-## Critical Concept: Plaquage (Pressing Against Constraints)
-
-**FUNDAMENTAL UNDERSTANDING** for bridles and lines physics:
-
-The kite behaves as a **rigid object pressed against a geometric cage**:
-
-```
-1. Rigid structure (Kite.ts) → FIXED geometry defined by anatomical points
-2. Wind applies aerodynamic forces → PUSHES the rigid structure in all directions
-3. PBD constraints define a GEOMETRIC CAGE
-   ├─> Main lines: EXACT distance (= lineLength)
-   └─> Bridles: MAXIMUM distance (<= bridleLength)
-        ├─> Bridle NEZ: CTRL at max 0.68m from NEZ
-        ├─> Bridle INTER: CTRL at max 0.50m from INTER
-        └─> Bridle CENTRE: CTRL at max 0.50m from CENTRE
-        → Intersection of 3 spheres = UNIQUE position of CTRL
-4. Kite PRESSES against these limits
-   └─> Equilibrium = position where wind cannot push kite beyond limits
-       (all geometric constraints are saturated)
-```
-
-**Analogy**: Inflated balloon in a rigid cage
-- Balloon (wind) pushes in all directions
-- Cage (bridles + lines) defines geometric limits
-- Balloon presses against bars
-- Final shape = intersection between push and constraints
 
 **Role of bridles**: They are an **angle adjustment system**, NOT load-bearing elements!
 
@@ -246,21 +182,6 @@ Longer bridles → CTRL farther from NEZ → Higher angle of attack → More lif
 
 **Critical**: Bridles DON'T pull, they RETAIN at maximum distance. Equilibrium depends on the **geometry imposed** by bridles (which determines angle of attack), not on internal forces.
 
-## When to Search the Codebase
-
-**Trust these instructions first.** Search only when:
-- Instructions are incomplete for your specific task
-- You encounter an error not covered here
-- You need to understand a specific pattern not documented above
-
-**Common inspection points:**
-- `src/simulation/SimulationApp.ts` (main orchestration)
-- `src/simulation/physics/PhysicsEngine.ts` (physics loop)
-- `src/core/StructuredObject.ts` (3D object base pattern)
-- `src/objects/organic/Kite.ts` (StructuredObject example)
-- `src/objects/mechanical/Line.ts` (pure data entity pattern)
-
----
 
 **Update this file** if you modify architecture, conventions, or major workflows.
 

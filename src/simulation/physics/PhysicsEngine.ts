@@ -113,6 +113,7 @@ export class PhysicsEngine {
     const {
       lift,
       drag,
+      gravity,  // 🔴 BUG FIX #1 : Gravité retournée séparément (purement verticale)
       torque: totalTorque,  // Inclut déjà couple aéro + couple gravitationnel !
     } = AerodynamicsCalculator.calculateForces(apparentWind, kite.quaternion);
 
@@ -130,13 +131,14 @@ export class PhysicsEngine {
     // Mettre à jour la visualisation des brides selon leurs tensions
     kite.updateBridleVisualization(bridleTensions);
 
-    // Somme vectorielle de toutes les forces (2ème loi de Newton)
-    // Les forces incluent DÉJÀ la gravité distribuée sur chaque surface
+    // 🔴 BUG FIX #1 : Somme vectorielle CORRECTE des forces (2ème loi de Newton)
+    // Maintenant lift et drag sont PUREMENT aérodynamiques
+    // Gravité est ajoutée séparément (pas mélangée dans lift/drag)
     const totalForce = new THREE.Vector3()
-      .add(lift) // Forces aérodynamiques + gravité combinées
-      .add(drag); // (Vide - traînée intégrée dans lift)
+      .add(lift)     // Portance aérodynamique (perpendiculaire au vent)
+      .add(drag)     // Traînée aérodynamique (parallèle au vent)
+      .add(gravity); // Gravité (purement verticale, non décomposée)
       // PAS de forces de lignes - elles sont des contraintes géométriques
-      // PAS de gravité globale - elle est distribuée par surface
 
     // Couple total = moment aérodynamique + moment gravitationnel (émergent)
     // Les lignes n'appliquent PAS de couple - elles contraignent la position

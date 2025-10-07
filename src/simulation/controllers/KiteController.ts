@@ -92,31 +92,38 @@ export class KiteController {
     // Utiliser les forces lissées pour la physique
     const newPosition = this.integratePhysics(this.smoothedForce, deltaTime);
 
-    // Appliquer les contraintes de lignes (Position-Based Dynamics)
-    // Le solveur peut modifier newPosition ainsi que state.velocity / state.angularVelocity
-    try {
-      ConstraintSolver.enforceLineConstraints(
-        this.kite,
-        newPosition,
-        { velocity: this.state.velocity, angularVelocity: this.state.angularVelocity },
-        handles
-      );
-    } catch (err) {
-      // Ne pas laisser une exception du solveur casser la boucle principale
-      console.error("⚠️ Erreur dans ConstraintSolver.enforceLineConstraints:", err);
-    }
+    // 🔴 BUG FIX #3 : Résolution ITÉRATIVE des contraintes pour convergence
+    // Les contraintes lignes ↔ brides s'influencent mutuellement
+    // Une seule passe n'est pas suffisante - il faut itérer jusqu'à convergence
+    const MAX_CONSTRAINT_ITERATIONS = 3;  // 3 passes généralement suffisantes
+    
+    for (let iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; iter++) {
+      // Appliquer les contraintes de lignes (Position-Based Dynamics)
+      // Le solveur peut modifier newPosition ainsi que state.velocity / state.angularVelocity
+      try {
+        ConstraintSolver.enforceLineConstraints(
+          this.kite,
+          newPosition,
+          { velocity: this.state.velocity, angularVelocity: this.state.angularVelocity },
+          handles
+        );
+      } catch (err) {
+        // Ne pas laisser une exception du solveur casser la boucle principale
+        console.error(`⚠️ Erreur dans ConstraintSolver.enforceLineConstraints (iter ${iter}):`, err);
+      }
 
-    // Appliquer les contraintes des brides (Position-Based Dynamics)
-    // Les brides sont des contraintes INTERNES qui lient les points du kite entre eux
-    try {
-      ConstraintSolver.enforceBridleConstraints(
-        this.kite,
-        newPosition,
-        { velocity: this.state.velocity, angularVelocity: this.state.angularVelocity },
-        this.kite.getBridleLengths()
-      );
-    } catch (err) {
-      console.error("⚠️ Erreur dans ConstraintSolver.enforceBridleConstraints:", err);
+      // Appliquer les contraintes des brides (Position-Based Dynamics)
+      // Les brides sont des contraintes INTERNES qui lient les points du kite entre eux
+      try {
+        ConstraintSolver.enforceBridleConstraints(
+          this.kite,
+          newPosition,
+          { velocity: this.state.velocity, angularVelocity: this.state.angularVelocity },
+          this.kite.getBridleLengths()
+        );
+      } catch (err) {
+        console.error(`⚠️ Erreur dans ConstraintSolver.enforceBridleConstraints (iter ${iter}):`, err);
+      }
     }
 
     // Gérer la collision avec le sol - corrige newPosition et vitesse si nécessaire

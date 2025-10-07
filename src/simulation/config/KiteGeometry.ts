@@ -277,29 +277,99 @@ export class KiteGeometry {
   static readonly TOTAL_MASS = KiteGeometry.calculateTotalMass();
 
   /**
-   * Distribution de la masse sur les surfaces
-   * Chaque surface porte une fraction de la masse totale proportionnelle à son aire
+   * 🔴 BUG FIX #2 : Distribution masse frame selon géométrie RÉELLE
    * 
-   * Modèle physique :
+   * Topologie du kite (4 surfaces triangulaires) :
+   *   Surface 0 (haute gauche)  : NEZ → BORD_GAUCHE → WHISKER_GAUCHE
+   *   Surface 1 (basse gauche)  : NEZ → WHISKER_GAUCHE → SPINE_BAS
+   *   Surface 2 (haute droite)  : NEZ → BORD_DROIT → WHISKER_DROIT
+   *   Surface 3 (basse droite)  : NEZ → WHISKER_DROIT → SPINE_BAS
+   * 
+   * Attribution des segments de frame aux surfaces :
+   *   - Spine (NEZ → SPINE_BAS) : partagée 50/50 entre hautes et basses
+   *   - Leading edge gauche (NEZ → BORD_GAUCHE) : 100% surface 0
+   *   - Leading edge droit (NEZ → BORD_DROIT) : 100% surface 2
+   *   - Strut gauche (BORD_GAUCHE → WHISKER_GAUCHE) : partagé surface 0/1
+   *   - Strut droit (BORD_DROIT → WHISKER_DROIT) : partagé surface 2/3
+   *   - Spreader (WHISKER_GAUCHE → WHISKER_DROIT) : partagé entre toutes
+   * 
+   * @returns Tableau de 4 masses (kg) pour chaque surface
+   */
+  private static calculateFrameMassDistribution(): number[] {
+    const specs = KiteGeometry.MATERIAL_SPECS.carbon;
+    
+    // Masses linéiques (kg/m)
+    const spineUnitMass = specs.spine / 1000;        // g/m → kg/m
+    const leadingEdgeUnitMass = specs.leadingEdge / 1000;
+    const strutUnitMass = specs.strut / 1000;
+    
+    // Longueurs individuelles des segments
+    const spineLength = KiteGeometry.POINTS.NEZ.distanceTo(KiteGeometry.POINTS.SPINE_BAS);
+    const leadingEdgeLeft = KiteGeometry.POINTS.NEZ.distanceTo(KiteGeometry.POINTS.BORD_GAUCHE);
+    const leadingEdgeRight = KiteGeometry.POINTS.NEZ.distanceTo(KiteGeometry.POINTS.BORD_DROIT);
+    const strutLeft = KiteGeometry.POINTS.BORD_GAUCHE.distanceTo(KiteGeometry.POINTS.WHISKER_GAUCHE);
+    const strutRight = KiteGeometry.POINTS.BORD_DROIT.distanceTo(KiteGeometry.POINTS.WHISKER_DROIT);
+    const spreader = KiteGeometry.POINTS.WHISKER_GAUCHE.distanceTo(KiteGeometry.POINTS.WHISKER_DROIT);
+    
+    // Masses individuelles des segments
+    const spineMass = spineLength * spineUnitMass;
+    const leadingEdgeLeftMass = leadingEdgeLeft * leadingEdgeUnitMass;
+    const leadingEdgeRightMass = leadingEdgeRight * leadingEdgeUnitMass;
+    const strutLeftMass = strutLeft * strutUnitMass;
+    const strutRightMass = strutRight * strutUnitMass;
+    const spreaderMass = spreader * strutUnitMass;
+    
+    // Attribution géométrique réaliste aux surfaces
+    const frameMasses = [
+      // Surface 0 (haute gauche) : spine + leading edge gauche + strut gauche + spreader
+      (spineMass * 0.5) +           // 50% spine (partie haute)
+      leadingEdgeLeftMass +         // 100% leading edge gauche
+      (strutLeftMass * 0.5) +       // 50% strut gauche (partie haute)
+      (spreaderMass * 0.25),        // 25% spreader (coin gauche)
+      
+      // Surface 1 (basse gauche) : spine + strut gauche + spreader
+      (spineMass * 0.5) +           // 50% spine (partie basse)
+      (strutLeftMass * 0.5) +       // 50% strut gauche (partie basse)
+      (spreaderMass * 0.25),        // 25% spreader (coin gauche)
+      
+      // Surface 2 (haute droite) : leading edge droit + strut droit + spreader
+      leadingEdgeRightMass +        // 100% leading edge droit
+      (strutRightMass * 0.5) +      // 50% strut droit (partie haute)
+      (spreaderMass * 0.25),        // 25% spreader (coin droit)
+      
+      // Surface 3 (basse droite) : strut droit + spreader
+      (strutRightMass * 0.5) +      // 50% strut droit (partie basse)
+      (spreaderMass * 0.25),        // 25% spreader (coin droit)
+    ];
+    
+    return frameMasses;
+  }
+
+  /**
+   * Distribution de la masse sur les surfaces
+   * Chaque surface porte une fraction de la masse totale
+   * 
+   * Modèle physique CORRIGÉ :
    * - Masse de tissu (fabric) : Distribuée proportionnellement à l'aire
-   * - Masse de frame : Distribuée uniformément sur les 4 surfaces
+   * - Masse de frame : Distribuée selon géométrie réelle (🔴 BUG FIX #2)
    * - Masse d'accessoires : Distribuée uniformément sur les 4 surfaces
    * 
    * @returns Masse de chaque surface en kg
    */
   static calculateSurfaceMasses(): number[] {
     const fabricMass = KiteGeometry.calculateFabricMass();
-    const frameMass = KiteGeometry.calculateFrameMass();
+    const frameMasses = KiteGeometry.calculateFrameMassDistribution();  // 🔴 BUG FIX #2
     const accessoriesMass = KiteGeometry.calculateAccessoriesMass();
     
-    // La masse de frame + accessoires est répartie uniformément
-    const uniformMassPerSurface = (frameMass + accessoriesMass) / KiteGeometry.SURFACES.length;
+    // Accessoires répartis uniformément (connecteurs dispersés sur tout le kite)
+    const uniformAccessories = accessoriesMass / KiteGeometry.SURFACES.length;
     
     // La masse de tissu est répartie proportionnellement à l'aire
-    return KiteGeometry.SURFACES.map(surface => {
+    return KiteGeometry.SURFACES.map((surface, index) => {
       const fabricMassRatio = surface.area / KiteGeometry.TOTAL_AREA;
       const surfaceFabricMass = fabricMass * fabricMassRatio;
-      return surfaceFabricMass + uniformMassPerSurface;
+      
+      return surfaceFabricMass + frameMasses[index] + uniformAccessories;
     });
   }
 
