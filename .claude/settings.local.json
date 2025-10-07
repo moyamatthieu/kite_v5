@@ -19,9 +19,12 @@
       "Bash(cloc:*)",
       "Bash(git mv:*)",
       "Bash(node:*)",
-      "Bash(npx ts-node --esm -e \"import(''./src/simulation/config/KiteGeometry'').then(m => console.log(''Masse:'', m.KiteGeometry.TOTAL_MASS, ''kg''))\")"
+      "Bash(npx ts-node --esm -e \"import(''./src/simulation/config/KiteGeometry'').then(m => console.log(''Masse:'', m.KiteGeometry.TOTAL_MASS, ''kg''))\")",
+      "Bash(npm install)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "default"
 }

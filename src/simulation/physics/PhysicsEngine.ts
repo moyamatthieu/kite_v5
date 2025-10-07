@@ -100,6 +100,10 @@ export class PhysicsEngine {
 
     // Vent apparent = vent réel - vitesse du kite (principe de relativité)
     const kiteState = this.kiteController.getState();
+
+    // 🔍 DEBUG: Vérifier la vitesse du kite pour comprendre le vent apparent faible - DISABLED for performance
+    // console.log(`🔍 KITE VELOCITY: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Magnitude: ${kiteState.velocity.length().toFixed(2)} m/s`);
+
     const apparentWind = this.windSimulator.getApparentWind(
       kiteState.velocity,
       deltaTime

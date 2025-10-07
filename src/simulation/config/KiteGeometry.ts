@@ -111,26 +111,26 @@ export class KiteGeometry {
       // Surface haute droite
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.BORD_DROIT,
         KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.BORD_DROIT,
       ],
       area: KiteGeometry.calculateTriangleArea(
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.BORD_DROIT,
-        KiteGeometry.POINTS.WHISKER_DROIT
+        KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.BORD_DROIT
       ),
     },
     {
       // Surface basse droite
       vertices: [
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.WHISKER_DROIT,
         KiteGeometry.POINTS.SPINE_BAS,
+        KiteGeometry.POINTS.WHISKER_DROIT,
       ],
       area: KiteGeometry.calculateTriangleArea(
         KiteGeometry.POINTS.NEZ,
-        KiteGeometry.POINTS.WHISKER_DROIT,
-        KiteGeometry.POINTS.SPINE_BAS
+        KiteGeometry.POINTS.SPINE_BAS,
+        KiteGeometry.POINTS.WHISKER_DROIT
       ),
     },
   ];
@@ -322,22 +322,24 @@ export class KiteGeometry {
     // Attribution géométrique réaliste aux surfaces
     const frameMasses = [
       // Surface 0 (haute gauche) : spine + leading edge gauche + strut gauche + spreader
-      (spineMass * 0.5) +           // 50% spine (partie haute)
+      (spineMass * 0.25) +          // 25% spine (partagée entre 4 surfaces)
       leadingEdgeLeftMass +         // 100% leading edge gauche
       (strutLeftMass * 0.5) +       // 50% strut gauche (partie haute)
       (spreaderMass * 0.25),        // 25% spreader (coin gauche)
-      
+
       // Surface 1 (basse gauche) : spine + strut gauche + spreader
-      (spineMass * 0.5) +           // 50% spine (partie basse)
+      (spineMass * 0.25) +          // 25% spine (partagée entre 4 surfaces)
       (strutLeftMass * 0.5) +       // 50% strut gauche (partie basse)
       (spreaderMass * 0.25),        // 25% spreader (coin gauche)
-      
-      // Surface 2 (haute droite) : leading edge droit + strut droit + spreader
+
+      // Surface 2 (haute droite) : spine + leading edge droit + strut droit + spreader
+      (spineMass * 0.25) +          // 25% spine (partagée entre 4 surfaces)
       leadingEdgeRightMass +        // 100% leading edge droit
       (strutRightMass * 0.5) +      // 50% strut droit (partie haute)
       (spreaderMass * 0.25),        // 25% spreader (coin droit)
-      
-      // Surface 3 (basse droite) : strut droit + spreader
+
+      // Surface 3 (basse droite) : spine + strut droit + spreader
+      (spineMass * 0.25) +          // 25% spine (partagée entre 4 surfaces)
       (strutRightMass * 0.5) +      // 50% strut droit (partie basse)
       (spreaderMass * 0.25),        // 25% spreader (coin droit)
     ];

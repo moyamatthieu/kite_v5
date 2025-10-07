@@ -3,22 +3,7 @@
  *
  * Rôle :
  *   - Calcule les forces de portance, traînée, friction et résultante sur chaque surface du kite
- *   - Utilisé pour déter      // Séparation couples aéro et gravité pour scaling cohérent :
-      // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
-      // - Couple gravité : physique pure, pas de scaling
-      const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
-      
-      // Couple aérodynamique (lift + drag)
-      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, aeroForce);
-      aeroTorque.add(aeroTorqueSurface);
-      
-      // Couple gravitationnel (émergent de la distribution de masse)
-      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, gravity);
-      gravityTorque.add(gravityTorqueSurface);
-      
-      // Couple total pour cette surface
-      const torque = new THREE.Vector3().crossVectors(centreWorld, totalSurfaceForce);
-      totalTorque.add(torque);ement du kite face au vent
+ *   - Utilisé pour déterminer le mouvement du kite face au vent
  *   - Fournit les vecteurs de force pour le rendu debug et la physique
  *
  * Dépendances principales :
@@ -150,6 +135,12 @@ export class AerodynamicsCalculator {
       const CL = sinAlpha * cosAlpha;  // Coefficient lift
       const CD = sinAlpha * sinAlpha;   // Coefficient drag (= CN)
       
+      // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
+      // if (surfaceIndex === 0) {
+      //   const alphaDeg = Math.asin(sinAlpha) * 180 / Math.PI;
+      //   console.log(`Surface ${surfaceIndex}: α=${alphaDeg.toFixed(1)}°, CL=${CL.toFixed(3)}, CD=${CD.toFixed(3)}, q=${dynamicPressure.toFixed(2)}Pa, A=${surface.area.toFixed(4)}m²`);
+      // }
+      
       // Direction : normale à la surface, orientée face au vent
       const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
       
@@ -201,6 +192,9 @@ export class AerodynamicsCalculator {
         .add(surface.vertices[1])
         .add(surface.vertices[2])
         .divideScalar(3);
+
+      // 🔍 DEBUG TOUTES les surfaces : géométrie + forces - DISABLED for performance
+      // console.log(`🔍 Surface ${surfaceIndex}: Centre=(${centre.x.toFixed(3)}, ${centre.y.toFixed(3)}, ${centre.z.toFixed(3)}), Normale=(${normaleMonde.x.toFixed(2)}, ${normaleMonde.y.toFixed(2)}, ${normaleMonde.z.toFixed(2)}), Force=(${totalSurfaceForce.x.toFixed(2)}, ${totalSurfaceForce.y.toFixed(2)}, ${totalSurfaceForce.z.toFixed(2)})`);
 
       // On note si cette force est sur le côté gauche ou droit
       // C'est important car si un côté a plus de force,
@@ -271,6 +265,27 @@ export class AerodynamicsCalculator {
     // Il suffit d'appliquer les scaling factors directement
     const lift = totalLift.multiplyScalar(CONFIG.aero.liftScale);
     const drag = totalDrag.multiplyScalar(CONFIG.aero.dragScale);
+
+    // 🔍 DEBUG : Afficher forces calculées - DISABLED for performance
+    // Uncomment for debugging:
+    // console.log('=== FORCES AÉRODYNAMIQUES (TOTALES APRÈS SCALING) ===');
+    // console.log('Lift:', lift.toArray().map(v => v.toFixed(2)), 'Magnitude:', lift.length().toFixed(2), 'N');
+    // console.log('Drag:', drag.toArray().map(v => v.toFixed(2)), 'Magnitude:', drag.length().toFixed(2), 'N');
+    // console.log('Gravity:', gravityForce.toArray().map(v => v.toFixed(2)), 'Magnitude:', gravityForce.length().toFixed(2), 'N');
+    // console.log('Ratio L/W:', (lift.length() / gravityForce.length()).toFixed(2));
+    // console.log('Wind speed:', apparentWind.length().toFixed(2), 'm/s');
+
+    // 🔍 DEBUG CRITIQUE : Asymétrie gauche/droite - DISABLED for performance
+    // const leftMag = leftForce.length();
+    // const rightMag = rightForce.length();
+    // const asymmetry = leftMag - rightMag;
+    // const asymmetryPercent = rightMag > 0 ? (asymmetry / rightMag * 100) : 0;
+    // const leftArr = leftForce.toArray();
+    // const rightArr = rightForce.toArray();
+    // const diffArr = leftForce.clone().sub(rightForce).toArray();
+    // console.log(`🔍 LEFT FORCE: (${leftArr[0].toFixed(2)}, ${leftArr[1].toFixed(2)}, ${leftArr[2].toFixed(2)}) | Mag: ${leftMag.toFixed(2)} N`);
+    // console.log(`🔍 RIGHT FORCE: (${rightArr[0].toFixed(2)}, ${rightArr[1].toFixed(2)}, ${rightArr[2].toFixed(2)}) | Mag: ${rightMag.toFixed(2)} N`);
+    // console.log(`🔍 ASYMMETRY: ${asymmetry.toFixed(2)} N (${asymmetryPercent.toFixed(1)}%) | Diff: (${diffArr[0].toFixed(2)}, ${diffArr[1].toFixed(2)}, ${diffArr[2].toFixed(2)})`);
 
     // CORRECTION CRITIQUE : Scaling cohérent du couple aérodynamique
     // Le couple DOIT être scalé proportionnellement aux forces aéro pour cohérence physique

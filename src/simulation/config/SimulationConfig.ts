@@ -43,7 +43,7 @@ export const CONFIG = {
     angularDragFactor: 0.5, // 🔧 PHASE 2: Réduit (2.0 → 0.5) pour rotation moins freinée
   },
   aero: {
-    liftScale: 4.0, // 🔧 PHASE 4 (Bug #4): Augmenté (2.0 → 4.0) pour formules CL/CD correctes
+    liftScale: 2.5, // 🔧 CORRECTED: Réduit (4.0 → 2.5) pour forces réalistes avec formules CL/CD
     dragScale: 1.5, // 🔧 PHASE 1: Augmenté (×1.5) pour équilibre forces
   },
   kite: {
@@ -69,7 +69,7 @@ export const CONFIG = {
   wind: {
     defaultSpeed: 20, // km/h
     defaultDirection: 0, // degrés
-    defaultTurbulence: 0.001, // % - Turbulence minimale
+    defaultTurbulence: 10, // % - Turbulence réaliste (0.001 → 10)
     turbulenceScale: 0.05,
     turbulenceFreqBase: 0.05,
     turbulenceFreqY: 0.3,

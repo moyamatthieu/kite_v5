@@ -100,6 +100,9 @@ export class WindSimulator {
     // Si le kite va vite vers l'avant, il "crée" du vent de face
     const apparent = windVector.clone().sub(kiteVelocity);
 
+    // 🔍 DEBUG: Vérifier le calcul du vent apparent - DISABLED for performance
+    // console.log(`🔍 WIND CALC: Real wind (${windVector.x.toFixed(2)}, ${windVector.y.toFixed(2)}, ${windVector.z.toFixed(2)}) = ${windVector.length().toFixed(2)} m/s | Kite vel (${kiteVelocity.x.toFixed(2)}, ${kiteVelocity.y.toFixed(2)}, ${kiteVelocity.z.toFixed(2)}) = ${kiteVelocity.length().toFixed(2)} m/s | Apparent (${apparent.x.toFixed(2)}, ${apparent.y.toFixed(2)}, ${apparent.z.toFixed(2)}) = ${apparent.length().toFixed(2)} m/s`);
+
     return apparent;
   }
 
