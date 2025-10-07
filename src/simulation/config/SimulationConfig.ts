@@ -43,7 +43,7 @@ export const CONFIG = {
     angularDragFactor: 0.5, // 🔧 PHASE 2: Réduit (2.0 → 0.5) pour rotation moins freinée
   },
   aero: {
-    liftScale: 2.0, // 🔧 PHASE 1: Augmenté (×2) pour compenser masse doublée
+    liftScale: 4.0, // 🔧 PHASE 4 (Bug #4): Augmenté (2.0 → 4.0) pour formules CL/CD correctes
     dragScale: 1.5, // 🔧 PHASE 1: Augmenté (×1.5) pour équilibre forces
   },
   kite: {

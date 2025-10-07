@@ -3,7 +3,22 @@
  *
  * Rôle :
  *   - Calcule les forces de portance, traînée, friction et résultante sur chaque surface du kite
- *   - Utilisé pour déterminer le comportement du kite face au vent
+ *   - Utilisé pour déter      // Séparation couples aéro et gravité pour scaling cohérent :
+      // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
+      // - Couple gravité : physique pure, pas de scaling
+      const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
+      
+      // Couple aérodynamique (lift + drag)
+      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, aeroForce);
+      aeroTorque.add(aeroTorqueSurface);
+      
+      // Couple gravitationnel (émergent de la distribution de masse)
+      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, gravity);
+      gravityTorque.add(gravityTorqueSurface);
+      
+      // Couple total pour cette surface
+      const torque = new THREE.Vector3().crossVectors(centreWorld, totalSurfaceForce);
+      totalTorque.add(torque);ement du kite face au vent
  *   - Fournit les vecteurs de force pour le rendu debug et la physique
  *
  * Dépendances principales :
@@ -82,9 +97,10 @@ export class AerodynamicsCalculator {
     let totalForce = new THREE.Vector3();
     let totalTorque = new THREE.Vector3();
     
-    // 🔴 BUG FIX #1 : Séparer forces aéro et gravité AVANT décomposition lift/drag
-    // La gravité ne doit PAS être décomposée en lift/drag (elle est purement verticale)
-    let aeroForce = new THREE.Vector3();      // Forces aérodynamiques uniquement
+    // 🔴 BUG FIX #4 : Accumuler lift/drag SÉPARÉMENT avec coefficients corrects
+    // Utiliser formules plaque plane : CL = sin(α)×cos(α), CD = sin²(α)
+    let totalLift = new THREE.Vector3();      // Portance totale
+    let totalDrag = new THREE.Vector3();      // Traînée totale
     let gravityForce = new THREE.Vector3();   // Gravité séparée
     
     // Séparation couples aéro et gravité pour scaling cohérent
@@ -125,21 +141,41 @@ export class AerodynamicsCalculator {
         return;
       }
 
-      // MODÈLE PHYSIQUE POUR PLAQUE PLANE (Hoerner, "Fluid Dynamic Drag")
-      // Pour une plaque plane frappée par un fluide :
-      // - Force NORMALE à la surface (perpendiculaire)
-      // - Magnitude : F_n = q × A × sin²(α)
-      // où α = angle d'incidence (angle entre vent et surface)
+      // 🔴 BUG FIX #4 : COEFFICIENTS PLAQUE PLANE CORRECTS (Hoerner)
+      // Formules physiques pour plaque plane inclinée à angle α :
+      //   C_L = sin(α) × cos(α)  → Coefficient de portance
+      //   C_D = sin²(α)           → Coefficient de traînée
+      // Ces coefficients sont validés expérimentalement !
       
-      // Coefficient de force normale pour plaque plane
-      const CN = sinAlpha * sinAlpha; // ∝ sin²(α)
+      const CL = sinAlpha * cosAlpha;  // Coefficient lift
+      const CD = sinAlpha * sinAlpha;   // Coefficient drag (= CN)
       
       // Direction : normale à la surface, orientée face au vent
       const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
       
-      // Force normale = pression dynamique × aire × coefficient
-      const normalForceMagnitude = dynamicPressure * surface.area * CN;
-      const force = windFacingNormal.clone().multiplyScalar(normalForceMagnitude);
+      // DIRECTION LIFT : Perpendiculaire au vent, dans le plan (vent, normale)
+      // Méthode : liftDir = normalize(windFacingNormal - (windFacingNormal·windDir)×windDir)
+      const liftDir = windFacingNormal.clone()
+        .sub(windDir.clone().multiplyScalar(windFacingNormal.dot(windDir)))
+        .normalize();
+      
+      // Vérifier validité (éviter division par zéro si vent // normale)
+      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
+        liftDir.copy(windFacingNormal);  // Fallback : utiliser normale
+      }
+      
+      // DIRECTION DRAG : Parallèle au vent
+      const dragDir = windDir.clone();
+      
+      // FORCES AÉRODYNAMIQUES (AVANT scaling)
+      const liftMagnitude = dynamicPressure * surface.area * CL;
+      const dragMagnitude = dynamicPressure * surface.area * CD;
+      
+      const liftForce = liftDir.clone().multiplyScalar(liftMagnitude);
+      const dragForce = dragDir.clone().multiplyScalar(dragMagnitude);
+      
+      // Force aérodynamique totale = lift + drag (vectoriel)
+      const aeroForce = liftForce.clone().add(dragForce);
       
       // GRAVITÉ DISTRIBUÉE (émergente, pas scriptée !)
       // Chaque surface porte une fraction de la masse totale
@@ -147,19 +183,17 @@ export class AerodynamicsCalculator {
       // → Couple gravitationnel émerge naturellement de r × F_gravity
       const gravity = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
       
-      // 🔴 BUG FIX #1 : Accumuler aéro et gravité SÉPARÉMENT
-      aeroForce.add(force);           // Forces aéro uniquement
+      // 🔴 BUG FIX #4 : Accumuler lift/drag SÉPARÉMENT (pas de décomposition !)
+      totalLift.add(liftForce);       // Portance accumulée
+      totalDrag.add(dragForce);       // Traînée accumulée
       gravityForce.add(gravity);      // Gravité séparée
       
       // Force totale sur cette surface = aéro + gravité
-      const totalSurfaceForce = force.clone().add(gravity);
+      const totalSurfaceForce = aeroForce.clone().add(gravity);
       
-      // Pour le debug : décomposition lift/drag depuis la force normale
-      // Lift = composante perpendiculaire au vent
-      // Drag = composante parallèle au vent
-      const dragMagnitude = force.dot(windDir); // Projection sur direction vent
-      const drag = windDir.clone().multiplyScalar(dragMagnitude);
-      const lift = force.clone().sub(drag); // Lift = force - drag
+      // Pour le debug : conserver lift/drag locaux
+      const lift = liftForce.clone();
+      const drag = dragForce.clone();
 
       // 6. Centre de pression = centre géométrique du triangle
       const centre = surface.vertices[0]
@@ -181,15 +215,11 @@ export class AerodynamicsCalculator {
 
       totalForce.add(totalSurfaceForce);
 
-      // Lift et drag déjà calculés correctement ci-dessus avec le modèle plaque plane
-      // Pas besoin de recalculer par décomposition vectorielle
-
       // Friction (négligeable pour l'air, nulle)
       const friction = new THREE.Vector3();
 
-      // Résultante = force normale totale (PAS force + lift + drag !)
-      // lift + drag = force par décomposition vectorielle
-      const resultant = force.clone();
+      // Résultante = force aéro totale (lift + drag vectoriel)
+      const resultant = aeroForce.clone();
 
       surfaceForces.push({
         surfaceIndex,
@@ -207,13 +237,13 @@ export class AerodynamicsCalculator {
       // Si vous poussez loin des gonds, elle tourne beaucoup
       // Ici, plus la force est loin du centre, plus elle fait tourner
       //
-      // SÉPARATION couples aéro et gravité pour scaling cohérent :
+      // Séparation couples aéro et gravité pour scaling cohérent :
       // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
       // - Couple gravité : physique pure, pas de scaling
       const centreWorld = centre.clone().applyQuaternion(kiteOrientation);
       
-      // Couple aérodynamique (force normale uniquement)
-      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, force);
+      // Couple aérodynamique (lift + drag)
+      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorld, aeroForce);
       aeroTorque.add(aeroTorqueSurface);
       
       // Couple gravitationnel (émergent de la distribution de masse)
@@ -236,15 +266,11 @@ export class AerodynamicsCalculator {
     // Si rightForce > leftForce → rotation vers la gauche
     // AUCUN facteur artificiel nécessaire!
 
-    // 🔴 BUG FIX #1 : Décomposition lift/drag CORRECTE (sur forces aéro uniquement)
-    // La gravité est purement verticale, elle ne doit PAS être décomposée en lift/drag
-    const globalDragComponent = aeroForce.dot(windDir);
-    const globalDrag = windDir.clone().multiplyScalar(globalDragComponent);
-    const globalLift = aeroForce.clone().sub(globalDrag);
-
-    // Application des facteurs de configuration aux forces
-    const lift = globalLift.multiplyScalar(CONFIG.aero.liftScale);
-    const drag = globalDrag.multiplyScalar(CONFIG.aero.dragScale);
+    // 🔴 BUG FIX #4 : PAS DE DÉCOMPOSITION GLOBALE !
+    // Les lift/drag ont déjà été calculés CORRECTEMENT par surface avec CL/CD
+    // Il suffit d'appliquer les scaling factors directement
+    const lift = totalLift.multiplyScalar(CONFIG.aero.liftScale);
+    const drag = totalDrag.multiplyScalar(CONFIG.aero.dragScale);
 
     // CORRECTION CRITIQUE : Scaling cohérent du couple aérodynamique
     // Le couple DOIT être scalé proportionnellement aux forces aéro pour cohérence physique

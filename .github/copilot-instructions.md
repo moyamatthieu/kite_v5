@@ -4,6 +4,49 @@
 ## Repository Overview
 
 **Kite Simulator** is an autonomous web-based kite physics simulation built with TypeScript and Three.js. It simulates realistic kite flight dynamics using emergent physics-based behavior—no scripted animations. 
+Modélisation du Comportement Aérodynamique et Cinématique d'une Aile de Kite
+L'objet de cette analyse est de décrire le comportement cinématique et aérodynamique d'une aile de kite (ou voile de traction) modélisée comme une structure tridimensionnelle rigide.
+
+Structure et Déplacements Contraints
+L'aile de kite est conceptualisée comme une entité non déformable, composée d'une ossature (les frames ou lattes) et de surfaces porteuses rigides. Sous l'effet des forces aérodynamiques générées par le vent, cette structure est mise en mouvement jusqu'à ce qu'elle atteigne les limites imposées par la géométrie du système de liaison avec le pilote.
+
+Ces limites sont strictement définies par la longueur totale des lignes de vol et des brides (les lignes de connexion entre les lignes de vol et l'aile elle-même). Une fois cet allongement maximal atteint, le système de lignes et de brides est entièrement tendu, définissant la frontière de l'espace de vol accessible à l'aile.
+
+La Sphère de Vol et le Mouvement Latéral
+L'aile est alors constamment plaquée contre cette frontière par la pression continue du vent. Géométriquement, l'espace de vol est donc une calotte sphérique dont le rayon R est égal à la somme de la longueur des lignes de vol et de celle des brides. L'aile évolue ainsi sur la surface de cette sphère de vol de rayon :
+
+R=Longueur des Lignes+Longueur des Brides
+L'effet aérodynamique fondamental est généré par l'inclinaison des surfaces de l'aile (son angle d'attaque et l'angle de site par rapport au vent). Cette inclinaison, conjuguée à la contrainte de distance maximale imposée par les lignes, génère une force latérale (composante propulsive ou de portance) qui ne peut se traduire que par un déplacement tangentiel sur la sphère de vol. L'aile se déplace ainsi dans son propre plan "vers l'avant" (perpendiculairement à la direction des lignes vers le pilote), décrivant un arc sur la surface de la sphère.
+
+Point d'Équilibre (Zénith)
+Lorsque la barre de contrôle est relâchée ou maintenue en position neutre, le kite tend à trouver un point d'équilibre dynamique. Ce point correspond généralement au zénith de la sphère de vol (le point le plus haut par rapport au pilote, idéalement au-dessus de sa tête).
+
+À ce point d'équilibre supérieur, l'inclinaison des surfaces portantes de l'aile par rapport au vent relatif (qui est alors plus horizontal) devient minimale, se rapprochant de l'horizontale (ou d'un angle d'attaque très faible). Par conséquent, la force aérodynamique totale et la pression du vent exercée sur ces surfaces diminuent drastiquement, permettant au kite de se stabiliser avec une traction minimale. C'est la position de "repos" ou de sécurité relative.
+
+Mécanisme de Direction par la Barre de Contrôle
+L'action du pilote sur la barre n'est pas simplement une déviation, mais une modification asymétrique de la géométrie de l'aile.
+
+1. Déclenchement des virage
+Lorsque le pilote tire ou pousse sur un côté de la barre de contrôle (une action appelée "barre à droite" ou "barre à gauche"), il provoque une variation différentielle de la longueur des lignes arrière (lignes de direction) connectées aux extrémités (ou aux tips) de l'aile.
+
+Ligne deplacé en arriere : La ligne tire et deplace le Ctrl correspondant en arriere.
+
+Ligne deplacé en avant : Simultanément, la ligne du côté opposé se deplace et deplace en avant le Ctrl.
+
+2. Modification de l'Angle d'Attaque (Twist)
+Cette asymétrie de tension a pour effet de deplacer la structure dans l'espace 3d, provoquant une modification des force sur les faces ce qui change l'equilibre et entraine une rotation.
+
+
+
+3. Création d'un Couple Aérodynamique
+L'augmentation de l'angle d'attaque sur le côté tiré entraîne une augmentation significative des forces aérodynamiques générées sur cette demi-aile (principalement la force de portance).
+
+L'aile génère plus de traction (portance et traînée induite) sur le côté où l'AOA est accru.
+
+Cette dissymétrie de force entre les deux moitiés de l'aile crée un couple de rotation (ou moment de lacet) autour de son centre de gravité, forçant l'aile à pivoter sur la sphère de vol dans la direction du côté tiré.
+
+4. Conséquence Cinématique
+La rotation de l'aile réoriente son axe de vol. L'aile commence alors à se déplacer selon une trajectoire courbe sur la sphère de vol, obéissant à la nouvelle direction induite par l'asymétrie de portance. La vitesse et l'amplitude de ce virage dépendent directement de l'intensité de l'action sur la barre et de l'efficacité aérodynamique de l'aile.
 
 **Key facts:**
 - Language: TypeScript (ES modules), French/English comments coexist
@@ -18,7 +61,7 @@
 
 ```bash
 npm install          # Install dependencies (ALWAYS first)
-npm run dev          # ne pas lancer, serveur en arriere plan 
+npm run dev # Le serveur de développement est **déjà actif** en arrière-plan sur le port 3001. **NE PAS relancer** cette commande.
 npm run build        # Build production bundle
 npm run preview      # Preview production build
 
