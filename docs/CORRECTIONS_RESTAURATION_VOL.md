@@ -184,11 +184,17 @@ aero: {
 
 ### Comportement de Vol Restauré
 
-1. ✅ **Réactivité** : Kite répond instantanément au vent et aux commandes
-2. ✅ **Manœuvrabilité** : Rotation suffisamment rapide pour piloter
-3. ✅ **Portance** : Kite monte et vole stable au lieu de tomber
-4. ✅ **Stabilité** : Damping approprié, pas d'oscillations excessives
-5. ✅ **Naturel** : Mouvement fluide sans rigidité artificielle
+**PRINCIPE PHYSIQUE FONDAMENTAL** :
+Le kite est une **structure rigide 3D retenue par des lignes** qui évol sur une **sphère de rayon R = 15.5m** (lignes + brides). Il est **constamment plaqué** contre cette sphère par le vent et **ne peut PAS s'éloigner plus**.
+
+1. ✅ **Monte au zénith** : Barre neutre → kite grimpe vers y ≈ 15m (sommet de la sphère)
+2. ✅ **Équilibre stable** : Au zénith, surfaces horizontales → pression minimale → immobile
+3. ✅ **Lignes toujours tendues** : Tensions ≥ 75N (pré-tension minimale)
+4. ✅ **Réactivité** : Barre inclinée → rotation visible + déplacement sur sphère
+5. ✅ **Mouvement sur sphère** : Distance kite ↔ barre = 15.0-15.5m (constant)
+6. ✅ **Pas de vol libre** : Le kite glisse sur la sphère, ne s'envole pas librement
+
+**Voir `docs/COMPORTEMENT_PHYSIQUE_REEL.md` pour explication complète**
 
 ### Compromis Physique vs Jouabilité
 
@@ -205,23 +211,23 @@ aero: {
 
 ### Checklist Validation
 
-- [ ] **Démarrage** : Kite se stabilise rapidement sans tomber
-- [ ] **Vent constant** : Kite vole à angle stable, ne dérive pas
-- [ ] **Changement vent** : Kite réagit instantanément (< 50ms)
-- [ ] **Commande barre** : Rotation visible et contrôlable
-- [ ] **Oscillations** : Kite se stabilise seul après perturbation
-- [ ] **Forces** : Ratio L/W ≈ 10 à 20 km/h (vérifier UI)
-- [ ] **Tensions** : Lignes tendues mais pas excessives (< 800N)
+- [ ] **Démarrage** : Kite monte progressivement vers zénith (y: 5m → 15m en ~2s)
+- [ ] **Zénith atteint** : Kite se stabilise au sommet (y ≈ 14-15m, immobile)
+- [ ] **Lignes tendues** : Tensions ≥ 75N en permanence (jamais molles)
+- [ ] **Distance constante** : Kite ↔ barre = 15.0-15.5m (toujours sur la sphère)
+- [ ] **Commande barre** : Rotation visible + déplacement latéral sur sphère
+- [ ] **Équilibre naturel** : Barre relâchée → kite retourne au zénith
+- [ ] **Pas de dépassement** : Kite ne peut PAS aller au-delà de R = 15.5m
 
 ### Métriques Cibles
 
 | Métrique | Valeur Attendue | Comment Vérifier |
 |----------|-----------------|------------------|
-| Altitude stable | 5-10 m | UI Position Y |
-| Ratio L/W | 8-12 | UI Forces / Masse |
-| Temps réponse | < 3 frames | Observer réaction vent |
-| Angle attaque | 20-40° | Orientation kite vs vent |
-| Vitesse rotation | ~5 rad/s | Observer contrôle barre |
+| Altitude zénith | 14-15 m | UI Position Y (constant) |
+| Distance kite-barre | 15.0-15.5 m | Calculer \|\|position\|\| |
+| Tensions lignes | ≥ 75N (min) | UI Tensions G/D |
+| Angle attaque zénith | 0-10° | Surfaces quasi-horizontales |
+| Vitesse au zénith | < 0.5 m/s | Oscillations minimales |
 
 ---
 
