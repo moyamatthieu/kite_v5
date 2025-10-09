@@ -74,7 +74,7 @@ export const CONFIG = {
     defaultMeshSubdivisionLevel: 1, // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
   },
   lines: {
-    defaultLength: 15, // m - Longueur par défaut
+    defaultLength: 30, // m - Longueur par défaut (augmentée pour vol réaliste)
     stiffness: 1200, // N/m - Rigidité réduite pour plus de souplesse (2200 était trop rigide)
     preTension: 75, // N - Tension minimale toujours présente
     maxTension: 800, // N - Tension max avant rupture (~80% charge nominale)
@@ -115,8 +115,8 @@ export const CONFIG = {
     offsetZ: 8.5, // m - Distance derrière la barre
   },
   initialization: {
-    initialKiteY: 7.0, // m - Altitude initiale du kite
-    initialDistanceFactor: 0.98, // Sans unité - Facteur de distance initiale (98% de longueur ligne → lignes légèrement tendues au départ)
+    initialKiteY: 15.0, // m - Altitude initiale du kite (augmentée pour longueur ligne 30m)
+    initialDistanceFactor: 0.95, // Sans unité - Facteur de distance initiale (95% de longueur ligne → lignes légèrement tendues au départ)
   },
   visualization: {
     lineWidth: 2, // pixels - Largeur des lignes de contrôle
