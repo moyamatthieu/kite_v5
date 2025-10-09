@@ -285,6 +285,33 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     };
   }
 
+  /**
+   * Accesseurs pour les composants (nécessaires pour DebugRenderer)
+   */
+  getKiteController(): KiteController {
+    return this.kiteController;
+  }
+
+  getWindSimulator(): WindSimulator {
+    return this.windSimulator;
+  }
+
+  getLineSystem(): LineSystem {
+    return this.lineSystem;
+  }
+
+  getBridleSystem(): BridleSystem {
+    return this.bridleSystem;
+  }
+
+  getControlBarManager(): ControlBarManager {
+    return this.controlBarManager;
+  }
+
+  getKite(): Kite | null {
+    return this.kite || null;
+  }
+
   reset(): void {
     // Reset du kite n'existe pas dans KiteController
     // On recrée simplement le controller

@@ -27,6 +27,7 @@ import {
 // Import des composants existants (temporairement pour compatibilité)
 import { Kite } from '../objects/organic/Kite';
 import { UIManager } from './ui/UIManager';
+import { DebugRenderer } from './rendering/DebugRenderer';
 import { CONFIG } from './config/SimulationConfig';
 import { KiteGeometry } from './config/KiteGeometry';
 
@@ -57,6 +58,7 @@ export class SimulationApp {
   // Composants existants (pour compatibilité)
   private kite!: Kite;
   private uiManager!: UIManager;
+  private debugRenderer?: DebugRenderer;
   private controlBar!: THREE.Group;
   private pilot!: THREE.Mesh;
   private leftLine!: THREE.Line;
@@ -487,6 +489,17 @@ export class SimulationApp {
           scene.add(this.rightLine);
           console.log('🪁 Kite, control bar, pilot and lines added to scene');
           console.log('🎭 Scene children count after adding objects:', scene.children.length);
+
+          // Créer le DebugRenderer maintenant que la scène est prête
+          // Créer un wrapper RenderManager simple pour DebugRenderer
+          const renderManagerAdapter = {
+            addObject: (obj: THREE.Object3D) => scene.add(obj),
+            removeObject: (obj: THREE.Object3D) => scene.remove(obj),
+            getScene: () => scene
+          } as any;
+
+          this.debugRenderer = new DebugRenderer(renderManagerAdapter);
+          console.log('🔍 DebugRenderer initialized with adapter');
         }
       }
 
@@ -633,6 +646,15 @@ export class SimulationApp {
     if (inputState.resetPressed) {
       this.reset();
     }
+
+    // Mise à jour du debug renderer si activé
+    if (this.debugRenderer && this.kite) {
+      // Utiliser KitePhysicsSystem comme moteur physique s'il est disponible
+      if (this.config.enableCompletePhysics && this.isCompletePhysicsReady && this.kitePhysicsSystem) {
+        // Cast KitePhysicsSystem vers le type attendu par DebugRenderer
+        this.debugRenderer.updateDebugArrows(this.kite, this.kitePhysicsSystem as any);
+      }
+    }
   }
 
   /**
@@ -706,36 +728,84 @@ export class SimulationApp {
   private updateUIOverlay(): void {
     if (typeof document === 'undefined') return;
 
+    // Récupérer les éléments du DOM
     const fpsElement = document.getElementById('fps');
     const posElement = document.getElementById('kite-pos');
     const velElement = document.getElementById('kite-vel');
     const windElement = document.getElementById('wind-speed');
     const barElement = document.getElementById('bar-pos');
+    const altitudeElement = document.getElementById('altitude');
+    const speedElement = document.getElementById('speed');
+    const aoaElement = document.getElementById('aoa');
+    const tensionLeftElement = document.getElementById('tension-left');
+    const tensionRightElement = document.getElementById('tension-right');
 
-    if (fpsElement || posElement || velElement || windElement || barElement) {
-      const renderStats = this.renderSystem ? this.renderSystem.getRenderStats() : { fps: 0 };
-      const kitePhysics = this.physicsObjects.get('kite');
-      const inputState = this.inputSystem.getInputState();
-      const windState = this.windSystem.getWindState();
+    // Obtenir les données
+    const renderStats = this.renderSystem ? this.renderSystem.getRenderStats() : { fps: 0 };
+    const kitePhysics = this.physicsObjects.get('kite');
+    const inputState = this.inputSystem.getInputState();
+    const windState = this.windSystem.getWindState();
 
-      if (fpsElement) {
-        fpsElement.textContent = `FPS: ${renderStats.fps}`;
+    // Mettre à jour FPS
+    if (fpsElement) {
+      fpsElement.textContent = `${renderStats.fps} FPS`;
+    }
+
+    // Mettre à jour position
+    if (posElement && kitePhysics) {
+      const pos = kitePhysics.position;
+      posElement.textContent = `Position: X=${pos.x.toFixed(1)}m Y=${pos.y.toFixed(1)}m Z=${pos.z.toFixed(1)}m`;
+    }
+
+    // Mettre à jour altitude
+    if (altitudeElement && kitePhysics) {
+      altitudeElement.textContent = `Altitude: ${kitePhysics.position.y.toFixed(2)}m`;
+    }
+
+    // Mettre à jour vitesse
+    if (velElement && kitePhysics) {
+      const vel = kitePhysics.velocity;
+      velElement.textContent = `Vitesse: (${vel.x.toFixed(1)}, ${vel.y.toFixed(1)}, ${vel.z.toFixed(1)}) m/s`;
+    }
+
+    // Mettre à jour vitesse magnitude
+    if (speedElement && kitePhysics) {
+      const speedMagnitude = kitePhysics.velocity.length();
+      speedElement.textContent = `Vitesse: ${speedMagnitude.toFixed(2)} m/s`;
+    }
+
+    // Mettre à jour vent
+    if (windElement) {
+      windElement.textContent = `Vent: ${windState.baseSpeed.toFixed(1)} m/s`;
+    }
+
+    // Mettre à jour position barre
+    if (barElement) {
+      const barPercent = (inputState.barPosition * 100).toFixed(0);
+      const direction = inputState.barPosition > 0 ? 'Droite' : inputState.barPosition < 0 ? 'Gauche' : 'Centre';
+      barElement.textContent = `Barre: ${barPercent}% (${direction})`;
+    }
+
+    // Mettre à jour angle d'attaque (si KitePhysicsSystem disponible)
+    if (aoaElement && this.config.enableCompletePhysics && this.kitePhysicsSystem) {
+      const kiteState = this.kitePhysicsSystem.getKiteState();
+      if (kiteState) {
+        // Calculer un angle d'attaque approximatif depuis la vitesse et l'orientation
+        // Pour l'instant, on affiche juste 0 (à implémenter plus tard)
+        aoaElement.textContent = `AOA: N/A`;
+      }
+    }
+
+    // Mettre à jour tensions lignes (si KitePhysicsSystem disponible)
+    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
+      const stats = this.kitePhysicsSystem.getStats();
+
+      if (tensionLeftElement && stats) {
+        tensionLeftElement.textContent = `Tension Gauche: N/A`;
       }
 
-      if (posElement && kitePhysics) {
-        posElement.textContent = `Position: (${kitePhysics.position.x.toFixed(1)}, ${kitePhysics.position.y.toFixed(1)}, ${kitePhysics.position.z.toFixed(1)})`;
-      }
-
-      if (velElement && kitePhysics) {
-        velElement.textContent = `Vitesse: (${kitePhysics.velocity.x.toFixed(1)}, ${kitePhysics.velocity.y.toFixed(1)}, ${kitePhysics.velocity.z.toFixed(1)})`;
-      }
-
-      if (windElement) {
-        windElement.textContent = `Vent: ${windState.baseSpeed.toFixed(1)} m/s`;
-      }
-
-      if (barElement) {
-        barElement.textContent = `Barre: ${(inputState.barPosition * 100).toFixed(0)}%`;
+      if (tensionRightElement && stats) {
+        tensionRightElement.textContent = `Tension Droite: N/A`;
       }
     }
   }
