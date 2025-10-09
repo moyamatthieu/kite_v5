@@ -29,8 +29,8 @@
  */
 
 import * as THREE from "three";
-import { Kite } from "@objects/organic/Kite";
-import { Line } from "@objects/mechanical/Line";
+import { Kite } from "@/objects/Kite";
+import { Line } from "@/objects/Line";
 import { BridleFactory } from "@factories/BridleFactory";
 
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
@@ -151,8 +151,8 @@ export class BridleSystem {
     }
 
     // Convertir en coordonnées monde
-    const startWorld = kite.localToWorld(startLocal);
-    const endWorld = kite.localToWorld(endLocal);
+    const startWorld = kite.toWorldCoordinates(startLocal);
+    const endWorld = kite.toWorldCoordinates(endLocal);
 
     // Calculer vélocité relative avec VelocityCalculator
     const key = `${startPointName}_${endPointName}`;

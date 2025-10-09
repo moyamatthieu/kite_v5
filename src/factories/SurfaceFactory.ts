@@ -27,13 +27,7 @@ export interface SurfaceParams extends FactoryParams {
 /**
  * Factory pour créer des surfaces tendues
  *
- * TODO: Questions pour évolution future
- * - [ ] Implémenter subdivision de surfaces pour plus de détail ? non
- * - [ ] Ajouter simulation de tension/déformation ? non
- * - [ ] Supporter surfaces courbes (NURBS simplifiées) ? non
- * - [ ] Calculer automatiquement la triangulation optimale ? non
- * - [ ] Ajouter textures procédurales (tissage, ripstop) ? non
- * - [ ] Gérer les plis et déformations ? non
+ 
  *
  */
 export class SurfaceFactory extends BaseFactory<StructuredObject & ICreatable> {

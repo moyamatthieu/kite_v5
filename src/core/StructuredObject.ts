@@ -29,7 +29,7 @@
 
 import * as THREE from 'three';
 
-import { Position3D, NamedPoint, SurfaceOptions, MaterialConfig } from '../types/index';
+import { Position3D, NamedPoint, MaterialConfig } from '../types/index';
 
 import { Primitive } from './Primitive';
 import { Node3D } from './Node3D';

@@ -33,7 +33,9 @@
  */
 
 import { Vector3 } from 'three';
-import { Line } from '@objects/mechanical/Line';
+
+import { Line } from '@/objects/Line';
+
 import { PhysicsConstants } from '../config/PhysicsConstants';
 
 /**

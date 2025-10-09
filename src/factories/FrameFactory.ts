@@ -2,9 +2,10 @@
  * FrameFactory.ts - Factory pour créer des structures filaires (frames)
  */
 
-import { BaseFactory, FactoryMetadata } from './FactoryRegistry';
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
+
+import { BaseFactory, FactoryMetadata } from './FactoryRegistry';
 
 export interface FrameParams {
   diameter?: number;

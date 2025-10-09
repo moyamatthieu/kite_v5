@@ -238,6 +238,13 @@ export class AerodynamicsCalculator {
         surface.vertices[2]
       );
 
+      // Centre orienté dans le repère monde (sans translation)
+      const centreOriente = centre.clone().applyQuaternion(kiteOrientation);
+      // Centre monde complet (incluant translation si disponible)
+      const centreMonde = kitePosition
+        ? centreOriente.clone().add(kitePosition)
+        : centreOriente.clone();
+
       // 🔍 DEBUG TOUTES les surfaces : géométrie + forces - DISABLED for performance
 
 
@@ -266,7 +273,7 @@ export class AerodynamicsCalculator {
         drag,
         friction,
         resultant,
-        center: centre.clone(), // Coordonnées locales du kite
+        center: centreMonde,
         normal: normaleMonde.clone(),
         area: surface.area,
       });
@@ -280,7 +287,7 @@ export class AerodynamicsCalculator {
       // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
       // - Couple gravité : physique pure, pas de scaling
       // Note: centre est déjà en coordonnées locales, on applique seulement la rotation
-      const centreWorldForTorque = centre.clone().applyQuaternion(kiteOrientation);
+  const centreWorldForTorque = centreOriente.clone();
       
       // Couples calculés via méthode utilitaire
       aeroTorque.add(AerodynamicsCalculator.calculateTorque(centreWorldForTorque, aeroForce));

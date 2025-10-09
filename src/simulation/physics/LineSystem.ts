@@ -12,12 +12,13 @@
  *   - Le ConstraintSolver.enforceLineConstraints() gère la contrainte géométrique
  */
 import * as THREE from "three";
-import { Kite } from "@objects/organic/Kite";
-import { Line } from "@objects/mechanical/Line";
-import { LineFactory } from "@factories/LineFactory";
 
-import { ControlBarManager } from "../controllers/ControlBarManager";
+import { LineFactory } from "@factories/LineFactory";
+import { Line } from "@/objects/Line";
+import { Kite } from "@/objects/Kite";
+
 import { PhysicsConstants } from "../config/PhysicsConstants";
+import { HandlePositions } from "../types";
 
 import { LinePhysics } from "./LinePhysics";
 import { VelocityCalculator } from "./VelocityCalculator";
@@ -38,8 +39,8 @@ export class LineSystem {
 
   calculateLineTensions(
     kite: Kite,
-    controlRotation: number,
-    pilotPosition: THREE.Vector3
+    handles: HandlePositions,
+    deltaTime: number
   ): {
     leftForce: THREE.Vector3;
     rightForce: THREE.Vector3;
@@ -55,23 +56,21 @@ export class LineSystem {
       };
     }
 
-    const leftWorld = kite.localToWorld(ctrlLeft);
-    const rightWorld = kite.localToWorld(ctrlRight);
+    const leftWorld = kite.toWorldCoordinates(ctrlLeft);
+    const rightWorld = kite.toWorldCoordinates(ctrlRight);
 
-    const tempControlBar = new ControlBarManager(pilotPosition);
-    tempControlBar.setRotation(controlRotation);
-    const handles = tempControlBar.getHandlePositions(kite.position);
+    const step = Math.max(deltaTime, 1 / 240); // évite zéro, affine les vitesses
 
     // Calculer vélocités relatives avec VelocityCalculator
     const leftVelocity = this.velocityCalculator.calculateRelative(
       "leftKite", "leftBar",
       leftWorld, handles.left,
-      1 / 60
+      step
     );
     const rightVelocity = this.velocityCalculator.calculateRelative(
       "rightKite", "rightBar",
       rightWorld, handles.right,
-      1 / 60
+      step
     );
 
     // Calculer tensions pour info/debug uniquement (pas de force appliquée)
@@ -92,9 +91,18 @@ export class LineSystem {
     };
   }
 
-  calculateCatenary(start: THREE.Vector3, end: THREE.Vector3, segments: number = PhysicsConstants.CATENARY_SEGMENTS): THREE.Vector3[] {
-    const tension = this.leftLine.getCurrentTension();
-    return this.physics.calculateCatenaryPoints(this.leftLine, start, end, tension, segments);
+  calculateCatenary(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    segments: number = PhysicsConstants.CATENARY_SEGMENTS,
+    side: 'left' | 'right' = 'left'
+  ): THREE.Vector3[] {
+    const line = side === 'left' ? this.leftLine : this.rightLine;
+    const tension = side === 'left'
+      ? this.leftLine.getCurrentTension()
+      : this.rightLine.getCurrentTension();
+
+    return this.physics.calculateCatenaryPoints(line, start, end, tension, segments);
   }
 
   setLineLength(length: number): void {
@@ -121,6 +129,28 @@ export class LineSystem {
     return {
       left: this.leftLine.getCurrentTension(),
       right: this.rightLine.getCurrentTension()
+    };
+  }
+
+  /**
+   * Retourne les longueurs actuelles des lignes gauche et droite
+   * @returns Objet contenant les longueurs en mètres
+   */
+  getDistances(): { left: number; right: number } {
+    return {
+      left: this.leftLine.getCurrentLength(),
+      right: this.rightLine.getCurrentLength()
+    };
+  }
+
+  /**
+   * Retourne l'état de tension des lignes (tendues ou non)
+   * @returns Objet indiquant si chaque ligne est tendue
+   */
+  getLineStates(): { leftTaut: boolean; rightTaut: boolean } {
+    return {
+      leftTaut: this.leftLine.isTaut(),
+      rightTaut: this.rightLine.isTaut()
     };
   }
 }

@@ -302,6 +302,18 @@ export class RenderSystem extends BaseSimulationSystem {
     return this.renderState?.renderer || null;
   }
 
+  addToScene(object: THREE.Object3D): void {
+    if (this.renderState?.scene) {
+      this.renderState.scene.add(object);
+    }
+  }
+
+  removeFromScene(object: THREE.Object3D): void {
+    if (this.renderState?.scene) {
+      this.renderState.scene.remove(object);
+    }
+  }
+
   /**
    * Obtient le canvas
    */

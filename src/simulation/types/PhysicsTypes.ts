@@ -29,7 +29,24 @@ export interface KiteState {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   angularVelocity: THREE.Vector3;
-  orientation: THREE.Quaternion;
+  orientation?: THREE.Quaternion;
+  acceleration?: THREE.Vector3;
+  angularAcceleration?: THREE.Vector3;
+  mass?: number;
+  totalLiftForce?: THREE.Vector3; // Ajouté pour le debug UI
+  totalDragForce?: THREE.Vector3; // Ajouté pour le debug UI
+}
+
+/**
+ * État du vent
+ */
+export interface WindState {
+  baseSpeed: number; // m/s
+  baseDirection: THREE.Vector3;
+  turbulence: number; // %
+  gustFrequency?: number;
+  gustAmplitude?: number;
+  time?: number;
 }
 
 export interface HandlePositions {

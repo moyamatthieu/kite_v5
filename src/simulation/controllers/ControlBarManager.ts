@@ -27,7 +27,7 @@
  */
 import * as THREE from "three";
 
-import { Kite } from "../../objects/organic/Kite";
+import { Kite } from "../../objects/Kite";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
 import { HandlePositions } from "../types";
@@ -108,10 +108,8 @@ export class ControlBarManager {
     const ctrlRight = kite.getPoint("CTRL_DROIT");
 
     if (ctrlLeft && ctrlRight) {
-      const kiteLeftWorld = ctrlLeft.clone();
-      const kiteRightWorld = ctrlRight.clone();
-      kite.localToWorld(kiteLeftWorld);
-      kite.localToWorld(kiteRightWorld);
+      const kiteLeftWorld = kite.toWorldCoordinates(ctrlLeft);
+      const kiteRightWorld = kite.toWorldCoordinates(ctrlRight);
 
       const centerKite = kiteLeftWorld
         .clone()

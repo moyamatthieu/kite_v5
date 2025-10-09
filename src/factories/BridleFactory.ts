@@ -22,7 +22,7 @@
  *   - src/simulation/types/BridleTypes.ts
  */
 
-import { Line, LineConfig, LineAttachments } from "@objects/mechanical/Line";
+import { Line, LineConfig, LineAttachments } from "@/objects/Line";
 
 import { BridleLengths, BridleAttachment, BridleSide, BridlePosition } from "../simulation/types/BridleTypes";
 

@@ -31,7 +31,7 @@
  *   - src/base/BaseFactory.ts (pattern de référence)
  */
 
-import { Line, LineConfig, LineAttachments } from '@objects/mechanical/Line';
+import { Line, LineConfig, LineAttachments } from '@/objects/Line';
 
 import { CONFIG } from '@/simulation/config/SimulationConfig';
 

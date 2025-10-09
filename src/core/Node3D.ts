@@ -23,6 +23,7 @@
  */
 
 import * as THREE from 'three';
+
 import { SceneManager } from './SceneManager';
 
 /**
@@ -99,14 +100,14 @@ export class Node3D extends THREE.Group {
     /**
      * _process() - Appelé à chaque frame
      */
-    protected _process(delta: number): void {
+    protected _process(_delta: number): void {
         // À overrider dans les classes dérivées
     }
     
     /**
      * _physics_process() - Appelé à chaque frame physique
      */
-    protected _physics_process(delta: number): void {
+    protected _physics_process(_delta: number): void {
         // À overrider dans les classes dérivées
     }
     

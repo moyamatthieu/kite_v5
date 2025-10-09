@@ -120,4 +120,45 @@ export class MathUtils {
   static easeInOut(t: number): number {
     return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
   }
+
+  /**
+   * Calcule la position initiale du kite avec lignes tendues
+   * Utilise le théorème de Pythagore pour placer le kite devant le pilote
+   * 
+   * @param pilotPosition - Position du pilote
+   * @param kiteY - Hauteur Y du kite
+   * @param lineLength - Longueur des lignes
+   * @param distanceFactor - Facteur de distance initiale (0-1, typiquement 0.98 pour lignes presque tendues)
+   * @param initialKiteZ - Position Z fixe (optionnelle, sinon calculée automatiquement)
+   * @returns Position 3D calculée du kite
+   */
+  static calculateInitialKitePosition(
+    pilotPosition: THREE.Vector3,
+    kiteY: number,
+    lineLength: number,
+    distanceFactor: number,
+    initialKiteZ?: number | null
+  ): THREE.Vector3 {
+    // Si une position Z fixe est fournie, l'utiliser directement
+    if (initialKiteZ !== null && initialKiteZ !== undefined) {
+      return new THREE.Vector3(pilotPosition.x, kiteY, initialKiteZ);
+    }
+
+    // Calculer la distance initiale (98% de la longueur des lignes par défaut)
+    const initialDistance = lineLength * distanceFactor;
+
+    // Différence de hauteur entre kite et pilote
+    const dy = kiteY - pilotPosition.y;
+
+    // Calculer la distance horizontale avec Pythagore: horizontal² = distance² - dy²
+    const horizontal = Math.max(
+      0.1, // Minimum pour éviter division par zéro
+      Math.sqrt(Math.max(0, initialDistance * initialDistance - dy * dy))
+    );
+
+    // Position Z : devant le pilote (direction -Z)
+    const kiteZ = pilotPosition.z - horizontal;
+
+    return new THREE.Vector3(pilotPosition.x, kiteY, kiteZ);
+  }
 }

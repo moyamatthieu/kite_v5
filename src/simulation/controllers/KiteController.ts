@@ -28,7 +28,7 @@
  */
 import * as THREE from "three";
 
-import { Kite } from "../../objects/organic/Kite";
+import { Kite } from "../../objects/Kite";
 import { KiteState, HandlePositions } from "../types";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
@@ -55,6 +55,10 @@ export class KiteController {
   private smoothedTorque: THREE.Vector3;
   private forceSmoothingRate: number = KiteController.DEFAULT_FORCE_SMOOTHING_RATE; // 🔧 PHASE 1: Quasi-désactivé pour restaurer réactivité
 
+  // Instantanés pour l'UI/debug
+  private lastLiftForce: THREE.Vector3 | null = null;
+  private lastDragForce: THREE.Vector3 | null = null;
+
   // Constantes pour éviter les facteurs magiques
   private static readonly DEFAULT_FORCE_SMOOTHING_RATE = 0.1;
   private static readonly MIN_FORCE_SMOOTHING_RATE = 0.1;
@@ -67,6 +71,9 @@ export class KiteController {
       velocity: new THREE.Vector3(),
       angularVelocity: new THREE.Vector3(),
       orientation: kite.quaternion.clone(),
+      acceleration: new THREE.Vector3(),
+      angularAcceleration: new THREE.Vector3(),
+      mass: CONFIG.kite.mass,
     };
     this.previousPosition = kite.position.clone();
     this.kite.userData.lineLength = CONFIG.lines.defaultLength;
@@ -146,6 +153,8 @@ export class KiteController {
     this.kite.position.copy(newPosition);
     this.updateOrientation(this.smoothedTorque, deltaTime); // Utiliser le torque lissé
     this.previousPosition.copy(newPosition);
+  this.state.position.copy(this.kite.position);
+  this.state.orientation = this.kite.quaternion.clone();
   }
   /**
    * Valide les forces appliquées au cerf-volant
@@ -189,6 +198,7 @@ export class KiteController {
     // IMPORTANT: clone() pour ne pas modifier le vecteur forces en place!
     const acceleration = forces.clone().divideScalar(CONFIG.kite.mass);
     this.lastAccelMagnitude = acceleration.length();
+  this.state.acceleration?.copy(acceleration);
 
     // Sécurité : limiter pour éviter l'explosion numérique
     this.hasExcessiveAccel = acceleration.length() > PhysicsConstants.MAX_ACCELERATION;
@@ -217,9 +227,11 @@ export class KiteController {
     }
 
     // Position : x(t+dt) = x(t) + v·dt
-    return this.kite.position
+    const nextPosition = this.kite.position
       .clone()
       .add(this.state.velocity.clone().multiplyScalar(deltaTime));
+
+    return nextPosition;
   }
 
   /**
@@ -259,6 +271,8 @@ export class KiteController {
         .multiplyScalar(PhysicsConstants.MAX_ANGULAR_ACCELERATION);
     }
 
+  this.state.angularAcceleration?.copy(angularAcceleration);
+
     // Mise à jour de la vitesse angulaire
     // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier angularAcceleration!
     this.state.angularVelocity.add(
@@ -291,7 +305,17 @@ export class KiteController {
   }
 
   getState(): KiteState {
-    return { ...this.state };
+    return {
+      position: this.kite.position.clone(),
+      velocity: this.state.velocity.clone(),
+      angularVelocity: this.state.angularVelocity.clone(),
+      orientation: this.kite.quaternion.clone(),
+      acceleration: this.state.acceleration?.clone(),
+      angularAcceleration: this.state.angularAcceleration?.clone(),
+      mass: this.state.mass,
+      totalLiftForce: this.lastLiftForce ? this.lastLiftForce.clone() : undefined,
+      totalDragForce: this.lastDragForce ? this.lastDragForce.clone() : undefined,
+    };
   }
 
   getKite(): Kite {
@@ -300,6 +324,11 @@ export class KiteController {
 
   setLineLength(length: number): void {
     this.kite.userData.lineLength = length;
+  }
+
+  setAerodynamicSnapshot(lift: THREE.Vector3, drag: THREE.Vector3): void {
+    this.lastLiftForce = lift.clone();
+    this.lastDragForce = drag.clone();
   }
 
   /**

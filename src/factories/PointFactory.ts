@@ -6,6 +6,8 @@
 
 import * as THREE from 'three';
 
+import { CONFIG } from '@/simulation/config/SimulationConfig';
+
 /**
  * Longueurs physiques des brides (en mètres)
  */
@@ -27,16 +29,6 @@ export interface KiteParams {
  */
 export class PointFactory {
   /**
-   * Longueurs de brides par défaut (en mètres)
-   * LONGUEURS IDENTIQUES : L'équilibre géométrique vient de la structure, pas des brides
-   */
-  private static readonly DEFAULT_BRIDLE_LENGTHS: BridleLengths = {
-    nez: 0.65,     // 65cm - identique pour toutes les brides
-    inter: 0.65,   // 65cm - identique pour toutes les brides
-    centre: 0.65,  // 65cm - identique pour toutes les brides
-  };
-
-  /**
    * Calcule la position du point de contrôle (CTRL) par trilatération 3D analytique
    * Résout l'intersection de 3 sphères centrées en NEZ, INTER, CENTRE
    * avec rayons = longueurs de brides respectives
@@ -45,8 +37,8 @@ export class PointFactory {
     nez: [number, number, number],
     inter: [number, number, number],
     centre: [number, number, number],
-    bridleLengths: BridleLengths,
-    side: 'left' | 'right'
+  bridleLengths: BridleLengths,
+  _side: 'left' | 'right'
   ): [number, number, number] {
     // Convertir en Vector3
     const p1 = new THREE.Vector3(...nez);      // Point 1 : NEZ
@@ -116,7 +108,8 @@ export class PointFactory {
    * Calcule toutes les positions des points anatomiques d'un cerf-volant delta
    */
   static calculateDeltaKitePoints(params: KiteParams): Map<string, [number, number, number]> {
-    const { width, height, depth, bridleLengths = PointFactory.DEFAULT_BRIDLE_LENGTHS } = params;
+  const { width, height, depth, bridleLengths } = params;
+  const effectiveBridleLengths: BridleLengths = bridleLengths ?? { ...CONFIG.bridle.defaultLengths };
 
     // Logique métier extraite de Kite.ts
     const centreY = height / 4;
@@ -137,7 +130,7 @@ export class PointFactory {
       nezPos,
       interDroitPos, // Utilise le point d'ancrage droit
       centrePos,
-      bridleLengths,
+      effectiveBridleLengths,
       'right'
     );
 

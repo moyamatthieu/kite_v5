@@ -5,8 +5,9 @@
  * Gère le cycle de vie, les updates et la hiérarchie des Node3D
  */
 
-import { Node3D } from './Node3D';
 import * as THREE from 'three';
+
+import { Node3D } from './Node3D';
 
 export class SceneManager {
   private static instance: SceneManager;
@@ -50,13 +51,6 @@ export class SceneManager {
    */
   update(deltaTime: number): void {
     this.totalTime += deltaTime;
-
-    const context = {
-      deltaTime,
-      totalTime: this.totalTime,
-      isPaused: false,
-      debugMode: false
-    };
 
     // Mise à jour de tous les nœuds
     for (const node of this.nodes) {

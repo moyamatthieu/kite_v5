@@ -1,17 +1,5 @@
 /**
- * SimulationConfig.ts - Configuration         // C  // Facteurs d'échelle aérodynamiques équilibrés
-  liftScale: 1.2, // Facteur de portance
-  dragScale: 1.2, // Facteur de traînée (équilibré avec portance)ficients d'amortissement (en 1/s) - appliqués avec formule exponentielle
-  linearDampingCoeff: 0.2, // Amortissement linéaire modéré
-  angularDragFactor: 1.0, // Amortissement angulaire équilibré pour stabilisation naturelleamping coefficients (en 1/s) - appliqués avec formule exponentielle
-  linearDampingCoeff: 1.5, // 🔧 RÉALISTE: Friction aérodynamique modérée pour stabilisation naturelle
-    // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
-  angularDragFactor: 5.0, // 🔧 STABILITÉ CRITIQUE: Très fort amortissement pour éviter rotation excessive
-  },le de la simulation K  wind: {
-    defaultSpeed: 25, // km/h - Vitesse réaliste pour cerf-volant sport (15-30 km/h typique)
-    defaultDirection: 0, // degrés
-    defaultTurbulence: 5, // % - Turbulence réaliste pour conditions normales
-    turbulenceScale: 0.05,*
+ * SimulationConfig.ts - Configuration centralisée de la simulation Kite
  * Rôle :
  *   - Définit tous les paramètres physiques, aérodynamiques, géométriques et environnementaux
  *   - Sert de source unique de vérité pour les réglages du monde virtuel
@@ -49,15 +37,15 @@ export const CONFIG = {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
-    // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
-  linearDampingCoeff: 1, // 🔧 FIX INERTIE: Drastiquement réduit pour réactivité immédiate
-    // 🔴 SOLUTION #2 : Amortissement angulaire réduit pour équilibre naturel
-  angularDragFactor: 1.5, // � ÉQUILIBRE: Réduit de 5.0 → 1.0 pour permettre stabilisation naturelle
+    controlDeadzone: 0.1, // m - Petite zone de tolérance pour la tension des lignes
+    // Amortissement réaliste pour un cerf-volant
+    linearDampingCoeff: 1.3, // Amortissement linéaire modéré pour stabilité
+    angularDragFactor: 1.8, // Amortissement angulaire pour éviter les oscillations
   },
   aero: {
-  // 🔴 SOLUTION #2 : Forces aérodynamiques équilibrées
-  liftScale: 1.2, // � ÉQUILIBRÉ: Réduit de 1.5 → 1.2 
-  dragScale: 1.2, // � ÉQUILIBRÉ: Maintenu à 1.2 (cohérent avec lift)
+    // Forces aérodynamiques réalistes pour un cerf-volant delta
+    liftScale: 2.5, // Portance réaliste pour un kite de cette taille
+    dragScale: 1.8, // Traînée modérée mais présente
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
@@ -71,20 +59,27 @@ export const CONFIG = {
     inertia: KiteGeometry.INERTIA, // kg·m² - Moment d'inertie (I ≈ m·r², calculé automatiquement)
     minHeight: 0, // m - Altitude minimale (plus haut pour éviter le sol)
     // 🔧 MAILLAGE FIN PARAMÉTRABLE (défaut = niveau 1 = 16 triangles)
-    defaultMeshSubdivisionLevel: 1, // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
+    defaultMeshSubdivisionLevel: 0, // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
+  },
+  bridle: {
+    defaultLengths: Object.freeze({
+      nez: 0.65,
+      inter: 0.65,
+      centre: 0.65,
+    }),
   },
   lines: {
-    defaultLength: 30, // m - Longueur par défaut (augmentée pour vol réaliste)
-    stiffness: 1200, // N/m - Rigidité réduite pour plus de souplesse (2200 était trop rigide)
-    preTension: 75, // N - Tension minimale toujours présente
-    maxTension: 800, // N - Tension max avant rupture (~80% charge nominale)
-    dampingCoeff: 0.05, // Coefficient d'amortissement interne (0-1)
-    linearMassDensity: 0.0005, // kg/m - Masse linéique pour calcul caténaire
+    defaultLength: 15, // m - Longueur réaliste pour cerf-volant sport
+    stiffness: 2500, // N/m - Rigidité réaliste pour lignes Dyneema
+    preTension: 80, // N - Pré-tension réaliste
+    maxTension: 1200, // N - Tension max avant rupture
+    dampingCoeff: 0.08, // Coefficient d'amortissement réaliste
+    linearMassDensity: 0.0006, // kg/m - Masse linéique réaliste
   },
   wind: {
-    defaultSpeed: 20, // km/h - Vitesse idéale pour cerf-volant
+    defaultSpeed: 20, // km/h - Vitesse idéale pour cerf-volant sport
     defaultDirection: 0, // degrés
-    defaultTurbulence: 0.001, // % - Turbulence réaliste (0.001 → 10)
+    defaultTurbulence: 5, // % - Turbulence réaliste pour conditions normales
     turbulenceScale: 0.05,
     turbulenceFreqBase: 0.05,
     turbulenceFreqY: 0.3,
@@ -115,8 +110,9 @@ export const CONFIG = {
     offsetZ: 8.5, // m - Distance derrière la barre
   },
   initialization: {
-    initialKiteY: 15.0, // m - Altitude initiale du kite (augmentée pour longueur ligne 30m)
-    initialDistanceFactor: 0.95, // Sans unité - Facteur de distance initiale (95% de longueur ligne → lignes légèrement tendues au départ)
+    initialKiteY: 10.0, // m - Altitude initiale du kite (réaliste pour 25m de lignes)
+    initialDistanceFactor: 0.98, // Sans unité - Lignes presque tendues au départ
+    initialKiteZ: null as number | null, // m - Position Z initiale (null = calculée automatiquement)
   },
   visualization: {
     lineWidth: 2, // pixels - Largeur des lignes de contrôle

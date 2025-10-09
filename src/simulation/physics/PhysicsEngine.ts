@@ -32,7 +32,7 @@
  */
 import * as THREE from "three";
 
-import { Kite } from "../../objects/organic/Kite";
+import { Kite } from "../../objects/Kite";
 import { KiteController } from "../controllers/KiteController";
 import { ControlBarManager } from "../controllers/ControlBarManager";
 import { WindParams } from "../types";
@@ -132,11 +132,12 @@ export class PhysicsEngine {
       kiteState.angularVelocity
     );
 
+    this.kiteController.setAerodynamicSnapshot(lift, drag);
+
     // CALCUL DES TENSIONS (pour affichage/debug uniquement)
     // Les lignes ne TIRENT PAS le kite - elles le RETIENNENT à distance max
     // La contrainte géométrique est appliquée par ConstraintSolver dans KiteController
-    const pilotPosition = this.controlBarManager.getPosition();
-    this.lineSystem.calculateLineTensions(kite, this.controlBarManager.getRotation(), pilotPosition);
+  this.lineSystem.calculateLineTensions(kite, handles, deltaTime);
 
     // CALCUL DES TENSIONS DES BRIDES (pour affichage/debug uniquement)
     // Les brides sont des contraintes INTERNES au kite

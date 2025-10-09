@@ -6,11 +6,8 @@
 
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
-import { BaseFactory as RegistryBaseFactory, FactoryMetadata } from '../factories/FactoryRegistry';
 
-export interface FactoryParams {
-  [key: string]: any;
-}
+export type FactoryParams = Record<string, unknown>;
 
 export interface ObjectMetadata {
   category: string;

@@ -26,7 +26,7 @@
  */
 import * as THREE from "three";
 
-import { Kite } from "../../objects/organic/Kite";
+import { Kite } from "../../objects/Kite";
 import { HandlePositions } from "../types";
 import { BridleLengths } from "../types/BridleTypes";
 import { PhysicsConstants } from "../config/PhysicsConstants";
@@ -72,7 +72,7 @@ export class ConstraintSolver {
       // Utiliser position prédite pour transformation locale→monde
       const originalPos = kite.position.clone();
       kite.position.copy(predictedPosition);
-      const cpWorld = kite.localToWorld(ctrlLocal);
+      const cpWorld = kite.toWorldCoordinates(ctrlLocal);
       kite.position.copy(originalPos);
       const diff = cpWorld.clone().sub(handle);
       const dist = diff.length();
@@ -103,7 +103,7 @@ export class ConstraintSolver {
 
       // Correction de vitesse
       kite.position.copy(predictedPosition);
-      const cpWorld2 = kite.localToWorld(ctrlLocal);
+      const cpWorld2 = kite.toWorldCoordinates(ctrlLocal);
       kite.position.copy(originalPos);
       const n2 = cpWorld2.clone().sub(handle).normalize();
       const r2 = cpWorld2.clone().sub(predictedPosition);
@@ -185,8 +185,8 @@ export class ConstraintSolver {
       // Convertir points locaux en coordonnées monde (avec position prédite)
       const originalPos = kite.position.clone();
       kite.position.copy(predictedPosition);
-      const startWorld = kite.localToWorld(startLocal);
-      const endWorld = kite.localToWorld(endLocal);
+      const startWorld = kite.toWorldCoordinates(startLocal);
+      const endWorld = kite.toWorldCoordinates(endLocal);
       kite.position.copy(originalPos);
 
       // Calculer distance actuelle
@@ -247,8 +247,8 @@ export class ConstraintSolver {
 
       // Correction de vitesse (dampening)
       kite.position.copy(predictedPosition);
-      const startWorld2 = kite.localToWorld(startLocal);
-      const endWorld2 = kite.localToWorld(endLocal);
+      const startWorld2 = kite.toWorldCoordinates(startLocal);
+      const endWorld2 = kite.toWorldCoordinates(endLocal);
       kite.position.copy(originalPos);
 
       const n2 = endWorld2.clone().sub(startWorld2).normalize();

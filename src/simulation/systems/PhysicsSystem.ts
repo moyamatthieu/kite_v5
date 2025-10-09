@@ -28,15 +28,12 @@ export interface PhysicsConfig {
   airDensity: number;
   gravity: number;
   minVelocity: number;
-  lineLength?: number;
 }
 
 export class PhysicsSystem extends BaseSimulationSystem {
   private logger: Logger = Logger.getInstance();
   private physicsObjects = new Map<string, PhysicsState>();
   private config: PhysicsConfig;
-  private lineLength: number = 30.0; // Valeur par défaut
-  private forceSmoothing: number = 0.5; // Valeur par défaut
 
   constructor(config: Partial<PhysicsConfig> = {}) {
     super('PhysicsSystem', 10); // Priorité 10 (après les systèmes d'entrée)
@@ -53,10 +50,6 @@ export class PhysicsSystem extends BaseSimulationSystem {
       timeStep: 1/60,
       ...config
     };
-
-    if (config && typeof config.lineLength === 'number') {
-      this.lineLength = config.lineLength;
-    }
   }
 
   async initialize(): Promise<void> {
@@ -290,28 +283,5 @@ export class PhysicsSystem extends BaseSimulationSystem {
       objectCount: this.physicsObjects.size,
       config: this.config
     };
-  }
-
-  /**
-   * Met à jour la longueur des lignes dynamiquement
-   */
-  setLineLength(length: number): void {
-    this.lineLength = length;
-    this.logger.info(`PhysicsSystem: line length set to ${length}m`, 'PhysicsSystem');
-  }
-
-  /**
-   * Met à jour le lissage des forces dynamiquement
-   */
-  setForceSmoothing(smoothing: number): void {
-    this.forceSmoothing = smoothing;
-    this.logger.info(`PhysicsSystem: force smoothing set to ${smoothing}`, 'PhysicsSystem');
-  }
-
-  /**
-   * Retourne le lissage des forces actuel
-   */
-  getForceSmoothing(): number {
-    return this.forceSmoothing;
   }
 }

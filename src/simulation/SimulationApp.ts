@@ -1,97 +1,97 @@
 /**
- * SimulationApp.ts - Application principale de simulation (Architecture ECS-inspired)
+ * SimulationApp.ts - Orchestrateur ECS pur
  *
- * Nouvelle architecture modulaire avec systèmes de simulation séparés.
- * Chaque système (Physics, Wind, Input, Render) fonctionne indépendamment
- * et communique via un contexte partagé.
+ * Architecture ECS propre avec séparation des responsabilités.
+ * Point d'entrée unique pour la simulation kite.
  */
 
 import * as THREE from 'three';
-import { Logger } from '../utils/Logging';
-import { UidGenerator } from '../utils/UidGenerator';
 
-// Import des systèmes modulaires
+import { Logger } from '../utils/Logging';
+import { MathUtils } from '../utils/MathUtils';
+
 import {
   PhysicsSystem,
   WindSystem,
   InputSystem,
   RenderSystem,
   KitePhysicsSystem,
-  type PhysicsState,
   type PhysicsConfig,
   type WindConfig,
   type InputConfig,
   type RenderConfig
 } from './systems';
 
-// Import des composants existants (temporairement pour compatibilité)
-import { Kite } from '../objects/organic/Kite';
-import { UIManager } from './ui/UIManager';
+import {
+  UIManager,
+  type SimulationControls
+} from './ui/UIManager';
+
 import { DebugRenderer } from './rendering/DebugRenderer';
 import { CONFIG } from './config/SimulationConfig';
-import { KiteGeometry } from './config/KiteGeometry';
+import { Kite } from '../objects/Kite';
+import { ControlBarManager } from './controllers/ControlBarManager';
 
 export interface SimulationConfig {
   targetFPS: number;
   maxFrameTime: number;
   enableDebug: boolean;
   enableRenderSystem: boolean;
-  enableLegacyComponents: boolean; // Nouveau flag pour contrôler les composants legacy
-  enableCompletePhysics: boolean; // Flag pour activer KitePhysicsSystem complet
+  enableCompletePhysics: boolean;
+  enableLegacyComponents: boolean;
   physics: Partial<PhysicsConfig>;
   wind: Partial<WindConfig>;
   input: Partial<InputConfig>;
   render: Partial<RenderConfig>;
 }
 
+/**
+ * Application principale de simulation
+ * Architecture ECS avec responsabilité d'orchestration uniquement
+ */
 export class SimulationApp {
-  private logger: Logger;
+  private readonly logger: Logger;
   private config: SimulationConfig;
 
-  // Systèmes ECS-inspired
+  // === SYSTÈMES ECS ===
   private physicsSystem!: PhysicsSystem;
   private windSystem!: WindSystem;
   private inputSystem!: InputSystem;
-  private renderSystem!: RenderSystem;
-  private kitePhysicsSystem?: KitePhysicsSystem; // Système physique complet (optionnel)
+  private renderSystem?: RenderSystem;
+  private kitePhysicsSystem?: KitePhysicsSystem;
 
-  // Composants existants (pour compatibilité)
+  // === ENTITÉS ===
   private kite!: Kite;
-  private uiManager!: UIManager;
-  private debugRenderer?: DebugRenderer;
+  private controlBarManager!: ControlBarManager;
+
+  // === COMPOSANTS LEGACY ===
   private controlBar!: THREE.Group;
   private pilot!: THREE.Mesh;
-  private leftLine!: THREE.Line;
-  private rightLine!: THREE.Line;
+  private leftLine?: THREE.Line;
+  private rightLine?: THREE.Line;
 
-  // Flag indiquant si la physique complète est prête
-  private isCompletePhysicsReady: boolean = false;
+  // === INTERFACE ===
+  private uiManager?: UIManager;
+  private debugRenderer?: DebugRenderer;
+  private simulationControls!: SimulationControls;
 
-  // État de simulation
-  private isRunning: boolean = false;
-  private isInitialized: boolean = false;
-  private clock: THREE.Clock;
-  private frameCount: number = 0;
-  private totalTime: number = 0;
-  private lastFrameTime: number = 0;
-
-  // Gestion des objets physiques
-  private physicsObjects = new Map<string, PhysicsState>();
-  // Nombre de segments utilisés pour la caténaire (réutilisable)
-  private catenarySegments: number = 15;
+  // === ÉTAT ===
+  private isRunning = false;
+  private isInitialized = false;
+  private frameCount = 0;
+  private totalTime = 0;
+  private lastFrameTime = 0;
 
   constructor(config: Partial<SimulationConfig> = {}) {
     this.logger = Logger.getInstance();
-    this.clock = new THREE.Clock();
 
-    // Configuration par défaut
     this.config = {
       targetFPS: 60,
-      maxFrameTime: 1/30, // 30 FPS minimum
+      maxFrameTime: 1 / 30,
       enableDebug: true,
       enableRenderSystem: true,
-      enableLegacyComponents: true, // Activer pour voir le kite 3D
-      enableCompletePhysics: true, // ⭐ Activer physique complète par défaut
+      enableCompletePhysics: true,
+      enableLegacyComponents: true,
       physics: {},
       wind: {},
       input: {},
@@ -99,160 +99,110 @@ export class SimulationApp {
       ...config
     };
 
-    this.logger.info('SimulationApp initializing with ECS architecture', 'SimulationApp');
+    this.logger.info('SimulationApp created', 'SimulationApp');
+  }
 
-    // Initialiser les systèmes
-    this.initializeSystems();
+  /**
+   * Initialise la simulation
+   */
+  async initialize(): Promise<void> {
+    try {
+      this.logger.info('Initializing simulation...', 'SimulationApp');
 
-    // Initialiser les composants existants (si activés)
-    if (this.config.enableLegacyComponents) {
-      this.initializeLegacyComponents();
+      // Créer les systèmes
+      await this.createSystems();
+
+      // Créer les entités
+      this.createEntities();
+
+      // Initialiser les systèmes
+      await this.initializeSystems();
+
+      // Créer l'interface
+      this.createInterface();
+
+      // Configurer le rendu
+      this.setupRendering();
+
+      this.isInitialized = true;
+      this.logger.info('✅ Simulation initialized', 'SimulationApp');
+
+    } catch (error) {
+      this.logger.error(`❌ Initialization failed: ${error}`, 'SimulationApp');
+      throw error;
     }
   }
 
   /**
-   * Initialise tous les systèmes de simulation
+   * Crée tous les systèmes ECS
    */
-  private initializeSystems(): void {
-    this.logger.info('Initializing simulation systems...', 'SimulationApp');
-
-    // Créer les systèmes avec leurs configurations
+  private async createSystems(): Promise<void> {
     this.physicsSystem = new PhysicsSystem(this.config.physics);
     this.windSystem = new WindSystem(this.config.wind);
     this.inputSystem = new InputSystem(this.config.input);
 
-    // Créer le système de rendu seulement si activé
     if (this.config.enableRenderSystem) {
       this.renderSystem = new RenderSystem(this.config.render);
     }
 
-    this.logger.info('All simulation systems created', 'SimulationApp');
-  }
-
-  /**
-   * Initialise les composants existants pour compatibilité
-   */
-  private initializeLegacyComponents(): void {
-    this.logger.info('Initializing legacy components...', 'SimulationApp');
-
-    // Configurer la géométrie du kite
-    KiteGeometry.setMeshSubdivisionLevel(CONFIG.kite.defaultMeshSubdivisionLevel);
-
-    // Créer la barre de contrôle
-    this.setupControlBar();
-
-    // Créer le pilote
-    this.pilot = this.setupPilot();
-
-    // Créer les lignes de contrôle
-    this.createControlLines();
-
-    // Créer le kite
-    this.kite = new Kite();
-    this.kite.position.set(0, 5, 0);
-
-    // Note: Le kite sera ajouté à la scène dans initialize() après que RenderSystem soit prêt
-
-    // Créer l'UI Manager (avec des wrappers vers les vraies méthodes)
-    const physicsEngineWrapper = {
-      getBridleLengths: () => this.getBridleLengths(),
-      setBridleLength: (type: string, length: number) => {
-        this.setBridleLength(type as 'nez' | 'inter' | 'centre', length);
-      },
-      setLineLength: (length: number) => this.setLineLength(length),
-      setWindParams: (params: any) => this.setWindParams(params),
-      getForceSmoothing: () => this.getForceSmoothing(),
-      setForceSmoothing: (smoothing: number) => this.setForceSmoothing(smoothing),
-      getKiteState: () => this.getKiteState(),
-      getWindState: () => this.getWindState(),
-      update: () => {},
-      // Mocks pour les autres propriétés attendues
-      windSimulator: {} as any,
-      lineSystem: {} as any,
-      bridleSystem: {} as any,
-      kiteController: {} as any,
-      controlBarManager: {} as any,
-      aerodynamicsCalculator: {} as any,
-      config: {} as any,
-      kite: this.kite,
-      controlBar: this.controlBar
-    } as any;
-
-    const debugRendererMock = {
-      isDebugMode: () => false,
-      toggleDebugMode: () => {},
-      renderDebugInfo: () => {},
-      clearDebugInfo: () => {},
-      setDebugMode: () => {},
-      renderManager: {} as any,
-      debugArrows: [],
-      debugMode: false,
-      vectorVisibility: {}
-    } as any;
-
-    this.uiManager = new UIManager(
-      physicsEngineWrapper,
-      debugRendererMock,
-      () => this.reset(), // resetCallback
-      () => { this.isRunning ? this.stop() : this.start(); } // togglePlayCallback
-    );
-
-    // Enregistrer le kite comme objet physique
-    this.registerPhysicsObject('kite', {
-      position: this.kite.position.clone(),
-      velocity: new THREE.Vector3(),
-      acceleration: new THREE.Vector3(),
-      angularVelocity: new THREE.Vector3(),
-      angularAcceleration: new THREE.Vector3(),
-      mass: 0.5, // kg
-      momentOfInertia: new THREE.Matrix3().identity()
-    });
-
-    // Initialiser KitePhysicsSystem si la physique complète est activée
     if (this.config.enableCompletePhysics) {
-      this.logger.info('Initializing complete physics system (KitePhysicsSystem)...', 'SimulationApp');
-      this.initializeKitePhysicsSystem();
-    }
-
-    this.logger.info('Legacy components initialized', 'SimulationApp');
-  }
-
-  /**
-   * Initialise le système physique complet du kite
-   */
-  private async initializeKitePhysicsSystem(): Promise<void> {
-    try {
-      // Créer KitePhysicsSystem avec la configuration
       this.kitePhysicsSystem = new KitePhysicsSystem({
-        windSpeed: CONFIG.wind.defaultSpeed, // km/h
-        windDirection: CONFIG.wind.defaultDirection, // degrés
-        turbulence: CONFIG.wind.defaultTurbulence, // 0-100
+        windSpeed: CONFIG.wind.defaultSpeed,
+        windDirection: CONFIG.wind.defaultDirection,
+        turbulence: CONFIG.wind.defaultTurbulence,
         lineLength: CONFIG.lines.defaultLength,
         pilotPosition: CONFIG.controlBar.position.clone(),
         enableConstraints: true,
         enableAerodynamics: true,
         enableGravity: true
       });
-
-      // Initialiser avec le kite
-      await this.kitePhysicsSystem.initialize(this.kite);
-
-      this.isCompletePhysicsReady = true;
-      this.logger.info('KitePhysicsSystem initialized successfully', 'SimulationApp');
-    } catch (error) {
-      this.logger.error(`Failed to initialize KitePhysicsSystem: ${error}`, 'SimulationApp');
-      this.isCompletePhysicsReady = false;
     }
   }
 
   /**
-   * Configure la barre de contrôle
+   * Calcule la position initiale du kite pour que les lignes soient tendues
    */
-  private setupControlBar(): void {
+  private calculateInitialKitePosition(): THREE.Vector3 {
+    return MathUtils.calculateInitialKitePosition(
+      CONFIG.controlBar.position,
+      CONFIG.initialization.initialKiteY,
+      CONFIG.lines.defaultLength,
+      CONFIG.initialization.initialDistanceFactor,
+      CONFIG.initialization.initialKiteZ
+    );
+  }
+
+  /**
+   * Crée les entités principales
+   */
+  private createEntities(): void {
+    // Créer le kite
+    this.kite = new Kite();
+    const initialPos = this.calculateInitialKitePosition();
+    this.kite.position.copy(initialPos);
+
+    // Créer le gestionnaire de barre de contrôle
+    this.controlBarManager = new ControlBarManager(CONFIG.controlBar.position.clone());
+
+    // Configurer le système de physique du kite
+    if (this.kitePhysicsSystem) {
+      this.kitePhysicsSystem.setKite(this.kite);
+    }
+
+    // Créer les composants legacy
+    if (this.config.enableLegacyComponents) {
+      this.createLegacyComponents();
+    }
+  }
+
+  /**
+   * Crée les composants legacy pour compatibilité
+   */
+  private createLegacyComponents(): void {
+    // Barre de contrôle
     this.controlBar = new THREE.Group();
     this.controlBar.name = 'ControlBar';
 
-    // Créer la barre de contrôle (code migré depuis legacy)
     const barGeometry = new THREE.CylinderGeometry(
       CONFIG.controlBar.barRadius,
       CONFIG.controlBar.barRadius,
@@ -261,14 +211,15 @@ export class SimulationApp {
     const barMaterial = new THREE.MeshStandardMaterial({
       color: 0x333333,
       metalness: 0.7,
-      roughness: 0.3,
+      roughness: 0.3
     });
+
     const bar = new THREE.Mesh(barGeometry, barMaterial);
     bar.rotation.z = CONFIG.controlBar.barRotation;
     bar.castShadow = true;
     this.controlBar.add(bar);
 
-    // Créer les poignées
+    // Poignées
     const handleGeometry = new THREE.CylinderGeometry(
       CONFIG.controlBar.handleRadius,
       CONFIG.controlBar.handleRadius,
@@ -276,7 +227,7 @@ export class SimulationApp {
     );
     const handleMaterial = new THREE.MeshStandardMaterial({
       color: 0x8b4513,
-      roughness: 0.6,
+      roughness: 0.6
     });
 
     const halfWidth = CONFIG.controlBar.width / 2;
@@ -290,16 +241,9 @@ export class SimulationApp {
     rightHandle.castShadow = true;
     this.controlBar.add(rightHandle);
 
-    // Positionner la barre de contrôle
     this.controlBar.position.copy(CONFIG.controlBar.position);
-    
-    console.log('🎮 Control bar created with legacy code');
-  }
-  
-  /**
-   * Crée le pilote (migré depuis legacy)
-   */
-  private setupPilot(): THREE.Mesh {
+
+    // Pilote
     const pilotGeometry = new THREE.BoxGeometry(
       CONFIG.pilot.width,
       CONFIG.pilot.height,
@@ -307,530 +251,181 @@ export class SimulationApp {
     );
     const pilotMaterial = new THREE.MeshStandardMaterial({
       color: 0x4a4a4a,
-      roughness: 0.8,
+      roughness: 0.8
     });
-    const pilot = new THREE.Mesh(pilotGeometry, pilotMaterial);
-    pilot.position.set(0, CONFIG.pilot.offsetY, CONFIG.pilot.offsetZ);
-    pilot.castShadow = true;
-    pilot.name = 'Pilot';
-    
-    console.log('👤 Pilot created with legacy code');
-    return pilot;
+
+    this.pilot = new THREE.Mesh(pilotGeometry, pilotMaterial);
+    this.pilot.position.set(0, CONFIG.pilot.offsetY, CONFIG.pilot.offsetZ);
+    this.pilot.castShadow = true;
+    this.pilot.name = 'Pilot';
+
+    // Lignes de contrôle
+    this.createControlLines();
   }
 
   /**
-   * Crée les lignes de contrôle (migré depuis legacy)
+   * Crée les lignes de contrôle visuelles
    */
   private createControlLines(): void {
     const lineMaterial = new THREE.LineBasicMaterial({
       color: 0x333333,
-      linewidth: CONFIG.visualization.lineWidth,
+      linewidth: CONFIG.visualization.lineWidth
     });
 
-    const pointsCount = this.catenarySegments + 1;
-    // Préallouer un buffer pour éviter de recréer la géométrie à chaque frame
-    const leftPositions = new Float32Array(pointsCount * 3);
-    const rightPositions = new Float32Array(pointsCount * 3);
+    const segments = 20;
+    const points = new Array(segments + 1).fill(0).map(() => new THREE.Vector3());
 
-    const leftGeometry = new THREE.BufferGeometry();
-    leftGeometry.setAttribute('position', new THREE.Float32BufferAttribute(leftPositions, 3));
-    leftGeometry.setDrawRange(0, pointsCount);
+    const leftLineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    const rightLineGeometry = new THREE.BufferGeometry().setFromPoints(points);
 
-    const rightGeometry = new THREE.BufferGeometry();
-    rightGeometry.setAttribute('position', new THREE.Float32BufferAttribute(rightPositions, 3));
-    rightGeometry.setDrawRange(0, pointsCount);
+    this.leftLine = new THREE.Line(leftLineGeometry, lineMaterial);
+    this.leftLine.name = 'LeftControlLine';
 
-    this.leftLine = new THREE.Line(leftGeometry, lineMaterial);
-    this.rightLine = new THREE.Line(rightGeometry, lineMaterial);
-
-    console.log('🔗 Control lines created with legacy code');
+    this.rightLine = new THREE.Line(rightLineGeometry, lineMaterial);
+    this.rightLine.name = 'RightControlLine';
   }
 
   /**
-   * Met à jour les positions des lignes de contrôle
+   * Initialise tous les systèmes
    */
-  private updateControlLines(): void {
-    if (!this.leftLine || !this.rightLine || !this.kite) return;
+  private async initializeSystems(): Promise<void> {
+    const initPromises: Promise<void>[] = [
+      this.physicsSystem.initialize(),
+      this.windSystem.initialize(),
+      this.inputSystem.initialize()
+    ];
 
-    const ctrlLeft = this.kite.getPoint("CTRL_GAUCHE");
-    const ctrlRight = this.kite.getPoint("CTRL_DROIT");
+    if (this.renderSystem) {
+      initPromises.push(this.renderSystem.initialize());
+    }
 
-    if (!ctrlLeft || !ctrlRight) return;
+    if (this.kitePhysicsSystem) {
+      initPromises.push(this.kitePhysicsSystem.initialize());
+    }
 
-    // Convertir les points locaux du kite en coordonnées monde
-    const kiteLeftWorld = ctrlLeft.clone();
-    const kiteRightWorld = ctrlRight.clone();
-    this.kite.localToWorld(kiteLeftWorld);
-    this.kite.localToWorld(kiteRightWorld);
-
-    // Calculer les positions des poignées de la barre
-    const barWidth = CONFIG.controlBar.width;
-    const halfWidth = barWidth / 2;
-    
-    const leftHandle = new THREE.Vector3(-halfWidth, 0, 0);
-    const rightHandle = new THREE.Vector3(halfWidth, 0, 0);
-    this.controlBar.localToWorld(leftHandle);
-    this.controlBar.localToWorld(rightHandle);
-
-    // Calculer les lignes avec caténaire réaliste
-    const leftPoints = this.calculateCatenary(leftHandle, kiteLeftWorld);
-    const rightPoints = this.calculateCatenary(rightHandle, kiteRightWorld);
-
-    // Mettre à jour les positions dans le BufferGeometry existant pour éviter des allocations
-    const updateGeometryFromPoints = (line: THREE.Line, points: THREE.Vector3[]) => {
-      const geom = line.geometry as THREE.BufferGeometry;
-      const attr = geom.getAttribute('position') as THREE.BufferAttribute | null;
-      if (!attr) return;
-
-      const array = attr.array as Float32Array;
-      const count = Math.min(points.length, this.catenarySegments + 1);
-      for (let i = 0; i < count; i++) {
-        const p = points[i];
-        const idx = i * 3;
-        array[idx] = p.x;
-        array[idx + 1] = p.y;
-        array[idx + 2] = p.z;
-      }
-
-      // Si moins de points que prévu, remplir le reste avec la dernière valeur pour éviter artefacts
-      if (count < this.catenarySegments + 1) {
-        const last = points[points.length - 1];
-        for (let i = count; i < this.catenarySegments + 1; i++) {
-          const idx = i * 3;
-          array[idx] = last.x;
-          array[idx + 1] = last.y;
-          array[idx + 2] = last.z;
-        }
-      }
-
-      attr.needsUpdate = true;
-    };
-
-    updateGeometryFromPoints(this.leftLine, leftPoints);
-    updateGeometryFromPoints(this.rightLine, rightPoints);
+    await Promise.all(initPromises);
   }
 
   /**
-   * Calcule les points d'une caténaire entre deux points
-   * Implémente l'affaissement réaliste des lignes sous l'effet de la gravité
+   * Crée l'interface utilisateur
    */
-  private calculateCatenary(startPos: THREE.Vector3, endPos: THREE.Vector3): THREE.Vector3[] {
-    const segments = 15; // Nombre de segments pour une courbe lisse
-    const points: THREE.Vector3[] = [];
+  private createInterface(): void {
+    // L'interface nécessite le système de rendu
+    if (!this.renderSystem) return;
 
-    // Paramètres physiques
-    const lineLength = CONFIG.lines.defaultLength;
-    const linearMassDensity = CONFIG.lines.linearMassDensity;
-    const gravity = 9.81;
+    // Créer les contrôles
+    this.simulationControls = this.createSimulationControls();
 
-    // Calculer la distance directe entre les points
-    const directDistance = startPos.distanceTo(endPos);
+    // Créer le debug renderer (requis par UIManager)
+    this.debugRenderer = new DebugRenderer({
+      addObject: (obj: THREE.Object3D) => this.renderSystem!.addToScene(obj),
+      removeObject: (obj: THREE.Object3D) => this.renderSystem!.removeFromScene(obj),
+      getScene: () => this.renderSystem!.getScene()
+    });
 
-    // Estimer la tension basée sur la position du kite (plus il est haut, plus la tension est forte)
-    const kiteHeight = Math.max(startPos.y, endPos.y);
-    const estimatedTension = 50 + kiteHeight * 8; // Tension de base 50N + 8N par mètre de hauteur
-
-    // Calculer l'affaissement (sag) avec la formule caténaire simplifiée
-    // sag = (ρ × g × L²) / (8 × T)
-    const sag = (linearMassDensity * gravity * lineLength * lineLength) / (8 * estimatedTension);
-
-    // Si la ligne est très tendue ou très courte, utiliser une ligne droite
-    if (directDistance >= lineLength * 0.95 || sag < 0.01) {
-      return [startPos.clone(), endPos.clone()];
-    }
-
-    // Générer les points de la caténaire
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-
-      // Position linéaire interpolée entre les deux points
-      const point = new THREE.Vector3().lerpVectors(startPos, endPos, t);
-
-      // Ajouter l'affaissement vertical (forme parabolique simplifiée)
-      // La formule 4*t*(1-t) donne un maximum au centre (t=0.5) et zéro aux extrémités
-      const sagFactor = 4 * t * (1 - t);
-      point.y -= sag * sagFactor;
-
-      points.push(point);
-    }
-
-    return points;
+    // Créer l'UI manager
+    this.uiManager = new UIManager(
+      this.simulationControls,
+      this.debugRenderer,
+      () => this.reset(),
+      () => { this.isRunning ? this.stop() : this.start(); }
+    );
   }
 
   /**
-   * Initialise l'application de simulation
+   * Configure le rendu
    */
-  async initialize(): Promise<void> {
-    try {
-      this.logger.info('Starting SimulationApp initialization...', 'SimulationApp');
+  private setupRendering(): void {
+    if (!this.renderSystem) return;
 
-      // Initialiser tous les systèmes
-      const initPromises = [
-        this.physicsSystem.initialize(),
-        this.windSystem.initialize(),
-        this.inputSystem.initialize()
-      ];
-
-      // Ajouter RenderSystem seulement si activé
-      if (this.config.enableRenderSystem) {
-        initPromises.push(this.renderSystem.initialize());
-      }
-
-      await Promise.all(initPromises);
-
-      // Ajouter le kite à la scène maintenant que le RenderSystem est initialisé
-      if (this.config.enableLegacyComponents && this.config.enableRenderSystem && this.renderSystem) {
-        const scene = this.renderSystem.getScene();
-        if (scene && this.kite) {
-          scene.add(this.kite);
-          scene.add(this.controlBar);
-          scene.add(this.pilot);
-          scene.add(this.leftLine);
-          scene.add(this.rightLine);
-          console.log('🪁 Kite, control bar, pilot and lines added to scene');
-          console.log('🎭 Scene children count after adding objects:', scene.children.length);
-
-          // Créer le DebugRenderer maintenant que la scène est prête
-          // Créer un wrapper RenderManager simple pour DebugRenderer
-          const renderManagerAdapter = {
-            addObject: (obj: THREE.Object3D) => scene.add(obj),
-            removeObject: (obj: THREE.Object3D) => scene.remove(obj),
-            getScene: () => scene
-          } as any;
-
-          this.debugRenderer = new DebugRenderer(renderManagerAdapter);
-          console.log('🔍 DebugRenderer initialized with adapter');
-        }
-      }
-
-      // Démarrer le rendu (si activé)
-      if (this.config.enableRenderSystem) {
-        this.renderSystem.startRendering();
-      }
-
-      this.isInitialized = true;
-      this.logger.info('SimulationApp fully initialized', 'SimulationApp');
-
-    } catch (error) {
-      this.logger.error(`SimulationApp initialization failed: ${error}`, 'SimulationApp');
-      throw error;
+    const scene = this.renderSystem.getScene();
+    if (scene) {
+      // Ajouter les entités à la scène
+      scene.add(this.kite);
+      scene.add(this.controlBar);
+      scene.add(this.pilot);
+      if (this.leftLine) scene.add(this.leftLine);
+      if (this.rightLine) scene.add(this.rightLine);
     }
+
+    // Démarrer le rendu
+    this.renderSystem.startRendering();
   }
 
   /**
-   * Boucle principale de simulation (ECS-inspired)
+   * Crée les contrôles de simulation
    */
-  update = (): void => {
-    if (!this.isInitialized || !this.isRunning) return;
-
-    const currentTime = performance.now();
-    const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, this.config.maxFrameTime);
-    this.lastFrameTime = currentTime;
-
-    this.totalTime += deltaTime;
-    this.frameCount++;
-
-    // Créer le contexte de simulation partagé
-    const context = {
-      deltaTime,
-      totalTime: this.totalTime,
-      isPaused: !this.isRunning,
-      debugMode: this.config.enableDebug
-    };
-
-    try {
-      // 1. Mise à jour des entrées (priorité haute)
-      this.inputSystem.update(context);
-
-      // 2. Mise à jour du vent
-      this.windSystem.update(context);
-
-      // 3. Mise à jour de la physique
-      this.physicsSystem.update(context);
-
-      // 4. Mise à jour du rendu (priorité basse)
-      if (this.config.enableRenderSystem) {
-        this.renderSystem.update(context);
-      }
-
-      // 5. Synchronisation avec les composants existants
-      this.syncLegacyComponents(context);
-
-      // 6. Mise à jour de l'UI
-      this.updateUI(context);
-
-    } catch (error) {
-      this.logger.error(`Simulation update error: ${error}`, 'SimulationApp');
-    }
-
-    // Continuer la boucle
-    if (this.isRunning) {
-      requestAnimationFrame(this.update);
-    }
-  };
-
-  /**
-   * Synchronise les composants existants avec les systèmes
-   */
-  private syncLegacyComponents(context: any): void {
-    if (!this.config.enableLegacyComponents) return;
-
-    // Obtenir l'état des entrées
-    const inputState = this.inputSystem.getInputState();
-
-    // Appliquer la rotation de la barre
-    this.controlBar.rotation.z = inputState.barPosition * Math.PI / 6; // Max ±30°
-
-    // Mettre à jour les lignes de contrôle
-    this.updateControlLines();
-
-    // === PHYSIQUE COMPLÈTE avec KitePhysicsSystem ===
-    if (this.config.enableCompletePhysics && this.isCompletePhysicsReady && this.kitePhysicsSystem) {
-      // Synchroniser la rotation de la barre vers KitePhysicsSystem
-      this.kitePhysicsSystem.setBarRotation(inputState.barPosition);
-
-      // Mettre à jour la physique complète
-      this.kitePhysicsSystem.update(context);
-
-      // Synchroniser la position et rotation du kite depuis KitePhysicsSystem
-      const kiteState = this.kitePhysicsSystem.getKiteState();
-      if (kiteState) {
-        this.kite.position.copy(kiteState.position);
-        this.kite.quaternion.copy(kiteState.orientation);
-      }
-
-      // Mettre à jour l'objet physique pour compatibilité avec l'UI
-      const kitePhysics = this.physicsObjects.get('kite');
-      if (kitePhysics && kiteState) {
-        kitePhysics.position.copy(kiteState.position);
-        kitePhysics.velocity.copy(kiteState.velocity);
-        kitePhysics.acceleration.set(0, 0, 0); // Reset acceleration
-        kitePhysics.angularVelocity.copy(kiteState.angularVelocity);
-      }
-    }
-    // === PHYSIQUE SIMPLIFIÉE (fallback) ===
-    else {
-      // Obtenir l'état physique du kite
-      const kitePhysics = this.physicsObjects.get('kite');
-      if (kitePhysics) {
-        // Synchroniser la position du kite
-        this.kite.position.copy(kitePhysics.position);
-
-        // Calculer le vent apparent pour le kite
-        const apparentWind = this.windSystem.getApparentWind(
-          kitePhysics.position,
-          kitePhysics.velocity
-        );
-
-        // Appliquer les forces aérodynamiques basées sur le vent apparent
-        this.applyAerodynamicForces(kitePhysics, apparentWind, context.deltaTime);
-
-        // Appliquer la gravité
-        if (kitePhysics.position.y > 0) {
-          const gravityForce = new THREE.Vector3(0, -9.81 * kitePhysics.mass, 0);
-          kitePhysics.acceleration.add(gravityForce.divideScalar(kitePhysics.mass));
-        } else {
-          // Collision avec le sol
-          kitePhysics.acceleration.set(0, 0, 0);
-          kitePhysics.velocity.set(0, 0, 0);
-          kitePhysics.position.y = 0;
-        }
-
-        // Intégration simple d'Euler
-        kitePhysics.velocity.add(kitePhysics.acceleration.clone().multiplyScalar(context.deltaTime));
-        kitePhysics.position.add(kitePhysics.velocity.clone().multiplyScalar(context.deltaTime));
-      }
-    }
-
-    // Gestion du reset
-    if (inputState.resetPressed) {
-      this.reset();
-    }
-
-    // Mise à jour du debug renderer si activé
-    if (this.debugRenderer && this.kite) {
-      // Utiliser KitePhysicsSystem comme moteur physique s'il est disponible
-      if (this.config.enableCompletePhysics && this.isCompletePhysicsReady && this.kitePhysicsSystem) {
-        // Cast KitePhysicsSystem vers le type attendu par DebugRenderer
-        this.debugRenderer.updateDebugArrows(this.kite, this.kitePhysicsSystem as any);
-      }
-    }
-  }
-
-  /**
-   * Applique les forces aérodynamiques (portance et traînée) au kite
-   */
-  private applyAerodynamicForces(
-    kiteState: any, 
-    apparentWind: THREE.Vector3, 
-    deltaTime: number
-  ): void {
-    const windSpeed = apparentWind.length();
-    
-    // Si le vent est trop faible, pas de forces aérodynamiques significatives
-    if (windSpeed < 0.1) return;
-
-    // Paramètres aérodynamiques depuis la configuration
-    const liftScale = CONFIG.aero.liftScale;
-    const dragScale = CONFIG.aero.dragScale;
-    const kiteArea = CONFIG.kite.area;
-    const airDensity = CONFIG.physics.airDensity;
-
-    // Direction du vent (normalisée)
-    const windDirection = apparentWind.clone().normalize();
-
-    // Calcul de la pression dynamique : q = 0.5 * ρ * v²
-    const dynamicPressure = 0.5 * airDensity * windSpeed * windSpeed;
-
-    // Estimation de l'angle d'attaque basé sur la rotation de la barre
-    // Plus la barre est tournée, plus l'angle d'attaque est élevé
-    const barRotation = this.controlBar.rotation.z;
-    const angleOfAttack = Math.abs(barRotation) + 0.2; // Angle de base + contribution barre
-
-    // Coefficients aérodynamiques (simplifiés)
-    // CL augmente avec l'angle d'attaque jusqu'à un point, puis diminue
-    const cl = Math.sin(angleOfAttack * 2) * liftScale;
-    const cd = 0.1 + angleOfAttack * angleOfAttack * dragScale; // CD augmente avec l'angle
-
-    // Calcul des forces
-    const liftMagnitude = cl * dynamicPressure * kiteArea;
-    const dragMagnitude = cd * dynamicPressure * kiteArea;
-
-    // Portance : perpendiculaire au vent
-    // Pour un kite, la portance est principalement verticale
-    const liftDirection = new THREE.Vector3(0, 1, 0);
-    const liftForce = liftDirection.multiplyScalar(liftMagnitude);
-
-    // Traînée : opposée au vent
-    const dragForce = windDirection.clone().multiplyScalar(-dragMagnitude);
-
-    // Appliquer les forces totales
-    const totalForce = liftForce.add(dragForce);
-    kiteState.acceleration.add(totalForce.divideScalar(kiteState.mass));
-
-    // Debug : afficher les forces dans la console (optionnel)
-    if (this.config.enableDebug && Math.random() < 0.01) { // 1% des frames pour éviter le spam
-      console.log(`Aéro: Vent=${windSpeed.toFixed(1)}m/s, Portance=${liftMagnitude.toFixed(1)}N, Traînée=${dragMagnitude.toFixed(1)}N`);
-    }
-  }
-
-  /**
-   * Met à jour l'interface utilisateur
-   */
-  private updateUI(context: any): void {
-    // Mettre à jour l'UI si elle existe
-    this.updateUIOverlay();
-  }
-
-  /**
-   * Met à jour l'overlay UI avec les données actuelles
-   */
-  private updateUIOverlay(): void {
-    if (typeof document === 'undefined') return;
-
-    // Récupérer les éléments du DOM
-    const fpsElement = document.getElementById('fps');
-    const posElement = document.getElementById('kite-pos');
-    const velElement = document.getElementById('kite-vel');
-    const windElement = document.getElementById('wind-speed');
-    const barElement = document.getElementById('bar-pos');
-    const altitudeElement = document.getElementById('altitude');
-    const speedElement = document.getElementById('speed');
-    const aoaElement = document.getElementById('aoa');
-    const tensionLeftElement = document.getElementById('tension-left');
-    const tensionRightElement = document.getElementById('tension-right');
-
-    // Obtenir les données
-    const renderStats = this.renderSystem ? this.renderSystem.getRenderStats() : { fps: 0 };
-    const kitePhysics = this.physicsObjects.get('kite');
-    const inputState = this.inputSystem.getInputState();
-    const windState = this.windSystem.getWindState();
-
-    // Mettre à jour FPS
-    if (fpsElement) {
-      fpsElement.textContent = `${renderStats.fps} FPS`;
-    }
-
-    // Mettre à jour position
-    if (posElement && kitePhysics) {
-      const pos = kitePhysics.position;
-      posElement.textContent = `Position: X=${pos.x.toFixed(1)}m Y=${pos.y.toFixed(1)}m Z=${pos.z.toFixed(1)}m`;
-    }
-
-    // Mettre à jour altitude
-    if (altitudeElement && kitePhysics) {
-      altitudeElement.textContent = `Altitude: ${kitePhysics.position.y.toFixed(2)}m`;
-    }
-
-    // Mettre à jour vitesse
-    if (velElement && kitePhysics) {
-      const vel = kitePhysics.velocity;
-      velElement.textContent = `Vitesse: (${vel.x.toFixed(1)}, ${vel.y.toFixed(1)}, ${vel.z.toFixed(1)}) m/s`;
-    }
-
-    // Mettre à jour vitesse magnitude
-    if (speedElement && kitePhysics) {
-      const speedMagnitude = kitePhysics.velocity.length();
-      speedElement.textContent = `Vitesse: ${speedMagnitude.toFixed(2)} m/s`;
-    }
-
-    // Mettre à jour vent
-    if (windElement) {
-      windElement.textContent = `Vent: ${windState.baseSpeed.toFixed(1)} m/s`;
-    }
-
-    // Mettre à jour position barre
-    if (barElement) {
-      const barPercent = (inputState.barPosition * 100).toFixed(0);
-      const direction = inputState.barPosition > 0 ? 'Droite' : inputState.barPosition < 0 ? 'Gauche' : 'Centre';
-      barElement.textContent = `Barre: ${barPercent}% (${direction})`;
-    }
-
-    // Mettre à jour angle d'attaque (si KitePhysicsSystem disponible)
-    if (aoaElement && this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      const kiteState = this.kitePhysicsSystem.getKiteState();
-      if (kiteState) {
-        // Calculer un angle d'attaque approximatif depuis la vitesse et l'orientation
-        // Pour l'instant, on affiche juste 0 (à implémenter plus tard)
-        aoaElement.textContent = `AOA: N/A`;
-      }
-    }
-
-    // Mettre à jour tensions lignes (si KitePhysicsSystem disponible)
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      const stats = this.kitePhysicsSystem.getStats();
-
-      if (tensionLeftElement && stats) {
-        tensionLeftElement.textContent = `Tension Gauche: N/A`;
-      }
-
-      if (tensionRightElement && stats) {
-        tensionRightElement.textContent = `Tension Droite: N/A`;
-      }
-    }
-  }
-
-  /**
-   * Enregistre un objet physique dans le système
-   */
-  registerPhysicsObject(id: string, state: PhysicsState): void {
-    this.physicsObjects.set(id, state);
-    this.physicsSystem.registerPhysicsObject(id, state);
-  }
-
-  /**
-   * Obtient les statistiques de la simulation
-   */
-  getStats(): any {
-    const fps = this.totalTime > 0 ? this.frameCount / this.totalTime : 0;
+  private createSimulationControls(): SimulationControls {
     return {
-      frameCount: this.frameCount,
-      totalTime: this.totalTime,
-      fps: fps,
-      physicsObjectsCount: this.physicsObjects.size,
-      isRunning: this.isRunning,
-      isInitialized: this.isInitialized,
-      physics: this.physicsSystem.getStats()
+      getBridleLengths: () => this.kitePhysicsSystem?.getBridleLengths() || { nez: 0.65, inter: 0.65, centre: 0.65 },
+      setBridleLength: (type: "nez" | "inter" | "centre", length: number) => {
+        if (this.kitePhysicsSystem) {
+          const currentLengths = this.kitePhysicsSystem.getBridleLengths();
+          this.kitePhysicsSystem.setBridleLengths({
+            ...currentLengths,
+            [type]: length
+          });
+        }
+      },
+      setLineLength: (length: number) => {
+        if (this.kitePhysicsSystem) {
+          this.kitePhysicsSystem.setLineLength(length);
+        }
+      },
+      setWindParams: (params: { speed?: number; direction?: number; turbulence?: number }) => {
+        if (params.speed !== undefined) {
+          this.windSystem.setWindSpeed(params.speed);
+          if (this.kitePhysicsSystem) {
+            this.kitePhysicsSystem.setWindParams({ speed: params.speed });
+          }
+        }
+        if (params.direction !== undefined) {
+          this.windSystem.setWindDirection(new THREE.Vector3(
+            Math.cos(params.direction * Math.PI / 180),
+            0,
+            Math.sin(params.direction * Math.PI / 180)
+          ));
+          if (this.kitePhysicsSystem) {
+            this.kitePhysicsSystem.setWindParams({ direction: params.direction });
+          }
+        }
+        if (params.turbulence !== undefined) {
+          if (this.windSystem) {
+            this.windSystem.setTurbulenceIntensity(params.turbulence / 100);
+          }
+        }
+      },
+      getForceSmoothing: () => this.kitePhysicsSystem?.getForceSmoothing() || 0.1,
+      setForceSmoothing: (value: number) => {
+        if (this.kitePhysicsSystem) {
+          this.kitePhysicsSystem.setForceSmoothing(value);
+        }
+      },
+      getKiteState: () => this.kitePhysicsSystem?.getKiteState() || {
+        position: new THREE.Vector3(),
+        velocity: new THREE.Vector3(),
+        angularVelocity: new THREE.Vector3(),
+        orientation: new THREE.Quaternion()
+      },
+      getWindState: () => {
+        const windState = this.kitePhysicsSystem?.getWindState();
+        return windState ? {
+          baseSpeed: windState.baseSpeed,
+          baseDirection: windState.baseDirection,
+          turbulence: windState.turbulence
+        } : {
+          baseSpeed: 0,
+          baseDirection: new THREE.Vector3(),
+          turbulence: 0
+        };
+      },
+      getLineLength: () => this.kitePhysicsSystem?.getLineSystem()?.lineLength || CONFIG.lines.defaultLength,
+      getControlLineDiagnostics: () => {
+        return this.kitePhysicsSystem?.getControlLineDiagnostics() || null;
+      },
+      getAerodynamicForces: () => {
+        return this.kitePhysicsSystem?.getAerodynamicForces() || null;
+      }
     };
   }
 
@@ -839,20 +434,16 @@ export class SimulationApp {
    */
   start(): void {
     if (!this.isInitialized) {
-      throw new Error('SimulationApp must be initialized before starting');
+      throw new Error('Simulation must be initialized first');
     }
+
+    if (this.isRunning) return;
 
     this.isRunning = true;
     this.lastFrameTime = performance.now();
-    this.logger.info('SimulationApp started', 'SimulationApp');
+    this.logger.info('▶️ Simulation started', 'SimulationApp');
 
-    // Mettre à jour l'UI
-    if (this.uiManager && typeof this.uiManager.updatePlayButton === 'function') {
-      this.uiManager.updatePlayButton(true);
-    }
-
-    // Démarrer la boucle
-    requestAnimationFrame(this.update);
+    this.updateLoop();
   }
 
   /**
@@ -860,256 +451,214 @@ export class SimulationApp {
    */
   stop(): void {
     this.isRunning = false;
-    this.logger.info('SimulationApp stopped', 'SimulationApp');
-
-    // Mettre à jour l'UI
-    if (this.uiManager && typeof this.uiManager.updatePlayButton === 'function') {
-      this.uiManager.updatePlayButton(false);
-    }
+    this.logger.info('⏸️ Simulation stopped', 'SimulationApp');
   }
 
   /**
    * Réinitialise la simulation
    */
   reset(): void {
-    this.logger.info('Resetting simulation...', 'SimulationApp');
+    this.logger.info('🔄 Resetting simulation...', 'SimulationApp');
 
-    // Réinitialiser les systèmes
+    const wasRunning = this.isRunning;
+
+    // Arrêter temporairement pour éviter les mises à jour pendant le reset
+    if (this.isRunning) {
+      this.isRunning = false;
+    }
+
+    // Reset systems
     this.physicsSystem.reset();
     this.windSystem.reset();
     this.inputSystem.reset();
-    if (this.renderSystem) {
-      this.renderSystem.reset();
-    }
+    this.kitePhysicsSystem?.reset();
 
-    // Réinitialiser KitePhysicsSystem si activé
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      this.kitePhysicsSystem.reset();
-    }
-
-    // Réinitialiser l'état
-    this.frameCount = 0;
-    this.totalTime = 0;
-
-    // Réinitialiser tous les objets physiques enregistrés
-    for (const [id, state] of this.physicsObjects) {
-      // Réinitialiser les vecteurs physiques
-      state.velocity.set(0, 0, 0);
-      state.acceleration.set(0, 0, 0);
-      state.angularVelocity.set(0, 0, 0);
-      state.angularAcceleration.set(0, 0, 0);
-
-      // Réinitialiser les positions selon le type d'objet
-      if (id === 'kite') {
-        // Position initiale du kite : 95% de la longueur de ligne
-        const initialDistance = CONFIG.lines.defaultLength * CONFIG.initialization.initialDistanceFactor;
-        const kiteY = CONFIG.initialization.initialKiteY;
-        const pilot = this.controlBar.position.clone();
-        const dy = kiteY - pilot.y;
-        const horizontal = this.calculateHorizontalDistance(initialDistance, dy);
-        
-        state.position.set(pilot.x, kiteY, pilot.z - horizontal);
-      } else {
-        // Pour les autres objets, position par défaut
-        state.position.set(0, 0, 0);
-      }
-    }
-
-    // Réinitialiser les composants visuels legacy
-    this.kite.position.copy(this.physicsObjects.get('kite')?.position || new THREE.Vector3(0, 5, 0));
+    // Reset kite position avec calcul automatique de la position initiale
+    const initialPos = this.calculateInitialKitePosition();
+    this.kite.position.copy(initialPos);
     this.kite.rotation.set(0, 0, 0);
     this.kite.quaternion.identity();
 
-    this.controlBar.rotation.z = 0;
-    this.controlBar.quaternion.identity();
+    // Reset state
+    this.frameCount = 0;
+    this.totalTime = 0;
+    this.lastFrameTime = performance.now();
+
+    // Redémarrer si c'était en cours d'exécution
+    if (wasRunning) {
+      this.isRunning = true;
+    }
+
+    this.logger.info('✅ Simulation reset', 'SimulationApp');
+  }
+
+  /**
+   * Boucle de mise à jour ECS
+   */
+  private updateLoop = (): void => {
+    if (!this.isRunning) return;
+
+    const currentTime = performance.now();
+    const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, this.config.maxFrameTime);
+    this.lastFrameTime = currentTime;
+
+    this.totalTime += deltaTime;
+    this.frameCount++;
+
+    const context = {
+      deltaTime,
+      totalTime: this.totalTime,
+      isPaused: !this.isRunning,
+      debugMode: this.config.enableDebug
+    };
+
+    try {
+      // Mise à jour des systèmes dans l'ordre des priorités
+      this.inputSystem.update(context);
+      this.windSystem.update(context);
+      this.physicsSystem.update(context);
+
+      if (this.kitePhysicsSystem) {
+        const inputState = this.inputSystem.getInputState();
+        this.kitePhysicsSystem.setBarRotation(inputState.barPosition);
+        this.kitePhysicsSystem.update(context);
+      }
+
+      if (this.renderSystem) {
+        this.renderSystem.update(context);
+      }
+
+      // Synchronisation legacy
+      if (this.config.enableLegacyComponents) {
+        this.syncLegacyComponents(context);
+      }
+
+      // Mise à jour UI
+      this.uiManager?.updateDebugInfo();
+
+      // Debug visualization
+      if (this.debugRenderer && this.kitePhysicsSystem && this.debugRenderer.isDebugMode()) {
+        this.debugRenderer.updateDebugArrows(this.kite, this.kitePhysicsSystem);
+      }
+
+    } catch (error) {
+      this.logger.error(`Update error: ${error}`, 'SimulationApp');
+    }
+
+    requestAnimationFrame(this.updateLoop);
+  };
+
+  /**
+   * Synchronise les composants legacy
+   */
+  private syncLegacyComponents(_context: any): void {
+    if (!this.kitePhysicsSystem) return;
+
+    // Mettre à jour la barre de contrôle
+    const inputState = this.inputSystem.getInputState();
+    this.controlBarManager.setRotation(inputState.barPosition);
 
     // Mettre à jour les lignes de contrôle
     this.updateControlLines();
-
-    this.logger.info('Simulation reset complete', 'SimulationApp');
   }
 
   /**
-   * Nettoie les ressources de la simulation
+   * Met à jour les lignes de contrôle
    */
-  dispose(): void {
-    this.logger.info('Disposing SimulationApp', 'SimulationApp');
+  private updateControlLines(): void {
+    if (!this.leftLine || !this.rightLine || !this.kitePhysicsSystem) return;
 
-    // Arrêter la simulation si elle tourne
-    if (this.isRunning) {
-      this.stop();
+    const handles = this.controlBarManager.getHandlePositions(this.kite.position);
+
+    // Récupérer les points de contrôle du kite (où les lignes s'attachent)
+    const ctrlLeft = this.kite.getPoint("CTRL_GAUCHE");
+    const ctrlRight = this.kite.getPoint("CTRL_DROIT");
+
+    if (!ctrlLeft || !ctrlRight) {
+      console.warn("⚠️ Points de contrôle CTRL_GAUCHE ou CTRL_DROIT introuvables");
+      return;
     }
 
-    // Disposer les systèmes
+    // Convertir les points locaux en coordonnées monde
+    const ctrlLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
+    const ctrlRightWorld = this.kite.toWorldCoordinates(ctrlRight);
+
+    // Mettre à jour les lignes avec les vrais points de connexion
+    this.updateLineGeometry(this.leftLine, ctrlLeftWorld, handles.left);
+    this.updateLineGeometry(this.rightLine, ctrlRightWorld, handles.right);
+  }
+
+  /**
+   * Met à jour la géométrie d'une ligne
+   */
+  private updateLineGeometry(line: THREE.Line, start: THREE.Vector3, end: THREE.Vector3): void {
+    const geometry = line.geometry as THREE.BufferGeometry;
+    const positions = geometry.attributes.position;
+
+    if (!positions) return;
+
+    const segments = 20;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const x = start.x + (end.x - start.x) * t;
+      const y = start.y + (end.y - start.y) * t;
+      const z = start.z + (end.z - start.z) * t;
+
+      positions.setXYZ(i, x, y, z);
+    }
+
+    positions.needsUpdate = true;
+  }
+
+  /**
+   * Nettoie les ressources
+   */
+  dispose(): void {
+    this.logger.info('Disposing SimulationApp...', 'SimulationApp');
+
+    this.stop();
+
+    // Dispose systems
     this.physicsSystem.dispose();
     this.windSystem.dispose();
     this.inputSystem.dispose();
-    if (this.renderSystem) {
-      this.renderSystem.dispose();
-    }
+    this.renderSystem?.dispose();
+    this.kitePhysicsSystem?.dispose();
 
-    // Nettoyer les objets physiques
-    this.physicsObjects.clear();
-
-    // Nettoyer les composants legacy si ils existent
-    if (this.config.enableLegacyComponents) {
-      // Note: Les composants Three.js sont gérés par le RenderSystem
-    }
-
-    this.logger.info('SimulationApp disposed', 'SimulationApp');
+    this.logger.info('✅ SimulationApp disposed', 'SimulationApp');
   }
 
-  /**
-   * Calcule la distance horizontale via Pythagore
-   * Utilisé pour positionner le kite initialement
-   */
-  private calculateHorizontalDistance(hypotenuse: number, vertical: number): number {
-    const minHorizontal = 0.1; // m - Distance horizontale minimale pour éviter kite au-dessus du pilote
-    return Math.max(
-      minHorizontal,
-      Math.sqrt(Math.max(0, hypotenuse * hypotenuse - vertical * vertical))
-    );
-  }
+  // === ACCESSEURS ===
 
-  // === MÉTHODES PUBLIQUES POUR L'INTERFACE UTILISATEUR ===
-
-  /**
-   * Met à jour les paramètres du vent
-   */
-  setWindParams(params: { speed?: number; direction?: number; turbulence?: number }): void {
-    // Mettre à jour WindSystem pour la version simplifiée
-    if (params.speed !== undefined) {
-      // Convertir km/h en m/s
-      this.windSystem.updateConfig({ baseSpeed: params.speed / 3.6 });
-    }
-    if (params.direction !== undefined) {
-      // Convertir degrés en radians, direction du vent
-      const rad = (params.direction * Math.PI) / 180;
-      const direction = new THREE.Vector3(Math.cos(rad), 0, Math.sin(rad));
-      this.windSystem.updateConfig({ baseDirection: direction });
-    }
-    if (params.turbulence !== undefined) {
-      this.windSystem.updateConfig({ turbulenceIntensity: params.turbulence });
-    }
-
-    // Déléguer à KitePhysicsSystem si activé
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      this.kitePhysicsSystem.setWindParams(params);
-    }
-  }
-
-  /**
-   * Met à jour la longueur des lignes
-   */
-  setLineLength(length: number): void {
-    // Met à jour la longueur des lignes dans la configuration et les systèmes
-    if (CONFIG && CONFIG.lines) {
-      CONFIG.lines.defaultLength = length;
-    }
-    if (this.physicsSystem && typeof this.physicsSystem.setLineLength === 'function') {
-      this.physicsSystem.setLineLength(length);
-    }
-    // Mettre à jour la géométrie visuelle des lignes si legacy
-    if (this.leftLine && this.rightLine) {
-      this.updateControlLines();
-    }
-
-    // Déléguer à KitePhysicsSystem si activé
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      this.kitePhysicsSystem.setLineLength(length);
-    }
-
-    this.logger.info(`Line length updated to ${length}m`, 'SimulationApp');
-  }
-
-  /**
-   * Met à jour la longueur d'une bride spécifique
-   */
-  setBridleLength(type: 'nez' | 'inter' | 'centre', length: number): void {
-    if (this.kite) {
-      // Mettre à jour les longueurs dans le kite
-      const currentLengths = this.kite.getBridleLengths();
-      const newLengths = { ...currentLengths, [type]: length };
-      this.kite.setBridleLengths(newLengths);
-
-      // Recalculer la géométrie du kite
-      this.kite.updateBridleLines();
-
-      // Déléguer à KitePhysicsSystem si activé
-      if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-        this.kitePhysicsSystem.setBridleLengths(newLengths);
-      }
-    }
-  }
-
-  /**
-   * Obtient les longueurs actuelles des brides
-   */
-  getBridleLengths(): { nez: number; inter: number; centre: number } {
-    return this.kite ? this.kite.getBridleLengths() : { nez: 0.65, inter: 0.65, centre: 0.65 };
-  }
-
-  /**
-   * Met à jour le lissage des forces
-   */
-  setForceSmoothing(smoothing: number): void {
-    // Met à jour le lissage des forces dans la configuration et le système physique
-    if (this.physicsSystem && typeof this.physicsSystem.setForceSmoothing === 'function') {
-      this.physicsSystem.setForceSmoothing(smoothing);
-    }
-    this.logger.info(`Force smoothing updated to ${smoothing}`, 'SimulationApp');
-  }
-
-  /**
-   * Obtient l'état du lissage des forces
-   */
-  getForceSmoothing(): number {
-    // Retourne la valeur actuelle du lissage des forces depuis le système physique
-    if (this.physicsSystem && typeof this.physicsSystem.getForceSmoothing === 'function') {
-      return this.physicsSystem.getForceSmoothing();
-    }
-    return 0.5; // Valeur par défaut
-  }
-
-  /**
-   * Obtient l'état actuel du kite
-   */
-  getKiteState(): any {
-    // Utiliser KitePhysicsSystem si disponible
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      return this.kitePhysicsSystem.getKiteState();
-    }
-
-    // Fallback sur l'objet physique
-    const kitePhysics = this.physicsObjects.get('kite');
-    return kitePhysics ? {
-      position: kitePhysics.position.clone(),
-      velocity: kitePhysics.velocity.clone(),
-      acceleration: kitePhysics.acceleration.clone()
-    } : {};
-  }
-
-  /**
-   * Obtient l'état actuel du vent
-   */
-  getWindState(): any {
-    // Utiliser KitePhysicsSystem si disponible
-    if (this.config.enableCompletePhysics && this.kitePhysicsSystem) {
-      const windState = this.kitePhysicsSystem.getWindState();
-      if (windState) {
-        return {
-          speed: windState.speed, // déjà en m/s
-          baseSpeed: windState.speed,
-          direction: windState.direction
-        };
-      }
-    }
-
-    // Fallback sur WindSystem
+  getSystems() {
     return {
-      speed: this.windSystem.getCurrentWindSpeed(),
-      baseSpeed: this.windSystem.getCurrentWindSpeed(),
-      direction: this.windSystem.getCurrentWindDirection()
+      physics: this.physicsSystem,
+      wind: this.windSystem,
+      input: this.inputSystem,
+      render: this.renderSystem,
+      kitePhysics: this.kitePhysicsSystem
     };
+  }
+
+  getConfig(): SimulationConfig {
+    return { ...this.config };
+  }
+
+  getStats() {
+    return {
+      isRunning: this.isRunning,
+      isInitialized: this.isInitialized,
+      frameCount: this.frameCount,
+      totalTime: this.totalTime,
+      fps: this.frameCount / Math.max(this.totalTime, 0.001)
+    };
+  }
+
+  isSimulationRunning(): boolean {
+    return this.isRunning;
+  }
+
+  isSimulationInitialized(): boolean {
+    return this.isInitialized;
   }
 }

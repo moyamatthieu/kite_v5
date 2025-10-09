@@ -17,7 +17,9 @@ export default [
       globals: {
         console: 'readonly',
         window: 'readonly',
-        document: 'readonly'
+        document: 'readonly',
+        performance: 'readonly',
+        requestAnimationFrame: 'readonly'
       }
     },
     plugins: {

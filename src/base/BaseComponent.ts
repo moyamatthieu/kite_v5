@@ -82,7 +82,7 @@ export abstract class BaseComponent {
  * Composant de debug visuel
  */
 export class DebugComponent extends BaseComponent {
-  update(context: ComponentContext): void {
+  update(_context: ComponentContext): void {
     // Logique de debug visuel
   }
 }
@@ -91,7 +91,7 @@ export class DebugComponent extends BaseComponent {
  * Composant de physique
  */
 export class PhysicsComponent extends BaseComponent {
-  update(context: ComponentContext): void {
+  update(_context: ComponentContext): void {
     // Logique de physique
   }
 }

@@ -225,6 +225,24 @@ export class WindSystem extends BaseSimulationSystem {
     return this.windState.baseDirection.clone();
   }
 
+  /**
+   * Met à jour l'intensité de la turbulence
+   * @param intensity - Intensité de la turbulence (0-1)
+   */
+  setTurbulenceIntensity(intensity: number): void {
+    this.config.turbulenceIntensity = Math.max(0, Math.min(1, intensity));
+    this.logger.info(`Turbulence intensity set to ${this.config.turbulenceIntensity.toFixed(2)}`, 'WindSystem');
+  }
+
+  /**
+   * Active ou désactive la turbulence
+   * @param enabled - État de la turbulence
+   */
+  setTurbulenceEnabled(enabled: boolean): void {
+    this.config.turbulenceEnabled = enabled;
+    this.logger.info(`Turbulence ${enabled ? 'enabled' : 'disabled'}`, 'WindSystem');
+  }
+
   reset(): void {
     this.windState.time = 0;
     this.windState.baseDirection.copy(this.config.baseDirection);

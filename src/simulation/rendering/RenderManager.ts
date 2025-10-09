@@ -190,6 +190,10 @@ export class RenderManager {
     this.scene.remove(object);
   }
 
+  getScene(): THREE.Scene {
+    return this.scene;
+  }
+
   render(): void {
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
@@ -201,7 +205,4 @@ export class RenderManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  getScene(): THREE.Scene {
-    return this.scene;
-  }
 }

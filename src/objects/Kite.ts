@@ -31,14 +31,13 @@
 
 import * as THREE from "three";
 
-import { StructuredObject } from "../../core/StructuredObject";
-import { ICreatable } from "../../types/index";
-import { Primitive } from "../../core/Primitive";
-import { FrameFactory } from "../../factories/FrameFactory";
-import { SurfaceFactory } from "../../factories/SurfaceFactory";
-import { PointFactory, BridleLengths } from "../../factories/PointFactory";
-import { FactoryRegistry } from "../../factories/FactoryRegistry";
-import { CONFIG } from "../../simulation/config/SimulationConfig";
+import { StructuredObject } from "../core/StructuredObject";
+import { ICreatable } from "../types/index";
+import { Primitive } from "../core/Primitive";
+import { FrameFactory } from "../factories/FrameFactory";
+import { SurfaceFactory } from "../factories/SurfaceFactory";
+import { PointFactory, BridleLengths } from "../factories/PointFactory";
+import { CONFIG } from "../simulation/config/SimulationConfig";
 
 export class Kite extends StructuredObject implements ICreatable {
   private frameFactory: FrameFactory;
@@ -52,11 +51,7 @@ export class Kite extends StructuredObject implements ICreatable {
   // LONGUEURS IDENTIQUES : L'équilibre vient de la géométrie, pas des brides
   // Principe: Kite suspendu par CTRL_GAUCHE et CTRL_DROIT sera horizontal
   // si le centre de masse se trouve entre ces deux points (axe X)
-  private bridleLengths: BridleLengths = {
-    nez: 0.65,     // 65cm - longueur standard
-    inter: 0.65,   // 65cm - longueur standard
-    centre: 0.65,  // 65cm - longueur standard
-  };
+  private bridleLengths: BridleLengths = { ...CONFIG.bridle.defaultLengths };
 
   // Paramètres du cerf-volant
   private params = {
@@ -217,14 +212,14 @@ export class Kite extends StructuredObject implements ICreatable {
       if (line instanceof THREE.Line) {
         const startName = line.userData.startPoint;
         const endName = line.userData.endPoint;
-        const startPos = this.pointsMap.get(startName);
-        const endPos = this.pointsMap.get(endName);
+        const startPos = this.getPoint(startName);
+        const endPos = this.getPoint(endName);
 
         if (startPos && endPos) {
           const geometry = line.geometry as THREE.BufferGeometry;
           const points = [
-            new THREE.Vector3(...startPos),
-            new THREE.Vector3(...endPos),
+            startPos.clone(),
+            endPos.clone(),
           ];
           geometry.setFromPoints(points);
           geometry.attributes.position.needsUpdate = true;
@@ -424,21 +419,21 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
-   * Transforme un point local en coordonnées monde
-   *
-   * Cette méthode utilitaire évite la duplication du pattern:
-   * `localPos.clone().applyQuaternion(kite.quaternion).add(kite.position)`
+   * Convertit un point du repère local du kite vers le repère monde
+   * 
+   * IMPORTANT : Cette méthode crée une copie pour éviter de modifier les points stockés.
+   * Pour la transformation Three.js standard, utilisez directement super.localToWorld()
    *
    * @param localPos - Position dans le repère local du kite
-   * @returns Position dans le repère monde
+   * @returns Nouvelle position dans le repère monde (copie)
    *
    * @example
    * ```typescript
    * const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
-   * const worldPos = kite.localToWorld(ctrlLeft);
+   * const worldPos = kite.toWorldCoordinates(ctrlLeft);
    * ```
    */
-  public localToWorld(localPos: THREE.Vector3): THREE.Vector3 {
+  public toWorldCoordinates(localPos: THREE.Vector3): THREE.Vector3 {
     return localPos
       .clone()
       .applyQuaternion(this.quaternion)

@@ -27,7 +27,6 @@
  *   - src/objects/mechanical/LineVisual.ts (rendu)
  */
 
-import * as THREE from "three";
 
 /**
  * Configuration physique d'une ligne de cerf-volant

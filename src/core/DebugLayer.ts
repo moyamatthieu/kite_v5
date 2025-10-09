@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+
 import { Node3D } from './Node3D';
 
 export interface DebugOptions {
