@@ -3,6 +3,7 @@
  */
 
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
 import { Logger } from '../../utils/Logging';
 
@@ -11,6 +12,7 @@ export interface RenderState {
   camera: THREE.Camera;
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
+  controls: OrbitControls;
   isRendering: boolean;
   frameCount: number;
   fps: number;
@@ -43,7 +45,7 @@ export class RenderSystem extends BaseSimulationSystem {
       antialias: true,
       shadowMapEnabled: true,
       shadowMapType: THREE.PCFSoftShadowMap,
-      pixelRatio: Math.min(window.devicePixelRatio, 2),
+      pixelRatio: 1, // Valeur par défaut, sera mise à jour dans initialize()
       clearColor: 0x87CEEB, // Bleu ciel
       clearAlpha: 1.0,
       targetFPS: 60,
@@ -55,6 +57,11 @@ export class RenderSystem extends BaseSimulationSystem {
 
   async initialize(): Promise<void> {
     this.logger.info('RenderSystem initializing...', 'RenderSystem');
+
+    // Mettre à jour pixelRatio maintenant que window est disponible
+    if (typeof window !== 'undefined') {
+      this.config.pixelRatio = Math.min(window.devicePixelRatio, 2);
+    }
 
     try {
       await this.initializeRenderer();
@@ -100,8 +107,59 @@ export class RenderSystem extends BaseSimulationSystem {
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(this.config.clearColor, 50, 200);
 
+    // Ajouter des lumières
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    directionalLight.castShadow = this.config.shadowMapEnabled;
+    if (this.config.shadowMapEnabled) {
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 500;
+    }
+    scene.add(directionalLight);
+
+    this.logger.info('Scene lights created', 'RenderSystem');
+
+    // Ajouter un sol (ground plane)
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x3a7d44, // Vert herbe
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2; // Rotation pour être horizontal
+    ground.position.y = 0;
+    ground.receiveShadow = this.config.shadowMapEnabled;
+    scene.add(ground);
+
+    // Ajouter une grille pour référence visuelle
+    const gridHelper = new THREE.GridHelper(100, 50, 0x888888, 0x444444);
+    gridHelper.position.y = 0.01; // Légèrement au-dessus du sol pour éviter le z-fighting
+    scene.add(gridHelper);
+
+    this.logger.info('Ground plane and grid created', 'RenderSystem');
+
     // Créer la caméra (sera configurée par le système de caméra séparé)
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 15); // Position de la caméra derrière et légèrement au-dessus
+    camera.lookAt(0, 5, 0); // Regarder vers le centre où se trouve le kite
+
+    // Créer les contrôles OrbitControls pour la navigation de caméra
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true; // Lissage du mouvement
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 5;
+    controls.maxDistance = 100;
+    controls.maxPolarAngle = Math.PI / 2; // Empêcher de passer sous le sol
+    controls.target.set(0, 5, 0); // Regarder le kite
+    controls.update();
+
+    this.logger.info('OrbitControls created', 'RenderSystem');
 
     // Initialiser l'état de rendu
     this.renderState = {
@@ -109,6 +167,7 @@ export class RenderSystem extends BaseSimulationSystem {
       camera,
       renderer,
       canvas,
+      controls,
       isRendering: false,
       frameCount: 0,
       fps: 0,
@@ -121,13 +180,26 @@ export class RenderSystem extends BaseSimulationSystem {
     // Ajouter le canvas au DOM
     const container = document.getElementById('app') || document.body;
     container.appendChild(canvas);
+    
+    this.logger.info(`Canvas created and added to container: ${container.id || 'body'}`, 'RenderSystem');
+    this.logger.info(`Canvas dimensions: ${canvas.width}x${canvas.height}`, 'RenderSystem');
 
     // Écouteur de redimensionnement
     window.addEventListener('resize', this.onResize.bind(this));
   }
 
   update(context: SimulationContext): void {
-    if (!this.renderState || !this.renderState.isRendering) return;
+    if (!this.renderState || !this.renderState.isRendering) {
+      if (!this.renderState) {
+        console.warn('RenderSystem: renderState is null');
+      } else if (!this.renderState.isRendering) {
+        console.warn('RenderSystem: isRendering is false');
+      }
+      return;
+    }
+
+    // Mettre à jour les contrôles de caméra
+    this.renderState.controls.update();
 
     // Calculer le FPS
     this.updateFPS();
@@ -179,7 +251,16 @@ export class RenderSystem extends BaseSimulationSystem {
   startRendering(): void {
     if (this.renderState) {
       this.renderState.isRendering = true;
+      console.log('🎬 RenderSystem: Rendering started');
+      console.log(`📺 Canvas element: ${this.renderState.canvas.id}`);
+      console.log(`🎭 Scene children count: ${this.renderState.scene.children.length}`);
+      console.log(`📐 Canvas size: ${this.renderState.canvas.width}x${this.renderState.canvas.height}`);
+      console.log(`📷 Camera position:`, this.renderState.camera.position);
       this.logger.info('Rendering started', 'RenderSystem');
+      this.logger.info(`Canvas element: ${this.renderState.canvas.id}`, 'RenderSystem');
+      this.logger.info(`Scene children count: ${this.renderState.scene.children.length}`, 'RenderSystem');
+    } else {
+      console.error('❌ RenderSystem: Cannot start rendering - renderState is null');
     }
   }
 

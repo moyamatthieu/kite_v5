@@ -120,7 +120,7 @@ export class Kite extends StructuredObject implements ICreatable {
       ],
     };
 
-    const mainFrame = this.frameFactory.createObject(mainFrameParams);
+    const mainFrame = this.frameFactory.createObject('frame', mainFrameParams);
     this.add(mainFrame);
 
     // Créer les whiskers avec un frame séparé (plus fin)
@@ -134,7 +134,7 @@ export class Kite extends StructuredObject implements ICreatable {
       ],
     };
 
-    const whiskerFrame = this.frameFactory.createObject(whiskerFrameParams);
+    const whiskerFrame = this.frameFactory.createObject('frame', whiskerFrameParams);
     this.add(whiskerFrame);
 
     // Créer le système de bridage avec des lignes souples

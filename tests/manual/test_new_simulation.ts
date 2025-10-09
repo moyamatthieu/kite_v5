@@ -2,7 +2,7 @@
  * test_new_simulation.ts - Test de la nouvelle architecture ECS-inspired
  */
 
-import { SimulationApp } from '../../src/simulation/SimulationApp_new';
+import { SimulationApp } from '../../src/simulation/SimulationApp';
 
 async function testNewSimulationApp(): Promise<void> {
   console.log('🧪 Testing new SimulationApp with ECS architecture...');

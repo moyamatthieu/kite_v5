@@ -6,7 +6,7 @@
  */
 
 import { PhysicsSystem, WindSystem, InputSystem, RenderSystem } from './src/simulation/systems';
-import { SimulationApp } from './src/simulation/SimulationApp_new';
+import { SimulationApp } from './src/simulation/SimulationApp';
 
 // Mock pour l'environnement DOM
 (globalThis as any).document = {

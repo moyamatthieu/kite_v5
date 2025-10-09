@@ -203,6 +203,28 @@ export class WindSystem extends BaseSimulationSystem {
     return this.config;
   }
 
+  /**
+   * Met à jour la configuration
+   */
+  updateConfig(newConfig: Partial<WindConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    this.logger.info('WindSystem config updated', 'WindSystem');
+  }
+
+  /**
+   * Obtient la vitesse actuelle du vent
+   */
+  getCurrentWindSpeed(): number {
+    return this.windState.baseSpeed;
+  }
+
+  /**
+   * Obtient la direction actuelle du vent
+   */
+  getCurrentWindDirection(): THREE.Vector3 {
+    return this.windState.baseDirection.clone();
+  }
+
   reset(): void {
     this.windState.time = 0;
     this.windState.baseDirection.copy(this.config.baseDirection);

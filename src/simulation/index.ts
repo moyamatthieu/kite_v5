@@ -3,7 +3,7 @@
  */
 
 // Export de la classe principale
-export { Simulation } from './SimulationApp';
+export { SimulationApp as Simulation } from './SimulationApp';
 
 // Re-export de tous les modules pour faciliter l'importation
 export * from './config/PhysicsConstants';

@@ -1,5 +1,105 @@
-CONSOLIDATION DES SOURCES - Thu Oct  9 12:37:15 UTC 2025
+CONSOLIDATION DES SOURCES - Thu Oct  9 13:33:30 UTC 2025
 ==================================
+
+=== base/BaseComponent.ts ===
+
+/**
+ * BaseComponent.ts - Système de composants pour les objets 3D
+ *
+ * Pattern : Component Pattern (similaire à Unity/ECS)
+ * Permet d'ajouter des fonctionnalités optionnelles aux Node3D
+ * sans hériter de classes lourdes.
+ */
+
+import { Node3D } from '../core/Node3D';
+
+export interface ComponentContext {
+  deltaTime: number;
+  totalTime: number;
+  parent: Node3D;
+}
+
+export abstract class BaseComponent {
+  protected name: string;
+  protected enabled: boolean = true;
+  protected parent?: Node3D;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  /**
+   * Attache le composant à un parent
+   */
+  attachTo(parent: Node3D): void {
+    this.parent = parent;
+    this.onAttach();
+  }
+
+  /**
+   * Détache le composant de son parent
+   */
+  detach(): void {
+    this.onDetach();
+    this.parent = undefined;
+  }
+
+  /**
+   * Appelé quand le composant est attaché
+   */
+  protected onAttach(): void {
+    // Override dans les sous-classes
+  }
+
+  /**
+   * Appelé quand le composant est détaché
+   */
+  protected onDetach(): void {
+    // Override dans les sous-classes
+  }
+
+  /**
+   * Met à jour le composant
+   */
+  abstract update(context: ComponentContext): void;
+
+  /**
+   * Active/désactive le composant
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  getName(): string {
+    return this.name;
+  }
+
+  getParent(): Node3D | undefined {
+    return this.parent;
+  }
+}
+
+/**
+ * Composant de debug visuel
+ */
+export class DebugComponent extends BaseComponent {
+  update(context: ComponentContext): void {
+    // Logique de debug visuel
+  }
+}
+
+/**
+ * Composant de physique
+ */
+export class PhysicsComponent extends BaseComponent {
+  update(context: ComponentContext): void {
+    // Logique de physique
+  }
+}
 
 === base/BaseFactory.ts ===
 
@@ -11,6 +111,7 @@ CONSOLIDATION DES SOURCES - Thu Oct  9 12:37:15 UTC 2025
 
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
+import { BaseFactory as RegistryBaseFactory, FactoryMetadata } from '../factories/FactoryRegistry';
 
 export interface FactoryParams {
   [key: string]: any;
@@ -86,8 +187,330 @@ export abstract class BaseFactory<T extends StructuredObject & ICreatable> {
       ...params
     };
   }
+
+  /**
+   * Nettoyer les ressources de la factory
+   */
+  dispose(): void {
+    // À surcharger dans les classes dérivées si nécessaire
+  }
 }
 
+
+=== base/BaseSimulationSystem.ts ===
+
+/**
+ * BaseSimulationSystem.ts - Interface de base pour tous les systèmes de simulation
+ *
+ * Pattern : Template Method pour les systèmes de simulation
+ * Chaque système (Physics, Wind, Input, etc.) hérite de cette classe
+ * et implémente ses méthodes spécifiques.
+ */
+
+export interface SimulationContext {
+  deltaTime: number;
+  totalTime: number;
+  isPaused: boolean;
+  debugMode: boolean;
+}
+
+export abstract class BaseSimulationSystem {
+  protected name: string;
+  protected enabled: boolean = true;
+  protected priority: number = 0; // Ordre d'exécution (plus petit = plus prioritaire)
+
+  constructor(name: string, priority: number = 0) {
+    this.name = name;
+    this.priority = priority;
+  }
+
+  /**
+   * Initialise le système (appelé une fois au démarrage)
+   */
+  abstract initialize(): void;
+
+  /**
+   * Met à jour le système (appelé chaque frame)
+   */
+  abstract update(context: SimulationContext): void;
+
+  /**
+   * Réinitialise le système à son état initial
+   */
+  abstract reset(): void;
+
+  /**
+   * Nettoie les ressources du système
+   */
+  abstract dispose(): void;
+
+  /**
+   * Active/désactive le système
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  getName(): string {
+    return this.name;
+  }
+
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Validation interne du système
+   */
+  validate(): boolean {
+    return true; // Override dans les sous-classes si nécessaire
+  }
+}
+
+=== core/DebugLayer.ts ===
+
+/**
+ * DebugLayer.ts - Couche de debug visuel pour les objets 3D
+ *
+ * Rôle : Gestion centralisée de tous les éléments de debug visuel
+ * Sépare complètement la logique de debug du mesh principal
+ */
+
+import * as THREE from 'three';
+import { Node3D } from './Node3D';
+
+export interface DebugOptions {
+  showPoints?: boolean;
+  showLabels?: boolean;
+  showAxes?: boolean;
+  showNormals?: boolean;
+  pointSize?: number;
+  labelSize?: number;
+  axisLength?: number;
+}
+
+export class DebugLayer {
+  public group: THREE.Group;
+  private parent: Node3D;
+  private options: DebugOptions;
+  private pointsGroup: THREE.Group;
+  private labelsGroup: THREE.Group;
+  private axesGroup: THREE.Group;
+  private normalsGroup: THREE.Group;
+
+  constructor(parent: Node3D, options: DebugOptions = {}) {
+    this.parent = parent;
+    this.options = {
+      showPoints: false,
+      showLabels: false,
+      showAxes: false,
+      showNormals: false,
+      pointSize: 0.05,
+      labelSize: 0.1,
+      axisLength: 1.0,
+      ...options
+    };
+
+    this.group = new THREE.Group();
+    this.group.name = `${parent.name}_debug`;
+
+    this.pointsGroup = new THREE.Group();
+    this.pointsGroup.name = 'points';
+    this.group.add(this.pointsGroup);
+
+    this.labelsGroup = new THREE.Group();
+    this.labelsGroup.name = 'labels';
+    this.group.add(this.labelsGroup);
+
+    this.axesGroup = new THREE.Group();
+    this.axesGroup.name = 'axes';
+    this.group.add(this.axesGroup);
+
+    this.normalsGroup = new THREE.Group();
+    this.normalsGroup.name = 'normals';
+    this.group.add(this.normalsGroup);
+
+    this.updateVisibility();
+  }
+
+  /**
+   * Active/désactive l'affichage des points
+   */
+  setShowPoints(show: boolean): void {
+    this.options.showPoints = show;
+    this.updateVisibility();
+  }
+
+  /**
+   * Active/désactive l'affichage des labels
+   */
+  setShowLabels(show: boolean): void {
+    this.options.showLabels = show;
+    this.updateVisibility();
+  }
+
+  /**
+   * Active/désactive l'affichage des axes
+   */
+  setShowAxes(show: boolean): void {
+    this.options.showAxes = show;
+    this.updateVisibility();
+  }
+
+  /**
+   * Active/désactive l'affichage des normales
+   */
+  setShowNormals(show: boolean): void {
+    this.options.showNormals = show;
+    this.updateVisibility();
+  }
+
+  /**
+   * Ajoute un point de debug
+   */
+  addPoint(position: THREE.Vector3, color: number = 0xff0000, name?: string): void {
+    const geometry = new THREE.SphereGeometry(this.options.pointSize, 8, 8);
+    const material = new THREE.MeshBasicMaterial({ color });
+    const point = new THREE.Mesh(geometry, material);
+
+    point.position.copy(position);
+    if (name) point.name = name;
+
+    this.pointsGroup.add(point);
+  }
+
+  /**
+   * Ajoute une étiquette de debug
+   */
+  addLabel(position: THREE.Vector3, text: string, color: number = 0xffffff): void {
+    // Note: Pour une vraie implémentation, il faudrait une bibliothèque de texte 3D
+    // Pour l'instant, on utilise un point coloré avec le nom
+    const geometry = new THREE.SphereGeometry(this.options.labelSize! * 0.5, 8, 8);
+    const material = new THREE.MeshBasicMaterial({ color });
+    const label = new THREE.Mesh(geometry, material);
+
+    label.position.copy(position);
+    label.name = text;
+
+    this.labelsGroup.add(label);
+  }
+
+  /**
+   * Dessine les axes XYZ
+   */
+  drawAxes(length: number = this.options.axisLength!): void {
+    this.clearAxes();
+
+    // Axe X (rouge)
+    const xAxis = this.createAxis(new THREE.Vector3(length, 0, 0), 0xff0000);
+    this.axesGroup.add(xAxis);
+
+    // Axe Y (vert)
+    const yAxis = this.createAxis(new THREE.Vector3(0, length, 0), 0x00ff00);
+    this.axesGroup.add(yAxis);
+
+    // Axe Z (bleu)
+    const zAxis = this.createAxis(new THREE.Vector3(0, 0, length), 0x0000ff);
+    this.axesGroup.add(zAxis);
+  }
+
+  /**
+   * Nettoie tous les éléments de debug
+   */
+  clear(): void {
+    this.clearPoints();
+    this.clearLabels();
+    this.clearAxes();
+    this.clearNormals();
+  }
+
+  /**
+   * Met à jour la visibilité selon les options
+   */
+  private updateVisibility(): void {
+    this.pointsGroup.visible = this.options.showPoints!;
+    this.labelsGroup.visible = this.options.showLabels!;
+    this.axesGroup.visible = this.options.showAxes!;
+    this.normalsGroup.visible = this.options.showNormals!;
+  }
+
+  private createAxis(direction: THREE.Vector3, color: number): THREE.Group {
+    const group = new THREE.Group();
+
+    // Ligne de l'axe
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      direction
+    ]);
+    const material = new THREE.LineBasicMaterial({ color });
+    const line = new THREE.Line(geometry, material);
+    group.add(line);
+
+    // Flèche à l'extrémité
+    const arrowGeometry = new THREE.ConeGeometry(0.05, 0.2, 8);
+    const arrowMaterial = new THREE.MeshBasicMaterial({ color });
+    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+    arrow.position.copy(direction);
+    arrow.lookAt(direction);
+    group.add(arrow);
+
+    return group;
+  }
+
+  private clearPoints(): void {
+    while (this.pointsGroup.children.length > 0) {
+      const child = this.pointsGroup.children[0];
+      this.pointsGroup.remove(child);
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        (child.material as THREE.Material).dispose();
+      }
+    }
+  }
+
+  private clearLabels(): void {
+    while (this.labelsGroup.children.length > 0) {
+      const child = this.labelsGroup.children[0];
+      this.labelsGroup.remove(child);
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        (child.material as THREE.Material).dispose();
+      }
+    }
+  }
+
+  private clearAxes(): void {
+    while (this.axesGroup.children.length > 0) {
+      const child = this.axesGroup.children[0];
+      this.axesGroup.remove(child);
+      // Nettoyer récursivement les géométries et matériaux
+      child.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+          (obj.material as THREE.Material).dispose();
+        } else if (obj instanceof THREE.Line) {
+          obj.geometry.dispose();
+          (obj.material as THREE.Material).dispose();
+        }
+      });
+    }
+  }
+
+  private clearNormals(): void {
+    while (this.normalsGroup.children.length > 0) {
+      const child = this.normalsGroup.children[0];
+      this.normalsGroup.remove(child);
+      if (child instanceof THREE.Line) {
+        child.geometry.dispose();
+        (child.material as THREE.Material).dispose();
+      }
+    }
+  }
+}
 
 === core/Node3D.ts ===
 
@@ -116,6 +539,7 @@ export abstract class BaseFactory<T extends StructuredObject & ICreatable> {
  */
 
 import * as THREE from 'three';
+import { SceneManager } from './SceneManager';
 
 /**
  * Transform3D compatible Godot
@@ -149,19 +573,23 @@ export class Node3D extends THREE.Group {
     
     // 🔧 État interne
     protected isReady: boolean = false;
-    
+    protected active: boolean = true;
+
     constructor(name: string = 'Node3D') {
         super();
         this.name = name;
         this.nodeId = this.generateNodeId();
-        
+
         // Transform3D unifié
         this.transform = {
             position: this.position,
             rotation: this.rotation,
             scale: this.scale
         };
-        
+
+        // Auto-enregistrement dans SceneManager
+        SceneManager.getInstance().register(this);
+
         // Auto-initialisation
         this.callReady();
     }
@@ -303,6 +731,62 @@ export class Node3D extends THREE.Group {
                 }
             });
         }
+    }
+    
+    /**
+     * Active/désactive le node
+     */
+    public setActive(active: boolean): void {
+        this.active = active;
+    }
+
+    /**
+     * Vérifie si le node est actif
+     */
+    public isActive(): boolean {
+        return this.active;
+    }
+
+    /**
+     * Obtient le nom du node
+     */
+    public getName(): string {
+        return this.name;
+    }
+
+    /**
+     * Appelé quand le node est enregistré dans SceneManager
+     */
+    public onRegister(): void {
+        // À overrider dans les sous-classes
+    }
+
+    /**
+     * Appelé quand le node est désenregistré de SceneManager
+     */
+    public onUnregister(): void {
+        // À overrider dans les sous-classes
+    }
+
+    /**
+     * Détruit le node et nettoie les ressources
+     */
+    public destroy(): void {
+        // Désenregistrer du SceneManager
+        SceneManager.getInstance().unregister(this);
+
+        // Nettoyer les signaux
+        this.signals.clear();
+
+        // Nettoyer les enfants
+        this.children.forEach(child => {
+            if (child instanceof Node3D) {
+                child.destroy();
+            }
+        });
+
+        // Nettoyer Three.js
+        this.clear();
     }
     
     // === 🏷️ Métadonnées et Debug ===
@@ -560,6 +1044,145 @@ export class Primitive {
   }
 }
 
+=== core/SceneManager.ts ===
+
+/**
+ * SceneManager.ts - Gestionnaire central de la scène 3D
+ *
+ * Rôle : Orchestrateur principal de tous les objets 3D
+ * Gère le cycle de vie, les updates et la hiérarchie des Node3D
+ */
+
+import { Node3D } from './Node3D';
+import * as THREE from 'three';
+
+export class SceneManager {
+  private static instance: SceneManager;
+  private nodes: Set<Node3D> = new Set();
+  private rootScene: THREE.Scene;
+  private totalTime: number = 0;
+
+  private constructor() {
+    this.rootScene = new THREE.Scene();
+  }
+
+  static getInstance(): SceneManager {
+    if (!SceneManager.instance) {
+      SceneManager.instance = new SceneManager();
+    }
+    return SceneManager.instance;
+  }
+
+  /**
+   * Enregistre un nouveau nœud dans la scène
+   */
+  register(node: Node3D): void {
+    if (!this.nodes.has(node)) {
+      this.nodes.add(node);
+      node.onRegister();
+    }
+  }
+
+  /**
+   * Désenregistre un nœud de la scène
+   */
+  unregister(node: Node3D): void {
+    if (this.nodes.has(node)) {
+      node.onUnregister();
+      this.nodes.delete(node);
+    }
+  }
+
+  /**
+   * Met à jour tous les nœuds enregistrés
+   */
+  update(deltaTime: number): void {
+    this.totalTime += deltaTime;
+
+    const context = {
+      deltaTime,
+      totalTime: this.totalTime,
+      isPaused: false,
+      debugMode: false
+    };
+
+    // Mise à jour de tous les nœuds
+    for (const node of this.nodes) {
+      if (node.isActive()) {
+        node.update(deltaTime);
+      }
+    }
+  }
+
+  /**
+   * Ajoute un objet à la scène Three.js racine
+   */
+  addToScene(object: THREE.Object3D): void {
+    this.rootScene.add(object);
+  }
+
+  /**
+   * Retire un objet de la scène Three.js racine
+   */
+  removeFromScene(object: THREE.Object3D): void {
+    this.rootScene.remove(object);
+  }
+
+  /**
+   * Obtient la scène Three.js racine
+   */
+  getScene(): THREE.Scene {
+    return this.rootScene;
+  }
+
+  /**
+   * Recherche un nœud par nom
+   */
+  findNodeByName(name: string): Node3D | undefined {
+    for (const node of this.nodes) {
+      if (node.getName() === name) {
+        return node;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Obtient tous les nœuds d'un certain type
+   */
+  getNodesOfType<T extends Node3D>(type: new (...args: any[]) => T): T[] {
+    const result: T[] = [];
+    for (const node of this.nodes) {
+      if (node instanceof type) {
+        result.push(node as T);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Nettoie tous les nœuds
+   */
+  clear(): void {
+    for (const node of this.nodes) {
+      node.destroy();
+    }
+    this.nodes.clear();
+    this.rootScene.clear();
+    this.totalTime = 0;
+  }
+
+  /**
+   * Statistiques de la scène
+   */
+  getStats(): { nodeCount: number; totalTime: number } {
+    return {
+      nodeCount: this.nodes.size,
+      totalTime: this.totalTime
+    };
+  }
+}
+
 === core/StructuredObject.ts ===
 
 
@@ -597,6 +1220,7 @@ import { Position3D, NamedPoint, SurfaceOptions, MaterialConfig } from '../types
 
 import { Primitive } from './Primitive';
 import { Node3D } from './Node3D';
+import { DebugLayer } from './DebugLayer';
 
 /**
  * Classe abstraite de base pour tous les objets 3D structurés
@@ -607,17 +1231,22 @@ export abstract class StructuredObject extends Node3D {
    * Points anatomiques nommés de l'objet
    */
   protected points: Map<string, THREE.Vector3> = new Map();
-  
+
   /**
    * Points avec marqueurs visuels (debug)
    */
   protected namedPoints: NamedPoint[] = [];
-  
+
+  /**
+   * Couche de debug séparée
+   */
+  protected debugLayer: DebugLayer;
+
   /**
    * Affichage des labels en mode debug
    */
   public showDebugPoints: boolean = false;
-  
+
   /**
    * Affichage des labels de texte
    */
@@ -627,6 +1256,16 @@ export abstract class StructuredObject extends Node3D {
     super(name);
     this.nodeType = 'StructuredObject';
     this.showDebugPoints = showDebugPoints;
+
+    // Initialiser la couche de debug
+    this.debugLayer = new DebugLayer(this, {
+      showPoints: showDebugPoints,
+      showLabels: false,
+      showNormals: false,
+      showAxes: false,
+      pointSize: 0.02
+    });
+
     // L'initialisation sera appelée par la classe enfant après configuration
   }
 
@@ -636,16 +1275,14 @@ export abstract class StructuredObject extends Node3D {
   protected initialize(): void {
     // Vider le groupe au cas où
     this.clear();
-    
+
     // Construire l'objet dans l'ordre
     this.definePoints();
     this.buildStructure();
     this.buildSurfaces();
-    
-    // Afficher les points de debug si demandé
-    if (this.showDebugPoints) {
-      this.createDebugMarkers();
-    }
+
+    // Mettre à jour la couche de debug
+    this.updateDebugLayer();
   }
 
   /**
@@ -793,23 +1430,18 @@ export abstract class StructuredObject extends Node3D {
   }
 
   /**
-   * Crée des marqueurs visuels pour tous les points (debug)
+   * Met à jour la couche de debug avec les points actuels
    */
-  protected createDebugMarkers(): void {
-    this.points.forEach((position, name) => {
-      // Petite sphère jaune pour marquer le point
-      const marker = Primitive.sphere(0.02, '#ffff00');
-      marker.position.copy(position);
-      this.add(marker);
-      
-      // Ajouter label texte si activé
-      if (this.showLabels) {
-        const label = this.createTextLabel(name);
-        label.position.copy(position);
-        label.position.y += 0.05; // Décaler le label au-dessus du point
-        this.add(label);
+  protected updateDebugLayer(): void {
+    // Vider la couche de debug
+    this.debugLayer.clear();
+
+    if (this.showDebugPoints) {
+      // Ajouter tous les points nommés
+      for (const [name, position] of this.points.entries()) {
+        this.debugLayer.addPoint(position, 0xffff00, this.showLabels ? name : undefined);
       }
-    });
+    }
   }
   
   /**
@@ -853,24 +1485,20 @@ export abstract class StructuredObject extends Node3D {
    */
   public setShowDebugPoints(show: boolean): void {
     this.showDebugPoints = show;
-    // Reconstruire l'objet pour appliquer le changement
-    this.initialize();
+    this.debugLayer.setShowPoints(show);
   }
-  
+
   /**
    * Active/désactive l'affichage des labels de texte
    */
   public setShowLabels(show: boolean): void {
     this.showLabels = show;
+    this.debugLayer.setShowLabels(show);
     // Si les points de debug ne sont pas activés et qu'on veut les labels, activer les deux
     if (show && !this.showDebugPoints) {
-      this.showDebugPoints = true;
+      this.setShowDebugPoints(true);
     }
-    // Reconstruire l'objet pour appliquer le changement
-    this.initialize();
-  }
-
-  /**
+  }  /**
    * Retourne tous les noms de points définis
    */
   public getPointNames(): string[] {
@@ -1118,102 +1746,231 @@ export class BridleFactory {
 }
 
 
+=== factories/FactoryRegistry.ts ===
+
+/**
+ * FactoryRegistry.ts - Registre centralisé des factories
+ *
+ * Permet la création dynamique d'objets depuis un nom ou un type
+ * Pattern : Factory Registry + Plugin Architecture
+ */
+
+export interface FactoryMetadata {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  supportedTypes: string[];
+  dependencies: string[];
+}
+
+export interface BaseFactory {
+  createObject(type: string, config: any): any;
+  getSupportedTypes(): string[];
+  getMetadata(): FactoryMetadata;
+  dispose(): void;
+}
+
+type FactoryConstructor = new () => BaseFactory;
+
+export interface FactoryParams {
+  [key: string]: any;
+}
+
+export class FactoryRegistry {
+  private static factories = new Map<string, FactoryConstructor>();
+  private static instances = new Map<string, BaseFactory>();
+
+  /**
+   * Enregistre une factory dans le registre
+   */
+  static register(name: string, factoryClass: FactoryConstructor): void {
+    if (this.factories.has(name)) {
+      console.warn(`Factory "${name}" is already registered. Overwriting.`);
+    }
+    this.factories.set(name, factoryClass);
+  }
+
+  /**
+   * Désenregistre une factory
+   */
+  static unregister(name: string): void {
+    if (this.factories.has(name)) {
+      // Nettoyer l'instance si elle existe
+      if (this.instances.has(name)) {
+        const instance = this.instances.get(name)!;
+        instance.dispose();
+        this.instances.delete(name);
+      }
+      this.factories.delete(name);
+    }
+  }
+
+  /**
+   * Crée un objet en utilisant la factory enregistrée
+   */
+  static createObject(name: string, params?: FactoryParams): any {
+    const factoryClass = this.factories.get(name);
+    if (!factoryClass) {
+      throw new Error(`Factory "${name}" not found. Available factories: ${Array.from(this.factories.keys()).join(', ')}`);
+    }
+
+    // Obtenir ou créer l'instance de factory
+    let factory = this.instances.get(name);
+    if (!factory) {
+      factory = new factoryClass();
+      this.instances.set(name, factory);
+    }
+
+    // Créer l'objet
+    return factory.createObject('default', params);
+  }
+
+  /**
+   * Vérifie si une factory est enregistrée
+   */
+  static hasFactory(name: string): boolean {
+    return this.factories.has(name);
+  }
+
+  /**
+   * Obtient la liste des factories enregistrées
+   */
+  static getRegisteredFactories(): string[] {
+    return Array.from(this.factories.keys());
+  }
+
+  /**
+   * Obtient les métadonnées d'une factory
+   */
+  static getFactoryMetadata(name: string): { name: string; description?: string } | null {
+    const factory = this.instances.get(name);
+    if (factory) {
+      return factory.getMetadata();
+    }
+    return null;
+  }
+
+  /**
+   * Nettoie toutes les factories et instances
+   */
+  static clear(): void {
+    // Nettoyer toutes les instances
+    for (const [name, instance] of this.instances) {
+      try {
+        instance.dispose();
+      } catch (error) {
+        console.error(`Error disposing factory "${name}":`, error);
+      }
+    }
+
+    this.instances.clear();
+    this.factories.clear();
+  }
+
+  /**
+   * Recharge une factory (utile pour le développement)
+   */
+  static reloadFactory(name: string): void {
+    if (this.instances.has(name)) {
+      const instance = this.instances.get(name)!;
+      instance.dispose();
+      this.instances.delete(name);
+    }
+    // La prochaine création recréera l'instance
+  }
+}
+
 === factories/FrameFactory.ts ===
 
 /**
  * FrameFactory.ts - Factory pour créer des structures filaires (frames)
- * 
- * Pattern actuel KISS : Points → Cylindres entre points
- * Compatible avec buildStructure() de StructuredObject
  */
 
-import { BaseFactory, FactoryParams } from '../base/BaseFactory';
+import { BaseFactory, FactoryMetadata } from './FactoryRegistry';
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
 
-export interface FrameParams extends FactoryParams {
-  diameter?: number;     // Diamètre des tubes
-  material?: string;     // Couleur/matériau
-  points?: Array<[string, number[]]>;  // Points nommés
-  connections?: Array<[string, string]>; // Connexions entre points
+export interface FrameParams {
+  diameter?: number;
+  material?: string;
+  points?: Array<[string, number[]]>;
+  connections?: Array<[string, string]>;
 }
 
 /**
  * Factory pour créer des structures filaires
- * 
- * TODO: Questions pour évolution future
- * - [ ] Supporter différents profils (carré, rond, I-beam) ? uniquemet rond
- * - [ ] Ajouter des jonctions/connecteurs aux intersections ?  non 
- * - [ ] Calculer automatiquement les connexions optimales ? non
- * - [ ] Supporter des courbes (splines) entre points ? non
- * - [ ] Ajouter contraintes mécaniques (résistance, poids) ? plus tard
-  */
-export class FrameFactory extends BaseFactory<StructuredObject & ICreatable> {
-  protected metadata = {
-    category: 'structure',
-    name: 'Frame',
-    description: 'Structure filaire paramétrique',
-    tags: ['frame', 'structure', 'squelette'],
-    complexity: 'simple' as const
-  };
+ */
+export class FrameFactory implements BaseFactory {
+  getSupportedTypes(): string[] {
+    return ['frame', 'structure'];
+  }
 
-  protected getDefaultParams(): FrameParams {
+  getMetadata(): FactoryMetadata {
     return {
-      diameter: 0.01,
-      material: '#333333',
-      points: [],
-      connections: []
+      id: 'frame_factory',
+      name: 'Frame Factory',
+      version: '1.0.0',
+      description: 'Creates wireframe structures from connected points',
+      supportedTypes: this.getSupportedTypes(),
+      dependencies: []
     };
   }
 
-  createObject(params?: FrameParams): StructuredObject & ICreatable {
-    const mergedParams = this.mergeParams(params) as FrameParams;
-    
+  createObject(type: string, config: FrameParams = {}): StructuredObject & ICreatable {
+    const params = {
+      diameter: 0.01,
+      material: '#333333',
+      points: [],
+      connections: [],
+      ...config
+    };
+
     class FrameObject extends StructuredObject implements ICreatable {
       constructor() {
         super("Frame", false);
       }
-      
+
       protected definePoints(): void {
-        // Ajouter les points fournis
-        if (mergedParams.points) {
-          mergedParams.points.forEach(([name, position]) => {
+        if (params.points) {
+          params.points.forEach(([name, position]) => {
             this.setPoint(name, position as [number, number, number]);
           });
         }
       }
-      
+
       protected buildStructure(): void {
-        // Créer les cylindres entre les points connectés
-        if (mergedParams.connections) {
-          mergedParams.connections.forEach(([point1, point2]) => {
+        if (params.connections) {
+          params.connections.forEach(([point1, point2]) => {
             this.addCylinderBetweenPoints(
-              point1, 
-              point2, 
-              mergedParams.diameter || 0.01,
-              mergedParams.material || '#333333'
+              point1,
+              point2,
+              params.diameter || 0.01,
+              params.material || '#333333'
             );
           });
         }
       }
-      
+
       protected buildSurfaces(): void {
         // Pas de surfaces pour un frame
       }
-      
-      // Implémentation ICreatable
+
       create(): this { return this; }
       getName(): string { return 'Frame'; }
       getDescription(): string { return 'Structure filaire'; }
-      getPrimitiveCount(): number { return (mergedParams.connections || []).length; }
+      getPrimitiveCount(): number { return params.connections?.length || 0; }
     }
-    
+
     const frame = new FrameObject();
     frame.init();
     return frame;
   }
-}
 
+  dispose(): void {
+    // Cleanup if needed
+  }
+}
 
 === factories/LineFactory.ts ===
 
@@ -1863,6 +2620,232 @@ export class SurfaceFactory extends BaseFactory<StructuredObject & ICreatable> {
 }
 
 
+=== factories/presets/PhysicalPresets.ts ===
+
+/**
+ * PhysicalPresets.ts - Constantes physiques centralisées
+ *
+ * Toutes les constantes physiques, matériaux et configurations
+ * utilisées dans la simulation du cerf-volant.
+ */
+
+import * as THREE from 'three';
+
+// ============================================================================
+// CONSTANTES PHYSIQUES FONDAMENTALES
+// ============================================================================
+
+export const PHYSICAL_CONSTANTS = {
+  gravity: 9.81, // m/s² - Accélération gravitationnelle terrestre
+  airDensity: 1.225, // kg/m³ - Densité de l'air à 15°C
+  speedOfSound: 343, // m/s - Vitesse du son dans l'air
+  dynamicViscosity: 1.81e-5, // Pa·s - Viscosité dynamique de l'air
+} as const;
+
+// ============================================================================
+// PRÉSETS DE MATÉRIAUX PHYSIQUES
+// ============================================================================
+
+export const MATERIAL_PRESETS = {
+  // Matériaux de structure (carbone/kevlar)
+  carbon: {
+    density: 1600, // kg/m³
+    youngModulus: 230e9, // Pa - Module de Young
+    tensileStrength: 3500e6, // Pa - Résistance à la traction
+    color: 0x333333,
+    name: 'Carbone'
+  },
+
+  kevlar: {
+    density: 1440, // kg/m³
+    youngModulus: 130e9, // Pa
+    tensileStrength: 3600e6, // Pa
+    color: 0x666666,
+    name: 'Kevlar'
+  },
+
+  // Matériaux de surface (tissus)
+  ripstopNylon: {
+    density: 40, // g/m² (surface density)
+    thickness: 0.00015, // m
+    tensileStrength: 150e6, // Pa
+    color: 0xffffff,
+    name: 'Ripstop Nylon'
+  },
+
+  dacron: {
+    density: 45, // g/m²
+    thickness: 0.00018, // m
+    tensileStrength: 180e6, // Pa
+    color: 0xf0f0f0,
+    name: 'Dacron'
+  }
+} as const;
+
+// ============================================================================
+// PRÉSETS DE LIGNES ET BRIDES
+// ============================================================================
+
+export const LINE_PRESETS = {
+  standard: {
+    stiffness: 2200, // N/m - Rigidité
+    preTension: 75, // N - Tension minimale
+    maxTension: 800, // N - Tension maximale
+    dampingCoeff: 0.05, // Coefficient d'amortissement
+    linearMassDensity: 0.0005, // kg/m - Masse linéique
+    color: 0xffaa00,
+    name: 'Ligne Standard'
+  },
+
+  bridle: {
+    stiffness: 5000, // N/m - Plus rigide pour les brides
+    preTension: 10, // N - Tension minimale faible
+    maxTension: 300, // N - Tension maximale
+    dampingCoeff: 0.02, // Amortissement faible
+    linearMassDensity: 0.0003, // kg/m - Plus léger
+    color: 0x00aaff,
+    name: 'Bride'
+  },
+
+  control: {
+    stiffness: 1800, // N/m - Moins rigide pour le contrôle
+    preTension: 50, // N
+    maxTension: 600, // N
+    dampingCoeff: 0.08, // Amortissement plus fort
+    linearMassDensity: 0.0007, // kg/m - Plus lourd
+    color: 0xff4444,
+    name: 'Ligne de Contrôle'
+  }
+} as const;
+
+// ============================================================================
+// PRÉSETS AÉRODYNAMIQUES
+// ============================================================================
+
+export const AERODYNAMIC_PRESETS = {
+  // Coefficients de portance (lift) selon l'angle d'attaque
+  liftCoefficients: {
+    low: 0.2,     // Angle d'attaque faible
+    medium: 0.8,  // Angle d'attaque moyen
+    high: 1.2,    // Angle d'attaque élevé
+    stall: 0.1    // Décrochage
+  },
+
+  // Coefficients de traînée (drag)
+  dragCoefficients: {
+    low: 0.05,    // Profil optimisé
+    medium: 0.08, // Profil standard
+    high: 0.15,   // Profil dégradé
+    stall: 0.3    // Décrochage
+  },
+
+  // Facteurs d'échelle pour équilibrer la simulation
+  scaleFactors: {
+    lift: 1.2,    // Facteur de portance
+    drag: 1.2,    // Facteur de traînée
+    torque: 1.0   // Facteur de couple
+  }
+} as const;
+
+// ============================================================================
+// PRÉSETS DE VENT
+// ============================================================================
+
+export const WIND_PRESETS = {
+  calm: {
+    speed: 5,      // km/h
+    direction: 0,  // degrés
+    turbulence: 0.001, // %
+    name: 'Calme'
+  },
+
+  light: {
+    speed: 15,     // km/h
+    direction: 0,  // degrés
+    turbulence: 0.005, // %
+    name: 'Léger'
+  },
+
+  moderate: {
+    speed: 25,     // km/h
+    direction: 0,  // degrés
+    turbulence: 0.01, // %
+    name: 'Modéré'
+  },
+
+  strong: {
+    speed: 35,     // km/h
+    direction: 0,  // degrés
+    turbulence: 0.02, // %
+    name: 'Fort'
+  }
+} as const;
+
+// ============================================================================
+// PRÉSETS DE CONFIGURATION KITE
+// ============================================================================
+
+export const KITE_PRESETS = {
+  standard: {
+    area: 0.5288,  // m² - Surface calculée
+    mass: 0.31,    // kg - Masse calculée
+    span: 1.65,    // m - Envergure
+    aspectRatio: 3.12, // Rapport d'allongement
+    name: 'Kite Standard'
+  },
+
+  sport: {
+    area: 0.6,     // m²
+    mass: 0.28,    // kg
+    span: 1.8,     // m
+    aspectRatio: 3.5,
+    name: 'Kite Sport'
+  },
+
+  beginner: {
+    area: 0.8,     // m²
+    mass: 0.35,    // kg
+    span: 2.0,     // m
+    aspectRatio: 2.8,
+    name: 'Kite Débutant'
+  }
+} as const;
+
+// ============================================================================
+// UTILITAIRES
+// ============================================================================
+
+export class PhysicalUtils {
+  /**
+   * Calcule la pression dynamique
+   */
+  static dynamicPressure(velocity: THREE.Vector3, airDensity: number = PHYSICAL_CONSTANTS.airDensity): number {
+    const speed = velocity.length();
+    return 0.5 * airDensity * speed * speed;
+  }
+
+  /**
+   * Calcule le nombre de Reynolds
+   */
+  static reynoldsNumber(velocity: number, length: number, viscosity: number = PHYSICAL_CONSTANTS.dynamicViscosity): number {
+    return (velocity * length) / viscosity;
+  }
+
+  /**
+   * Convertit km/h en m/s
+   */
+  static kmhToMs(speedKmh: number): number {
+    return speedKmh / 3.6;
+  }
+
+  /**
+   * Convertit m/s en km/h
+   */
+  static msToKmh(speedMs: number): number {
+    return speedMs * 3.6;
+  }
+}
+
 === main.ts ===
 
 import { Simulation } from "./simulation";
@@ -1870,19 +2853,29 @@ import { Simulation } from "./simulation";
 // Initialisation de la simulation
 console.log("🚀 Démarrage de la simulation ...");
 
-try {
-  const app = new Simulation();
-  console.log("✅ Simulation initialisée avec succès");
+async function startSimulation() {
+  try {
+    const app = new Simulation();
+    await app.initialize();
+    console.log("✅ Simulation initialisée avec succès");
+    
+    // Démarrer la simulation
+    await app.start();
+    console.log("▶️ Simulation démarrée");
 
-  // Gestion du nettoyage lors de la fermeture de la page
-  window.addEventListener("beforeunload", () => {
-    if (app && typeof app.cleanup === "function") {
-      app.cleanup();
-    }
-  });
-} catch (error) {
-  console.error("❌ Erreur lors de l'initialisation de la simulation:", error);
+    // Gestion du nettoyage lors de la fermeture de la page
+    window.addEventListener("beforeunload", () => {
+      if (app && typeof app.cleanup === "function") {
+        app.cleanup();
+      }
+    });
+  } catch (error) {
+    console.error("❌ Erreur lors de l'initialisation de la simulation:", error);
+  }
 }
+
+// Lancer la simulation au chargement
+startSimulation();
 
 
 === objects/mechanical/Line.ts ===
@@ -2146,6 +3139,7 @@ import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
 import { PointFactory, BridleLengths } from "../../factories/PointFactory";
+import { FactoryRegistry } from "../../factories/FactoryRegistry";
 import { CONFIG } from "../../simulation/config/SimulationConfig";
 
 export class Kite extends StructuredObject implements ICreatable {
@@ -2228,7 +3222,7 @@ export class Kite extends StructuredObject implements ICreatable {
       ],
     };
 
-    const mainFrame = this.frameFactory.createObject(mainFrameParams);
+    const mainFrame = this.frameFactory.createObject('frame', mainFrameParams);
     this.add(mainFrame);
 
     // Créer les whiskers avec un frame séparé (plus fin)
@@ -2242,7 +3236,7 @@ export class Kite extends StructuredObject implements ICreatable {
       ],
     };
 
-    const whiskerFrame = this.frameFactory.createObject(whiskerFrameParams);
+    const whiskerFrame = this.frameFactory.createObject('frame', whiskerFrameParams);
     this.add(whiskerFrame);
 
     // Créer le système de bridage avec des lignes souples
@@ -2532,6 +3526,28 @@ export class Kite extends StructuredObject implements ICreatable {
   }
 
   /**
+   * Transforme un point local en coordonnées monde
+   *
+   * Cette méthode utilitaire évite la duplication du pattern:
+   * `localPos.clone().applyQuaternion(kite.quaternion).add(kite.position)`
+   *
+   * @param localPos - Position dans le repère local du kite
+   * @returns Position dans le repère monde
+   *
+   * @example
+   * ```typescript
+   * const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
+   * const worldPos = kite.localToWorld(ctrlLeft);
+   * ```
+   */
+  public localToWorld(localPos: THREE.Vector3): THREE.Vector3 {
+    return localPos
+      .clone()
+      .applyQuaternion(this.quaternion)
+      .add(this.position);
+  }
+
+  /**
    * Ajoute des marqueurs visuels aux points importants
    */
   private addVisualMarkers(): void {
@@ -2606,9 +3622,508 @@ export class Kite extends StructuredObject implements ICreatable {
  * tout en redirigeant vers la nouvelle structure modulaire
  */
 
-export { Simulation } from './simulation/SimulationApp';
+export { SimulationApp as Simulation } from './simulation/SimulationApp';
 
 === simulation/SimulationApp.ts ===
+
+/**
+ * SimulationApp.ts - Application principale de simulation (Architecture ECS-inspired)
+ *
+ * Nouvelle architecture modulaire avec systèmes de simulation séparés.
+ * Chaque système (Physics, Wind, Input, Render) fonctionne indépendamment
+ * et communique via un contexte partagé.
+ */
+
+import * as THREE from 'three';
+import { Logger } from '../utils/Logging';
+import { UidGenerator } from '../utils/UidGenerator';
+
+// Import des systèmes modulaires
+import {
+  PhysicsSystem,
+  WindSystem,
+  InputSystem,
+  RenderSystem,
+  type PhysicsState,
+  type PhysicsConfig,
+  type WindConfig,
+  type InputConfig,
+  type RenderConfig
+} from './systems';
+
+// Import des composants existants (temporairement pour compatibilité)
+import { Kite } from '../objects/organic/Kite';
+import { UIManager } from './ui/UIManager';
+import { CONFIG } from './config/SimulationConfig';
+import { KiteGeometry } from './config/KiteGeometry';
+
+export interface SimulationConfig {
+  targetFPS: number;
+  maxFrameTime: number;
+  enableDebug: boolean;
+  enableRenderSystem: boolean;
+  enableLegacyComponents: boolean; // Nouveau flag pour contrôler les composants legacy
+  physics: Partial<PhysicsConfig>;
+  wind: Partial<WindConfig>;
+  input: Partial<InputConfig>;
+  render: Partial<RenderConfig>;
+}
+
+export class SimulationApp {
+  private logger: Logger;
+  private config: SimulationConfig;
+
+  // Systèmes ECS-inspired
+  private physicsSystem!: PhysicsSystem;
+  private windSystem!: WindSystem;
+  private inputSystem!: InputSystem;
+  private renderSystem!: RenderSystem;
+
+  // Composants existants (pour compatibilité)
+  private kite!: Kite;
+  private uiManager!: UIManager;
+  private controlBar!: THREE.Group;
+
+  // État de simulation
+  private isRunning: boolean = false;
+  private isInitialized: boolean = false;
+  private clock: THREE.Clock;
+  private frameCount: number = 0;
+  private totalTime: number = 0;
+  private lastFrameTime: number = 0;
+
+  // Gestion des objets physiques
+  private physicsObjects = new Map<string, PhysicsState>();
+
+  constructor(config: Partial<SimulationConfig> = {}) {
+    this.logger = Logger.getInstance();
+    this.clock = new THREE.Clock();
+
+    // Configuration par défaut
+    this.config = {
+      targetFPS: 60,
+      maxFrameTime: 1/30, // 30 FPS minimum
+      enableDebug: true,
+      enableRenderSystem: true,
+      enableLegacyComponents: false, // Désactiver par défaut pour éviter les erreurs de mocks
+      physics: {},
+      wind: {},
+      input: {},
+      render: {},
+      ...config
+    };
+
+    this.logger.info('SimulationApp initializing with ECS architecture', 'SimulationApp');
+
+    // Initialiser les systèmes
+    this.initializeSystems();
+
+    // Initialiser les composants existants (si activés)
+    if (this.config.enableLegacyComponents) {
+      this.initializeLegacyComponents();
+    }
+  }
+
+  /**
+   * Initialise tous les systèmes de simulation
+   */
+  private initializeSystems(): void {
+    this.logger.info('Initializing simulation systems...', 'SimulationApp');
+
+    // Créer les systèmes avec leurs configurations
+    this.physicsSystem = new PhysicsSystem(this.config.physics);
+    this.windSystem = new WindSystem(this.config.wind);
+    this.inputSystem = new InputSystem(this.config.input);
+
+    // Créer le système de rendu seulement si activé
+    if (this.config.enableRenderSystem) {
+      this.renderSystem = new RenderSystem(this.config.render);
+    }
+
+    this.logger.info('All simulation systems created', 'SimulationApp');
+  }
+
+  /**
+   * Initialise les composants existants pour compatibilité
+   */
+  private initializeLegacyComponents(): void {
+    this.logger.info('Initializing legacy components...', 'SimulationApp');
+
+    // Configurer la géométrie du kite
+    KiteGeometry.setMeshSubdivisionLevel(CONFIG.kite.defaultMeshSubdivisionLevel);
+
+    // Créer la barre de contrôle
+    this.setupControlBar();
+
+    // Créer le kite
+    this.kite = new Kite();
+    this.kite.position.set(0, 5, 0);
+
+    // Ajouter le kite à la scène de rendu (si RenderSystem activé)
+    if (this.config.enableRenderSystem && this.renderSystem) {
+      const scene = this.renderSystem.getScene();
+      if (scene) {
+        scene.add(this.kite);
+        scene.add(this.controlBar);
+      }
+    }
+
+    // Créer l'UI Manager (avec mocks appropriés)
+    const physicsEngineMock = {
+      getBridleLengths: () => ({ nez: 0.5, center: 0.5, tip: 0.5 }),
+      setBridleLength: () => {},
+      getKiteState: () => ({}),
+      getWindState: () => ({}),
+      update: () => {}
+    } as any;
+
+    const debugRendererMock = {
+      isDebugMode: () => false,
+      toggleDebugMode: () => {},
+      renderDebugInfo: () => {},
+      clearDebugInfo: () => {},
+      setDebugMode: () => {},
+      renderManager: {} as any,
+      debugArrows: [],
+      debugMode: false,
+      vectorVisibility: {}
+    } as any;
+
+    this.uiManager = new UIManager(
+      physicsEngineMock,
+      debugRendererMock,
+      () => this.reset(), // resetCallback
+      () => { /* toggle play */ } // togglePlayCallback
+    );
+
+    // Enregistrer le kite comme objet physique
+    this.registerPhysicsObject('kite', {
+      position: this.kite.position.clone(),
+      velocity: new THREE.Vector3(),
+      acceleration: new THREE.Vector3(),
+      angularVelocity: new THREE.Vector3(),
+      angularAcceleration: new THREE.Vector3(),
+      mass: 0.5, // kg
+      momentOfInertia: new THREE.Matrix3().identity()
+    });
+
+    this.logger.info('Legacy components initialized', 'SimulationApp');
+  }
+
+  /**
+   * Configure la barre de contrôle
+   */
+  private setupControlBar(): void {
+    this.controlBar = new THREE.Group();
+    this.controlBar.name = 'ControlBar';
+
+    // Créer une barre simple pour l'instant
+    const barGeometry = new THREE.CylinderGeometry(0.02, 0.02, 2);
+    const barMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const bar = new THREE.Mesh(barGeometry, barMaterial);
+
+    this.controlBar.add(bar);
+    this.controlBar.position.set(0, 1, 5);
+  }
+
+  /**
+   * Initialise l'application de simulation
+   */
+  async initialize(): Promise<void> {
+    try {
+      this.logger.info('Starting SimulationApp initialization...', 'SimulationApp');
+
+      // Initialiser tous les systèmes
+      const initPromises = [
+        this.physicsSystem.initialize(),
+        this.windSystem.initialize(),
+        this.inputSystem.initialize()
+      ];
+
+      // Ajouter RenderSystem seulement si activé
+      if (this.config.enableRenderSystem) {
+        initPromises.push(this.renderSystem.initialize());
+      }
+
+      await Promise.all(initPromises);
+
+      // Démarrer le rendu (si activé)
+      if (this.config.enableRenderSystem) {
+        this.renderSystem.startRendering();
+      }
+
+      this.isInitialized = true;
+      this.logger.info('SimulationApp fully initialized', 'SimulationApp');
+
+    } catch (error) {
+      this.logger.error(`SimulationApp initialization failed: ${error}`, 'SimulationApp');
+      throw error;
+    }
+  }
+
+  /**
+   * Boucle principale de simulation (ECS-inspired)
+   */
+  update = (): void => {
+    if (!this.isInitialized || !this.isRunning) return;
+
+    const currentTime = performance.now();
+    const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, this.config.maxFrameTime);
+    this.lastFrameTime = currentTime;
+
+    this.totalTime += deltaTime;
+    this.frameCount++;
+
+    // Créer le contexte de simulation partagé
+    const context = {
+      deltaTime,
+      totalTime: this.totalTime,
+      isPaused: !this.isRunning,
+      debugMode: this.config.enableDebug
+    };
+
+    try {
+      // 1. Mise à jour des entrées (priorité haute)
+      this.inputSystem.update(context);
+
+      // 2. Mise à jour du vent
+      this.windSystem.update(context);
+
+      // 3. Mise à jour de la physique
+      this.physicsSystem.update(context);
+
+      // 4. Mise à jour du rendu (priorité basse)
+      if (this.config.enableRenderSystem) {
+        this.renderSystem.update(context);
+      }
+
+      // 5. Synchronisation avec les composants existants
+      this.syncLegacyComponents(context);
+
+      // 6. Mise à jour de l'UI
+      this.updateUI(context);
+
+    } catch (error) {
+      this.logger.error(`Simulation update error: ${error}`, 'SimulationApp');
+    }
+
+    // Continuer la boucle
+    if (this.isRunning) {
+      requestAnimationFrame(this.update);
+    }
+  };
+
+  /**
+   * Synchronise les composants existants avec les systèmes
+   */
+  private syncLegacyComponents(context: any): void {
+    if (!this.config.enableLegacyComponents) return;
+
+    // Obtenir l'état des entrées
+    const inputState = this.inputSystem.getInputState();
+
+    // Appliquer la rotation de la barre
+    this.controlBar.rotation.z = inputState.barPosition * Math.PI / 6; // Max ±30°
+
+    // Obtenir l'état physique du kite
+    const kitePhysics = this.physicsObjects.get('kite');
+    if (kitePhysics) {
+      // Synchroniser la position du kite
+      this.kite.position.copy(kitePhysics.position);
+
+      // Calculer le vent apparent pour le kite
+      const apparentWind = this.windSystem.getApparentWind(
+        kitePhysics.position,
+        kitePhysics.velocity
+      );
+
+      // TODO: Appliquer les forces aérodynamiques basées sur le vent apparent
+      // Pour l'instant, juste une force de gravité simple
+      if (kitePhysics.position.y > 0) {
+        kitePhysics.acceleration.set(0, -9.81, 0);
+      } else {
+        kitePhysics.acceleration.set(0, 0, 0);
+        kitePhysics.velocity.set(0, 0, 0);
+        kitePhysics.position.y = 0;
+      }
+
+      // Intégration simple d'Euler
+      kitePhysics.velocity.add(kitePhysics.acceleration.clone().multiplyScalar(context.deltaTime));
+      kitePhysics.position.add(kitePhysics.velocity.clone().multiplyScalar(context.deltaTime));
+    }
+
+    // Gestion du reset
+    if (inputState.resetPressed) {
+      this.reset();
+    }
+  }
+
+  /**
+   * Met à jour l'interface utilisateur
+   */
+  private updateUI(context: any): void {
+    // Mettre à jour l'UI si elle existe
+    this.updateUIOverlay();
+  }
+
+  /**
+   * Met à jour l'overlay UI avec les données actuelles
+   */
+  private updateUIOverlay(): void {
+    if (typeof document === 'undefined') return;
+
+    const fpsElement = document.getElementById('fps');
+    const posElement = document.getElementById('kite-pos');
+    const velElement = document.getElementById('kite-vel');
+    const windElement = document.getElementById('wind-speed');
+    const barElement = document.getElementById('bar-pos');
+
+    if (fpsElement || posElement || velElement || windElement || barElement) {
+      const renderStats = this.renderSystem ? this.renderSystem.getRenderStats() : { fps: 0 };
+      const kitePhysics = this.physicsObjects.get('kite');
+      const inputState = this.inputSystem.getInputState();
+      const windState = this.windSystem.getWindState();
+
+      if (fpsElement) {
+        fpsElement.textContent = `FPS: ${renderStats.fps}`;
+      }
+
+      if (posElement && kitePhysics) {
+        posElement.textContent = `Position: (${kitePhysics.position.x.toFixed(1)}, ${kitePhysics.position.y.toFixed(1)}, ${kitePhysics.position.z.toFixed(1)})`;
+      }
+
+      if (velElement && kitePhysics) {
+        velElement.textContent = `Vitesse: (${kitePhysics.velocity.x.toFixed(1)}, ${kitePhysics.velocity.y.toFixed(1)}, ${kitePhysics.velocity.z.toFixed(1)})`;
+      }
+
+      if (windElement) {
+        windElement.textContent = `Vent: ${windState.baseSpeed.toFixed(1)} m/s`;
+      }
+
+      if (barElement) {
+        barElement.textContent = `Barre: ${(inputState.barPosition * 100).toFixed(0)}%`;
+      }
+    }
+  }
+
+  /**
+   * Enregistre un objet physique dans le système
+   */
+  registerPhysicsObject(id: string, state: PhysicsState): void {
+    this.physicsObjects.set(id, state);
+    this.physicsSystem.registerPhysicsObject(id, state);
+  }
+
+  /**
+   * Démarre la simulation
+   */
+  start(): void {
+    if (!this.isInitialized) {
+      throw new Error('SimulationApp must be initialized before starting');
+    }
+
+    this.isRunning = true;
+    this.lastFrameTime = performance.now();
+    this.logger.info('SimulationApp started', 'SimulationApp');
+
+    // Démarrer la boucle
+    requestAnimationFrame(this.update);
+  }
+
+  /**
+   * Arrête la simulation
+   */
+  stop(): void {
+    this.isRunning = false;
+    this.logger.info('SimulationApp stopped', 'SimulationApp');
+  }
+
+  /**
+   * Réinitialise la simulation
+   */
+  reset(): void {
+    this.logger.info('Resetting simulation...', 'SimulationApp');
+
+    // Réinitialiser les systèmes
+    this.physicsSystem.reset();
+    this.windSystem.reset();
+    this.inputSystem.reset();
+    if (this.renderSystem) {
+      this.renderSystem.reset();
+    }
+
+    // Réinitialiser l'état
+    this.frameCount = 0;
+    this.totalTime = 0;
+
+    // Réinitialiser les objets physiques
+    for (const [id, state] of this.physicsObjects) {
+      // TODO: Implémenter une logique de reset par objet
+    }
+
+    // Réinitialiser les composants existants
+    this.kite.position.set(0, 5, 0);
+    this.controlBar.rotation.z = 0;
+
+    this.logger.info('Simulation reset complete', 'SimulationApp');
+  }
+
+  /**
+   * Obtient les statistiques de performance
+   */
+  getStats(): {
+    fps: number;
+    frameCount: number;
+    totalTime: number;
+    isRunning: boolean;
+    physicsObjects: number;
+  } {
+    const renderStats = this.renderSystem ? this.renderSystem.getRenderStats() : { fps: 0 };
+
+    return {
+      fps: renderStats.fps,
+      frameCount: this.frameCount,
+      totalTime: this.totalTime,
+      isRunning: this.isRunning,
+      physicsObjects: this.physicsObjects.size
+    };
+  }
+
+  /**
+   * Nettoie les ressources
+   */
+  dispose(): void {
+    this.logger.info('Disposing SimulationApp...', 'SimulationApp');
+
+    this.stop();
+
+    // Disposer les systèmes
+    this.physicsSystem.dispose();
+    this.windSystem.dispose();
+    this.inputSystem.dispose();
+    if (this.config.enableRenderSystem) {
+      this.renderSystem.dispose();
+    }
+
+    // Disposer les composants existants
+    if (this.config.enableLegacyComponents) {
+      if (this.uiManager) {
+        // Note: UIManager n'a pas de méthode dispose
+      }
+    }
+
+    this.logger.info('SimulationApp disposed', 'SimulationApp');
+  }
+
+  /**
+   * Alias pour dispose() pour compatibilité avec l'ancien code
+   */
+  cleanup(): void {
+    this.dispose();
+  }
+}
+
+=== simulation/SimulationApp_legacy.ts ===
 
 /**
  * SimulationApp.ts - Application principale de simulation
@@ -3552,6 +5067,7 @@ export class PhysicsConstants {
   static readonly CONTROL_DEADZONE = 0.01; // rad - Zone morte pour input barre de contrôle
   static readonly LINE_CONSTRAINT_TOLERANCE = 0.0005; // m - Tolérance contraintes lignes (0.5mm)
   static readonly LINE_TENSION_FACTOR = 0.99; // Sans unité - Facteur tension lignes (99% = légèrement tendues)
+  static readonly CONSTRAINT_ITERATIONS = 2; // Sans unité - Nombre d'itérations pour convergence PBD
 
   // Sol et friction
   static readonly GROUND_FRICTION = 0.95; // Sans unité - Facteur friction sol (5% perte vitesse)
@@ -4054,9 +5570,8 @@ export class KiteController {
     // Résolution itérative des contraintes PBD pour convergence stable
     // Les contraintes lignes ↔ brides s'influencent mutuellement
     // Une seule passe n'est pas suffisante - il faut itérer jusqu'à convergence
-    const MAX_CONSTRAINT_ITERATIONS = 2;  // 🔧 PHASE 3: Réduit (3 → 2) pour moins de sur-contrainte
-    
-    for (let iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; iter++) {
+
+    for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
       // Appliquer les contraintes de lignes (Position-Based Dynamics)
       // Le solveur peut modifier newPosition ainsi que state.velocity / state.angularVelocity
       try {
@@ -4300,7 +5815,7 @@ export class KiteController {
  */
 
 // Export de la classe principale
-export { Simulation } from './SimulationApp';
+export { SimulationApp as Simulation } from './SimulationApp';
 
 // Re-export de tous les modules pour faciliter l'importation
 export * from './config/PhysicsConstants';
@@ -4608,6 +6123,7 @@ export class AerodynamicsCalculator {
       // Séparation couples aéro et gravité pour scaling cohérent :
       // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
       // - Couple gravité : physique pure, pas de scaling
+      // Note: centre est déjà en coordonnées locales, on applique seulement la rotation
       const centreWorldForTorque = centre.clone().applyQuaternion(kiteOrientation);
       
       // Couples calculés via méthode utilitaire
@@ -4757,6 +6273,7 @@ import { BridleFactory } from "@factories/BridleFactory";
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
 
 import { LinePhysics } from "./LinePhysics";
+import { VelocityCalculator } from "./VelocityCalculator";
 
 /**
  * Système de gestion des brides
@@ -4775,11 +6292,9 @@ export class BridleSystem {
   private rightInter: Line;
   private rightCentre: Line;
 
-  // Service de calcul physique (réutilisé)
+  // Services de calcul physique (réutilisés)
   private physics: LinePhysics;
-
-  // Positions précédentes pour calcul vélocité
-  private previousPositions: Map<string, THREE.Vector3> = new Map();
+  private velocityCalculator: VelocityCalculator;
 
   constructor(bridleLengths: BridleLengths) {
     // Valider les longueurs
@@ -4794,8 +6309,9 @@ export class BridleSystem {
     // Assigner brides droites
     [this.rightNez, this.rightInter, this.rightCentre] = right;
 
-    // Service de calcul physique
+    // Services de calcul physique
     this.physics = new LinePhysics();
+    this.velocityCalculator = new VelocityCalculator();
   }
 
   /**
@@ -4811,67 +6327,37 @@ export class BridleSystem {
   calculateBridleTensions(kite: Kite): BridleTensions {
     const deltaTime = 1 / 60; // Approximation pour calcul vélocité
 
-    // Calculer tension bride gauche NEZ
-    const leftNezTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftNez,
-      "NEZ",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
+    // Configuration des 6 brides avec leur métadonnées
+    const bridleConfigs = [
+      { line: this.leftNez, start: "NEZ", end: "CTRL_GAUCHE", key: "leftNez" },
+      { line: this.leftInter, start: "INTER_GAUCHE", end: "CTRL_GAUCHE", key: "leftInter" },
+      { line: this.leftCentre, start: "CENTRE", end: "CTRL_GAUCHE", key: "leftCentre" },
+      { line: this.rightNez, start: "NEZ", end: "CTRL_DROIT", key: "rightNez" },
+      { line: this.rightInter, start: "INTER_DROIT", end: "CTRL_DROIT", key: "rightInter" },
+      { line: this.rightCentre, start: "CENTRE", end: "CTRL_DROIT", key: "rightCentre" },
+    ] as const;
 
-    // Calculer tension bride gauche INTER
-    const leftInterTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftInter,
-      "INTER_GAUCHE",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
+    // Calculer toutes les tensions en une passe
+    const tensionsMap = new Map<string, number>();
+    for (const config of bridleConfigs) {
+      const tension = this.calculateSingleBridleTension(
+        kite,
+        config.line,
+        config.start,
+        config.end,
+        deltaTime
+      );
+      tensionsMap.set(config.key, tension);
+    }
 
-    // Calculer tension bride gauche CENTRE
-    const leftCentreTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftCentre,
-      "CENTRE",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
-
-    // Calculer tension bride droite NEZ
-    const rightNezTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightNez,
-      "NEZ",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
-    // Calculer tension bride droite INTER
-    const rightInterTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightInter,
-      "INTER_DROIT",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
-    // Calculer tension bride droite CENTRE
-    const rightCentreTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightCentre,
-      "CENTRE",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
+    // Construire le résultat
     return {
-      leftNez: leftNezTension,
-      leftInter: leftInterTension,
-      leftCentre: leftCentreTension,
-      rightNez: rightNezTension,
-      rightInter: rightInterTension,
-      rightCentre: rightCentreTension,
+      leftNez: tensionsMap.get("leftNez")!,
+      leftInter: tensionsMap.get("leftInter")!,
+      leftCentre: tensionsMap.get("leftCentre")!,
+      rightNez: tensionsMap.get("rightNez")!,
+      rightInter: tensionsMap.get("rightInter")!,
+      rightCentre: tensionsMap.get("rightCentre")!,
     };
   }
 
@@ -4902,22 +6388,16 @@ export class BridleSystem {
     }
 
     // Convertir en coordonnées monde
-    const startWorld = startLocal
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
+    const startWorld = kite.localToWorld(startLocal);
+    const endWorld = kite.localToWorld(endLocal);
 
-    const endWorld = endLocal
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
-
-    // Calculer vélocité relative
-    const velocity = this.calculateVelocity(
+    // Calculer vélocité relative avec VelocityCalculator
+    const key = `${startPointName}_${endPointName}`;
+    const velocity = this.velocityCalculator.calculateRelative(
+      `${key}_start`,
+      `${key}_end`,
       startWorld,
       endWorld,
-      startPointName,
-      endPointName,
       deltaTime
     );
 
@@ -4933,45 +6413,6 @@ export class BridleSystem {
     bridle.updateState(result.currentLength, result.tension, performance.now());
 
     return result.tension;
-  }
-
-  /**
-   * Calcule la vélocité relative entre deux points
-   *
-   * @param currentStart - Position actuelle point départ (monde)
-   * @param currentEnd - Position actuelle point arrivée (monde)
-   * @param startKey - Clé unique point départ
-   * @param endKey - Clé unique point arrivée
-   * @param deltaTime - Pas de temps
-   * @returns Vecteur vélocité relative
-   */
-  private calculateVelocity(
-    currentStart: THREE.Vector3,
-    currentEnd: THREE.Vector3,
-    startKey: string,
-    endKey: string,
-    deltaTime: number
-  ): THREE.Vector3 {
-    const key = `${startKey}_${endKey}`;
-    const prevStart = this.previousPositions.get(`${key}_start`);
-    const prevEnd = this.previousPositions.get(`${key}_end`);
-
-    let velocity = new THREE.Vector3();
-
-    if (prevStart && prevEnd) {
-      // Vélocité point départ
-      const velStart = currentStart.clone().sub(prevStart).divideScalar(deltaTime);
-      // Vélocité point arrivée
-      const velEnd = currentEnd.clone().sub(prevEnd).divideScalar(deltaTime);
-      // Vélocité relative
-      velocity = velStart.sub(velEnd);
-    }
-
-    // Mémoriser positions actuelles
-    this.previousPositions.set(`${key}_start`, currentStart.clone());
-    this.previousPositions.set(`${key}_end`, currentEnd.clone());
-
-    return velocity;
   }
 
   /**
@@ -5144,11 +6585,11 @@ export class ConstraintSolver {
 
     // Résolution PBD pour chaque ligne
     const solveLine = (ctrlLocal: THREE.Vector3, handle: THREE.Vector3) => {
-      const q = kite.quaternion;
-      const cpWorld = ctrlLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
+      // Utiliser position prédite pour transformation locale→monde
+      const originalPos = kite.position.clone();
+      kite.position.copy(predictedPosition);
+      const cpWorld = kite.localToWorld(ctrlLocal);
+      kite.position.copy(originalPos);
       const diff = cpWorld.clone().sub(handle);
       const dist = diff.length();
 
@@ -5177,11 +6618,9 @@ export class ConstraintSolver {
       }
 
       // Correction de vitesse
-      const q2 = kite.quaternion;
-      const cpWorld2 = ctrlLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
+      kite.position.copy(predictedPosition);
+      const cpWorld2 = kite.localToWorld(ctrlLocal);
+      kite.position.copy(originalPos);
       const n2 = cpWorld2.clone().sub(handle).normalize();
       const r2 = cpWorld2.clone().sub(predictedPosition);
       const pointVel = state.velocity
@@ -5203,8 +6642,8 @@ export class ConstraintSolver {
       }
     };
 
-    // Deux passes pour mieux satisfaire les contraintes
-    for (let i = 0; i < 2; i++) {
+    // Plusieurs passes pour mieux satisfaire les contraintes
+    for (let i = 0; i < PhysicsConstants.CONSTRAINT_ITERATIONS; i++) {
       solveLine(ctrlLeft, handles.left);
       solveLine(ctrlRight, handles.right);
     }
@@ -5259,18 +6698,12 @@ export class ConstraintSolver {
         return;
       }
 
-      const q = kite.quaternion;
-
-      // Convertir points locaux en coordonnées monde
-      const startWorld = startLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
-
-      const endWorld = endLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
+      // Convertir points locaux en coordonnées monde (avec position prédite)
+      const originalPos = kite.position.clone();
+      kite.position.copy(predictedPosition);
+      const startWorld = kite.localToWorld(startLocal);
+      const endWorld = kite.localToWorld(endLocal);
+      kite.position.copy(originalPos);
 
       // Calculer distance actuelle
       const diff = endWorld.clone().sub(startWorld);
@@ -5329,15 +6762,10 @@ export class ConstraintSolver {
       }
 
       // Correction de vitesse (dampening)
-      const q2 = kite.quaternion;
-      const startWorld2 = startLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
-      const endWorld2 = endLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
+      kite.position.copy(predictedPosition);
+      const startWorld2 = kite.localToWorld(startLocal);
+      const endWorld2 = kite.localToWorld(endLocal);
+      kite.position.copy(originalPos);
 
       const n2 = endWorld2.clone().sub(startWorld2).normalize();
       const rStart2 = startWorld2.clone().sub(predictedPosition);
@@ -5764,21 +7192,20 @@ import { ControlBarManager } from "../controllers/ControlBarManager";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 
 import { LinePhysics } from "./LinePhysics";
+import { VelocityCalculator } from "./VelocityCalculator";
 
 export class LineSystem {
   private leftLine: Line;
   private rightLine: Line;
   private physics: LinePhysics;
-  private previousLeftKitePos: THREE.Vector3 | null = null;
-  private previousRightKitePos: THREE.Vector3 | null = null;
-  private previousLeftBarPos: THREE.Vector3 | null = null;
-  private previousRightBarPos: THREE.Vector3 | null = null;
+  private velocityCalculator: VelocityCalculator;
 
   constructor(lineLength?: number) {
     const [left, right] = LineFactory.createLinePair(lineLength);
     this.leftLine = left;
     this.rightLine = right;
     this.physics = new LinePhysics();
+    this.velocityCalculator = new VelocityCalculator();
   }
 
   calculateLineTensions(
@@ -5800,15 +7227,24 @@ export class LineSystem {
       };
     }
 
-    const leftWorld = ctrlLeft.clone().applyQuaternion(kite.quaternion).add(kite.position);
-    const rightWorld = ctrlRight.clone().applyQuaternion(kite.quaternion).add(kite.position);
+    const leftWorld = kite.localToWorld(ctrlLeft);
+    const rightWorld = kite.localToWorld(ctrlRight);
 
     const tempControlBar = new ControlBarManager(pilotPosition);
     tempControlBar.setRotation(controlRotation);
     const handles = tempControlBar.getHandlePositions(kite.position);
 
-    const leftVelocity = this.calculateVelocity(leftWorld, handles.left, this.previousLeftKitePos, this.previousLeftBarPos, 1 / 60);
-    const rightVelocity = this.calculateVelocity(rightWorld, handles.right, this.previousRightKitePos, this.previousRightBarPos, 1 / 60);
+    // Calculer vélocités relatives avec VelocityCalculator
+    const leftVelocity = this.velocityCalculator.calculateRelative(
+      "leftKite", "leftBar",
+      leftWorld, handles.left,
+      1 / 60
+    );
+    const rightVelocity = this.velocityCalculator.calculateRelative(
+      "rightKite", "rightBar",
+      rightWorld, handles.right,
+      1 / 60
+    );
 
     // Calculer tensions pour info/debug uniquement (pas de force appliquée)
     const leftResult = this.physics.calculateTensionForce(this.leftLine, leftWorld, handles.left, leftVelocity);
@@ -5817,12 +7253,6 @@ export class LineSystem {
     // Mettre à jour l'état des lignes (pour affichage)
     this.leftLine.updateState(leftResult.currentLength, leftResult.tension, performance.now());
     this.rightLine.updateState(rightResult.currentLength, rightResult.tension, performance.now());
-
-    // Mémoriser positions pour prochain frame
-    this.previousLeftKitePos = leftWorld.clone();
-    this.previousRightKitePos = rightWorld.clone();
-    this.previousLeftBarPos = handles.left.clone();
-    this.previousRightBarPos = handles.right.clone();
 
     // ⚠️ IMPORTANT : PAS DE FORCES NI DE COUPLE APPLIQUÉS
     // Les lignes sont des contraintes géométriques (ConstraintSolver)
@@ -5834,42 +7264,6 @@ export class LineSystem {
     };
   }
 
-  private calculateVelocity(
-    currentKite: THREE.Vector3,
-    currentBar: THREE.Vector3,
-    previousKite: THREE.Vector3 | null,
-    previousBar: THREE.Vector3 | null,
-    deltaTime: number
-  ): THREE.Vector3 {
-    if (!previousKite || !previousBar || deltaTime <= 0) {
-      return new THREE.Vector3();
-    }
-    const kiteVelocity = new THREE.Vector3().subVectors(currentKite, previousKite).divideScalar(deltaTime);
-    const barVelocity = new THREE.Vector3().subVectors(currentBar, previousBar).divideScalar(deltaTime);
-    return new THREE.Vector3().subVectors(kiteVelocity, barVelocity);
-  }
-
-  private calculateTorque(
-    ctrlLeft: THREE.Vector3,
-    ctrlRight: THREE.Vector3,
-    kiteQuaternion: THREE.Quaternion,
-    leftForce: THREE.Vector3,
-    rightForce: THREE.Vector3
-  ): THREE.Vector3 {
-    const totalTorque = new THREE.Vector3();
-    if (leftForce.length() > PhysicsConstants.EPSILON) {
-      const leftLever = ctrlLeft.clone().applyQuaternion(kiteQuaternion);
-      const leftTorque = new THREE.Vector3().crossVectors(leftLever, leftForce);
-      totalTorque.add(leftTorque);
-    }
-    if (rightForce.length() > PhysicsConstants.EPSILON) {
-      const rightLever = ctrlRight.clone().applyQuaternion(kiteQuaternion);
-      const rightTorque = new THREE.Vector3().crossVectors(rightLever, rightForce);
-      totalTorque.add(rightTorque);
-    }
-    return totalTorque;
-  }
-
   calculateCatenary(start: THREE.Vector3, end: THREE.Vector3, segments: number = PhysicsConstants.CATENARY_SEGMENTS): THREE.Vector3[] {
     const tension = this.leftLine.getCurrentTension();
     return this.physics.calculateCatenaryPoints(this.leftLine, start, end, tension, segments);
@@ -5879,10 +7273,8 @@ export class LineSystem {
     const [left, right] = LineFactory.createLinePair(length);
     this.leftLine = left;
     this.rightLine = right;
-    this.previousLeftKitePos = null;
-    this.previousRightKitePos = null;
-    this.previousLeftBarPos = null;
-    this.previousRightBarPos = null;
+    // Réinitialiser l'historique des vélocités
+    this.velocityCalculator.resetAll();
   }
 
   get lineLength(): number {
@@ -6060,59 +7452,7 @@ export class PhysicsEngine {
     const currentTime = Date.now();
     if (currentTime - this.lastLogTime >= this.LOG_INTERVAL) {
       this.lastLogTime = currentTime;
-
-      // Calculs supplémentaires pour le log
-      const elapsedTime = (currentTime - this.startTime) / 1000; // en secondes
-      const euler = new THREE.Euler().setFromQuaternion(kite.quaternion, 'XYZ');
-      const pitch = euler.x * (180 / Math.PI); // Convertir en degrés
-      const roll = euler.z * (180 / Math.PI);
-      const yaw = euler.y * (180 / Math.PI);
-
-      // Tensions des lignes
-      const lineTensions = this.lineSystem.getTensions();
-
-      // Accélération (approximation : F/m)
-      const totalForceCalc = new THREE.Vector3().add(lift).add(drag).add(gravity);
-      const acceleration = totalForceCalc.clone().divideScalar(CONFIG.kite.mass);
-
-      // Ratio portance/traînée
-      const liftMag = lift.length();
-      const dragMag = drag.length();
-      const ldRatio = dragMag > 0.01 ? liftMag / dragMag : 0;
-
-      console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
-      console.log(`║ 📊 ÉTAT COMPLET DU KITE - Frame #${this.frameCount.toString().padStart(6, '0')}                              ║`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ ⏱️  Temps: ${elapsedTime.toFixed(3)}s | Δt: ${(deltaTime * 1000).toFixed(2)}ms | FPS: ${(1/deltaTime).toFixed(1)}    ║`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ 📍 POSITION & ORIENTATION                                                 ║`);
-      console.log(`║    Position: (${kite.position.x.toFixed(2)}, ${kite.position.y.toFixed(2)}, ${kite.position.z.toFixed(2)}) m`);
-      console.log(`║    Distance pilote: ${kite.position.length().toFixed(2)} m`);
-      console.log(`║    Angles: Pitch ${pitch.toFixed(1)}° | Roll ${roll.toFixed(1)}° | Yaw ${yaw.toFixed(1)}°`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ 🚀 CINÉMATIQUE                                                            ║`);
-      console.log(`║    Vitesse: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s`);
-      console.log(`║    Accélération: (${acceleration.x.toFixed(2)}, ${acceleration.y.toFixed(2)}, ${acceleration.z.toFixed(2)}) m/s² | Mag: ${acceleration.length().toFixed(2)} m/s²`);
-      console.log(`║    Vit. angulaire: (${kiteState.angularVelocity.x.toFixed(2)}, ${kiteState.angularVelocity.y.toFixed(2)}, ${kiteState.angularVelocity.z.toFixed(2)}) rad/s | Mag: ${kiteState.angularVelocity.length().toFixed(2)} rad/s`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ 💨 AÉRODYNAMIQUE                                                          ║`);
-      console.log(`║    Vent apparent: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s`);
-      console.log(`║    Portance: (${lift.x.toFixed(2)}, ${lift.y.toFixed(2)}, ${lift.z.toFixed(2)}) N | Mag: ${liftMag.toFixed(2)} N`);
-      console.log(`║    Traînée: (${drag.x.toFixed(2)}, ${drag.y.toFixed(2)}, ${drag.z.toFixed(2)}) N | Mag: ${dragMag.toFixed(2)} N`);
-      console.log(`║    Ratio L/D: ${ldRatio.toFixed(2)}`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ ⚖️  FORCES & COUPLES                                                       ║`);
-      console.log(`║    Gravité: (${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)}, ${gravity.z.toFixed(2)}) N | Mag: ${gravity.length().toFixed(2)} N`);
-      console.log(`║    Force totale: (${totalForceCalc.x.toFixed(2)}, ${totalForceCalc.y.toFixed(2)}, ${totalForceCalc.z.toFixed(2)}) N | Mag: ${totalForceCalc.length().toFixed(2)} N`);
-      console.log(`║    Couple total: (${totalTorque.x.toFixed(2)}, ${totalTorque.y.toFixed(2)}, ${totalTorque.z.toFixed(2)}) N⋅m | Mag: ${totalTorque.length().toFixed(2)} N⋅m`);
-      console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
-      console.log(`║ 🪢 TENSIONS                                                                ║`);
-      console.log(`║    Ligne gauche: ${lineTensions.left.toFixed(2)} N | Ligne droite: ${lineTensions.right.toFixed(2)} N`);
-      console.log(`║    Asymétrie: ${(lineTensions.left - lineTensions.right).toFixed(2)} N (${((lineTensions.left - lineTensions.right) / Math.max(lineTensions.left, lineTensions.right) * 100).toFixed(1)}%)`);
-      console.log(`║    Brides: NEZ L/R: ${bridleTensions.leftNez.toFixed(1)}/${bridleTensions.rightNez.toFixed(1)} N`);
-      console.log(`║            INTER L/R: ${bridleTensions.leftInter.toFixed(1)}/${bridleTensions.rightInter.toFixed(1)} N`);
-      console.log(`║            CENTRE L/R: ${bridleTensions.leftCentre.toFixed(1)}/${bridleTensions.rightCentre.toFixed(1)} N`);
-      console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
+      this.logPhysicsState(kite, kiteState, apparentWind, lift, drag, gravity, totalTorque, bridleTensions, deltaTime, currentTime);
     }
 
     // Mettre à jour la visualisation des brides selon leurs tensions
@@ -6191,7 +7531,254 @@ export class PhysicsEngine {
   getForceSmoothing(): number {
     return this.kiteController.getForceSmoothing();
   }
+
+  /**
+   * Affiche l'état physique complet du kite (appelé toutes les secondes)
+   */
+  private logPhysicsState(
+    kite: Kite,
+    kiteState: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
+    apparentWind: THREE.Vector3,
+    lift: THREE.Vector3,
+    drag: THREE.Vector3,
+    gravity: THREE.Vector3,
+    totalTorque: THREE.Vector3,
+    bridleTensions: { leftNez: number; rightNez: number; leftInter: number; rightInter: number; leftCentre: number; rightCentre: number },
+    deltaTime: number,
+    currentTime: number
+  ): void {
+    // Calculs supplémentaires pour le log
+    const elapsedTime = (currentTime - this.startTime) / 1000; // en secondes
+    const euler = new THREE.Euler().setFromQuaternion(kite.quaternion, 'XYZ');
+    const pitch = euler.x * (180 / Math.PI); // Convertir en degrés
+    const roll = euler.z * (180 / Math.PI);
+    const yaw = euler.y * (180 / Math.PI);
+
+    // Tensions des lignes
+    const lineTensions = this.lineSystem.getTensions();
+
+    // Accélération (approximation : F/m)
+    const totalForceCalc = new THREE.Vector3().add(lift).add(drag).add(gravity);
+    const acceleration = totalForceCalc.clone().divideScalar(CONFIG.kite.mass);
+
+    // Ratio portance/traînée
+    const liftMag = lift.length();
+    const dragMag = drag.length();
+    const ldRatio = dragMag > 0.01 ? liftMag / dragMag : 0;
+
+    console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
+    console.log(`║ 📊 ÉTAT COMPLET DU KITE - Frame #${this.frameCount.toString().padStart(6, '0')}                              ║`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ ⏱️  Temps: ${elapsedTime.toFixed(3)}s | Δt: ${(deltaTime * 1000).toFixed(2)}ms | FPS: ${(1/deltaTime).toFixed(1)}    ║`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 📍 POSITION & ORIENTATION                                                 ║`);
+    console.log(`║    Position: (${kite.position.x.toFixed(2)}, ${kite.position.y.toFixed(2)}, ${kite.position.z.toFixed(2)}) m`);
+    console.log(`║    Distance pilote: ${kite.position.length().toFixed(2)} m`);
+    console.log(`║    Angles: Pitch ${pitch.toFixed(1)}° | Roll ${roll.toFixed(1)}° | Yaw ${yaw.toFixed(1)}°`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 🚀 CINÉMATIQUE                                                            ║`);
+    console.log(`║    Vitesse: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s`);
+    console.log(`║    Accélération: (${acceleration.x.toFixed(2)}, ${acceleration.y.toFixed(2)}, ${acceleration.z.toFixed(2)}) m/s² | Mag: ${acceleration.length().toFixed(2)} m/s²`);
+    console.log(`║    Vit. angulaire: (${kiteState.angularVelocity.x.toFixed(2)}, ${kiteState.angularVelocity.y.toFixed(2)}, ${kiteState.angularVelocity.z.toFixed(2)}) rad/s | Mag: ${kiteState.angularVelocity.length().toFixed(2)} rad/s`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 💨 AÉRODYNAMIQUE                                                          ║`);
+    console.log(`║    Vent apparent: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s`);
+    console.log(`║    Portance: (${lift.x.toFixed(2)}, ${lift.y.toFixed(2)}, ${lift.z.toFixed(2)}) N | Mag: ${liftMag.toFixed(2)} N`);
+    console.log(`║    Traînée: (${drag.x.toFixed(2)}, ${drag.y.toFixed(2)}, ${drag.z.toFixed(2)}) N | Mag: ${dragMag.toFixed(2)} N`);
+    console.log(`║    Ratio L/D: ${ldRatio.toFixed(2)}`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ ⚖️  FORCES & COUPLES                                                       ║`);
+    console.log(`║    Gravité: (${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)}, ${gravity.z.toFixed(2)}) N | Mag: ${gravity.length().toFixed(2)} N`);
+    console.log(`║    Force totale: (${totalForceCalc.x.toFixed(2)}, ${totalForceCalc.y.toFixed(2)}, ${totalForceCalc.z.toFixed(2)}) N | Mag: ${totalForceCalc.length().toFixed(2)} N`);
+    console.log(`║    Couple total: (${totalTorque.x.toFixed(2)}, ${totalTorque.y.toFixed(2)}, ${totalTorque.z.toFixed(2)}) N⋅m | Mag: ${totalTorque.length().toFixed(2)} N⋅m`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 🪢 TENSIONS                                                                ║`);
+    console.log(`║    Ligne gauche: ${lineTensions.left.toFixed(2)} N | Ligne droite: ${lineTensions.right.toFixed(2)} N`);
+    console.log(`║    Asymétrie: ${(lineTensions.left - lineTensions.right).toFixed(2)} N (${((lineTensions.left - lineTensions.right) / Math.max(lineTensions.left, lineTensions.right) * 100).toFixed(1)}%)`);
+    console.log(`║    Brides: NEZ L/R: ${bridleTensions.leftNez.toFixed(1)}/${bridleTensions.rightNez.toFixed(1)} N`);
+    console.log(`║            INTER L/R: ${bridleTensions.leftInter.toFixed(1)}/${bridleTensions.rightInter.toFixed(1)} N`);
+    console.log(`║            CENTRE L/R: ${bridleTensions.leftCentre.toFixed(1)}/${bridleTensions.rightCentre.toFixed(1)} N`);
+    console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
+  }
 }
+
+=== simulation/physics/VelocityCalculator.ts ===
+
+/**
+ * VelocityCalculator.ts - Service de calcul de vélocité relative
+ *
+ * Rôle :
+ *   - Calcule la vélocité relative entre deux points à partir de leur historique de positions
+ *   - Stocke les positions précédentes pour permettre la dérivation temporelle
+ *   - Service réutilisable par LineSystem et BridleSystem
+ *
+ * Principe :
+ *   v = Δpos / Δt
+ *   où Δpos = position_actuelle - position_précédente
+ *
+ * Responsabilité :
+ *   - Gestion de l'historique des positions (Map clé → position)
+ *   - Calcul de vélocité par différence finie
+ *   - Service stateless réutilisable
+ *
+ * Relation avec les autres modules :
+ *   - Utilisé par LineSystem pour calculer vélocité relative lignes
+ *   - Utilisé par BridleSystem pour calculer vélocité relative brides
+ *
+ * Philosophie :
+ *   - DRY (Don't Repeat Yourself) : élimine duplication LineSystem/BridleSystem
+ *   - Single Responsibility : calcul vélocité uniquement
+ *   - Testable unitairement
+ *
+ * Voir aussi :
+ *   - src/simulation/physics/LineSystem.ts
+ *   - src/simulation/physics/BridleSystem.ts
+ */
+
+import * as THREE from "three";
+
+/**
+ * Service de calcul de vélocité relative par différence finie
+ *
+ * Maintient un historique des positions précédentes pour calculer
+ * la dérivée temporelle (vélocité) par différence finie d'ordre 1.
+ *
+ * @example
+ * ```typescript
+ * const velCalc = new VelocityCalculator();
+ *
+ * // Frame 1
+ * const vel1 = velCalc.calculate("kite", pos1, deltaTime);
+ * // vel1 = (0, 0, 0) car pas d'historique
+ *
+ * // Frame 2
+ * const vel2 = velCalc.calculate("kite", pos2, deltaTime);
+ * // vel2 = (pos2 - pos1) / deltaTime
+ * ```
+ */
+export class VelocityCalculator {
+  /**
+   * Historique des positions précédentes
+   * Clé : identifiant unique (ex: "leftKite", "NEZ_CTRL_GAUCHE")
+   * Valeur : dernière position connue
+   */
+  private previousPositions: Map<string, THREE.Vector3> = new Map();
+
+  /**
+   * Calcule la vélocité relative d'un point entre deux frames
+   *
+   * Utilise la différence finie d'ordre 1 :
+   * v = (pos_actuelle - pos_précédente) / Δt
+   *
+   * Au premier appel pour une clé, retourne (0, 0, 0) car pas d'historique.
+   *
+   * @param key - Identifiant unique du point (ex: "leftKite", "NEZ_CTRL_GAUCHE")
+   * @param currentPos - Position actuelle du point
+   * @param deltaTime - Pas de temps entre les frames (en secondes)
+   * @returns Vecteur vélocité en m/s
+   *
+   * @example
+   * ```typescript
+   * const vel = calculator.calculate(
+   *   "line_left_kite",
+   *   new THREE.Vector3(0, 10, 0),
+   *   1/60 // 60 FPS
+   * );
+   * ```
+   */
+  calculate(
+    key: string,
+    currentPos: THREE.Vector3,
+    deltaTime: number
+  ): THREE.Vector3 {
+    // Récupérer position précédente
+    const prevPos = this.previousPositions.get(key);
+
+    // Si pas d'historique ou deltaTime invalide, retourner vélocité nulle
+    if (!prevPos || deltaTime <= 0) {
+      // Mémoriser position actuelle pour prochain frame
+      this.previousPositions.set(key, currentPos.clone());
+      return new THREE.Vector3();
+    }
+
+    // Calculer vélocité par différence finie
+    const velocity = currentPos.clone().sub(prevPos).divideScalar(deltaTime);
+
+    // Mémoriser position actuelle pour prochain frame
+    this.previousPositions.set(key, currentPos.clone());
+
+    return velocity;
+  }
+
+  /**
+   * Calcule la vélocité relative entre deux points (utilisé par LineSystem)
+   *
+   * Cette version calcule la différence de vélocité entre deux points,
+   * utile pour calculer la vitesse relative d'une ligne qui relie deux objets.
+   *
+   * v_relative = v_point1 - v_point2
+   *
+   * @param keyPoint1 - Identifiant unique du premier point
+   * @param keyPoint2 - Identifiant unique du second point
+   * @param currentPos1 - Position actuelle du premier point
+   * @param currentPos2 - Position actuelle du second point
+   * @param deltaTime - Pas de temps entre les frames (en secondes)
+   * @returns Vélocité relative entre les deux points
+   *
+   * @example
+   * ```typescript
+   * const velRelative = calculator.calculateRelative(
+   *   "kite", "bar",
+   *   kitePos, barPos,
+   *   1/60
+   * );
+   * ```
+   */
+  calculateRelative(
+    keyPoint1: string,
+    keyPoint2: string,
+    currentPos1: THREE.Vector3,
+    currentPos2: THREE.Vector3,
+    deltaTime: number
+  ): THREE.Vector3 {
+    const vel1 = this.calculate(keyPoint1, currentPos1, deltaTime);
+    const vel2 = this.calculate(keyPoint2, currentPos2, deltaTime);
+
+    // Vélocité relative = différence des vélocités
+    return new THREE.Vector3().subVectors(vel1, vel2);
+  }
+
+  /**
+   * Réinitialise l'historique pour une clé donnée
+   *
+   * Utile quand on change drastiquement la position d'un objet
+   * (ex: reset de simulation)
+   *
+   * @param key - Identifiant du point à réinitialiser
+   */
+  reset(key: string): void {
+    this.previousPositions.delete(key);
+  }
+
+  /**
+   * Réinitialise tout l'historique
+   *
+   * Utile pour reset complet de la simulation
+   */
+  resetAll(): void {
+    this.previousPositions.clear();
+  }
+
+  /**
+   * Retourne le nombre de points suivis
+   *
+   * Utile pour debug/monitoring
+   */
+  getTrackedCount(): number {
+    return this.previousPositions.size;
+  }
+}
+
 
 === simulation/physics/WindSimulator.ts ===
 
@@ -7094,6 +8681,1087 @@ export class RenderManager {
   }
 }
 
+=== simulation/systems/InputSystem.ts ===
+
+/**
+ * InputSystem.ts - Système de gestion des entrées utilisateur
+ */
+
+import * as THREE from 'three';
+import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
+import { Logger } from '../../utils/Logging';
+
+export interface InputState {
+  // Entrées analogiques (normalisées -1 à 1)
+  barPosition: number; // Position de la barre (-1: tirée gauche, 0: neutre, 1: tirée droite)
+  barVelocity: number; // Vitesse de mouvement de la barre
+
+  // Entrées numériques
+  resetPressed: boolean;
+  debugTogglePressed: boolean;
+
+  // État interne
+  lastBarPosition: number;
+  smoothingFactor: number;
+}
+
+export interface InputConfig {
+  barSmoothingEnabled: boolean;
+  barSmoothingFactor: number; // Facteur de lissage (0-1, plus proche de 1 = plus lisse)
+  deadzone: number; // Zone morte pour éviter les oscillations
+  maxBarSpeed: number; // Vitesse maximale de changement de la barre
+  keyboardEnabled: boolean;
+  mouseEnabled: boolean;
+}
+
+export class InputSystem extends BaseSimulationSystem {
+  private logger: Logger;
+  private inputState: InputState;
+  private config: InputConfig;
+
+  // Gestion des événements
+  private keyStates = new Map<string, boolean>();
+  private mousePosition = new THREE.Vector2();
+  private mouseButtons = new Map<number, boolean>();
+
+  constructor(config: Partial<InputConfig> = {}) {
+    super('InputSystem', 1); // Haute priorité (traité en premier)
+
+    this.logger = Logger.getInstance();
+    this.config = {
+      barSmoothingEnabled: true,
+      barSmoothingFactor: 0.8,
+      deadzone: 0.05,
+      maxBarSpeed: 2.0, // unités par seconde
+      keyboardEnabled: true,
+      mouseEnabled: true,
+      ...config
+    };
+
+    this.inputState = {
+      barPosition: 0,
+      barVelocity: 0,
+      resetPressed: false,
+      debugTogglePressed: false,
+      lastBarPosition: 0,
+      smoothingFactor: this.config.barSmoothingFactor
+    };
+
+    this.setupEventListeners();
+  }
+
+  async initialize(): Promise<void> {
+    this.logger.info('InputSystem initialized', 'InputSystem');
+  }
+
+  update(context: SimulationContext): void {
+    // Mettre à jour l'état des entrées
+    this.updateKeyboardInput();
+    this.updateMouseInput();
+
+    // Calculer la position de la barre avec lissage
+    this.updateBarPosition(context.deltaTime);
+
+    // Mettre à jour les états des boutons (pulse)
+    this.updateButtonStates();
+  }
+
+  /**
+   * Configure les écouteurs d'événements
+   */
+  private setupEventListeners(): void {
+    if (typeof window === 'undefined') return;
+
+    // Écouteurs clavier
+    if (this.config.keyboardEnabled) {
+      window.addEventListener('keydown', this.onKeyDown.bind(this));
+      window.addEventListener('keyup', this.onKeyUp.bind(this));
+    }
+
+    // Écouteurs souris
+    if (this.config.mouseEnabled) {
+      window.addEventListener('mousemove', this.onMouseMove.bind(this));
+      window.addEventListener('mousedown', this.onMouseDown.bind(this));
+      window.addEventListener('mouseup', this.onMouseUp.bind(this));
+    }
+  }
+
+  /**
+   * Gestionnaire d'événement clavier (appui)
+   */
+  private onKeyDown(event: KeyboardEvent): void {
+    this.keyStates.set(event.code, true);
+
+    // Empêcher le comportement par défaut pour certaines touches
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyR'].includes(event.code)) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Gestionnaire d'événement clavier (relâchement)
+   */
+  private onKeyUp(event: KeyboardEvent): void {
+    this.keyStates.set(event.code, false);
+  }
+
+  /**
+   * Gestionnaire de mouvement de souris
+   */
+  private onMouseMove(event: MouseEvent): void {
+    this.mousePosition.set(event.clientX, event.clientY);
+  }
+
+  /**
+   * Gestionnaire d'appui souris
+   */
+  private onMouseDown(event: MouseEvent): void {
+    this.mouseButtons.set(event.button, true);
+  }
+
+  /**
+   * Gestionnaire de relâchement souris
+   */
+  private onMouseUp(event: MouseEvent): void {
+    this.mouseButtons.set(event.button, false);
+  }
+
+  /**
+   * Met à jour les entrées clavier
+   */
+  private updateKeyboardInput(): void {
+    // Contrôle de la barre avec les flèches gauche/droite
+    let targetBarPosition = 0;
+
+    if (this.keyStates.get('ArrowLeft')) {
+      targetBarPosition = -1; // Barre tirée à gauche
+    } else if (this.keyStates.get('ArrowRight')) {
+      targetBarPosition = 1; // Barre tirée à droite
+    }
+
+    // Appliquer la zone morte
+    if (Math.abs(targetBarPosition) < this.config.deadzone) {
+      targetBarPosition = 0;
+    }
+
+    this.inputState.barPosition = targetBarPosition;
+
+    // Boutons pulse
+    this.inputState.resetPressed = this.keyStates.get('KeyR') || false;
+    this.inputState.debugTogglePressed = this.keyStates.get('KeyD') || false;
+  }
+
+  /**
+   * Met à jour les entrées souris (réservé pour extension future)
+   */
+  private updateMouseInput(): void {
+    // Pour l'instant, la souris n'est pas utilisée pour le contrôle principal
+    // Mais on pourrait l'utiliser pour un contrôle plus fin
+  }
+
+  /**
+   * Met à jour la position de la barre avec lissage
+   */
+  private updateBarPosition(deltaTime: number): void {
+    const targetPosition = this.inputState.barPosition;
+
+    if (this.config.barSmoothingEnabled) {
+      // Lissage exponentiel
+      const smoothedPosition = THREE.MathUtils.lerp(
+        this.inputState.lastBarPosition,
+        targetPosition,
+        1.0 - Math.pow(1.0 - this.inputState.smoothingFactor, deltaTime * 60)
+      );
+
+      this.inputState.lastBarPosition = smoothedPosition;
+      this.inputState.barPosition = smoothedPosition;
+    } else {
+      this.inputState.lastBarPosition = targetPosition;
+    }
+
+    // Calculer la vitesse de changement
+    this.inputState.barVelocity = (this.inputState.barPosition - this.inputState.lastBarPosition) / deltaTime;
+
+    // Limiter la vitesse maximale
+    if (Math.abs(this.inputState.barVelocity) > this.config.maxBarSpeed) {
+      this.inputState.barVelocity = Math.sign(this.inputState.barVelocity) * this.config.maxBarSpeed;
+    }
+  }
+
+  /**
+   * Met à jour les états des boutons (pulse - seulement true pendant un frame)
+   */
+  private updateButtonStates(): void {
+    // Pour l'instant, pas de logique pulse nécessaire car on utilise directement les keyStates
+    // Mais on pourrait implémenter une logique de pulse ici si nécessaire
+  }
+
+  /**
+   * Obtient l'état actuel des entrées
+   */
+  getInputState(): Readonly<InputState> {
+    return this.inputState;
+  }
+
+  /**
+   * Force une position de barre (pour debug ou automation)
+   */
+  setBarPosition(position: number): void {
+    this.inputState.barPosition = THREE.MathUtils.clamp(position, -1, 1);
+    this.inputState.lastBarPosition = this.inputState.barPosition;
+  }
+
+  /**
+   * Obtient la configuration actuelle
+   */
+  getConfig(): Readonly<InputConfig> {
+    return this.config;
+  }
+
+  reset(): void {
+    this.inputState.barPosition = 0;
+    this.inputState.barVelocity = 0;
+    this.inputState.lastBarPosition = 0;
+    this.inputState.resetPressed = false;
+    this.inputState.debugTogglePressed = false;
+
+    // Réinitialiser les états des touches
+    this.keyStates.clear();
+    this.mouseButtons.clear();
+
+    this.logger.info('InputSystem reset', 'InputSystem');
+  }
+
+  dispose(): void {
+    // Supprimer les écouteurs d'événements
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.onKeyDown.bind(this));
+      window.removeEventListener('keyup', this.onKeyUp.bind(this));
+      window.removeEventListener('mousemove', this.onMouseMove.bind(this));
+      window.removeEventListener('mousedown', this.onMouseDown.bind(this));
+      window.removeEventListener('mouseup', this.onMouseUp.bind(this));
+    }
+
+    this.logger.info('InputSystem disposed', 'InputSystem');
+  }
+}
+
+=== simulation/systems/PhysicsSystem.ts ===
+
+/**
+ * PhysicsSystem.ts - Système de simulation physique
+ */
+
+import * as THREE from 'three';
+import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
+import { Logger } from '../../utils/Logging';
+import { MathUtils } from '../../utils/MathUtils';
+import { PHYSICAL_CONSTANTS } from '../../factories/presets/PhysicalPresets';
+
+export interface PhysicsState {
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  acceleration: THREE.Vector3;
+  angularVelocity: THREE.Vector3;
+  angularAcceleration: THREE.Vector3;
+  mass: number;
+  momentOfInertia: THREE.Matrix3;
+}
+
+export interface PhysicsConfig {
+  gravityEnabled: boolean;
+  airResistanceEnabled: boolean;
+  groundCollisionEnabled: boolean;
+  maxVelocity: number;
+  maxAngularVelocity: number;
+  timeStep: number;
+  airDensity: number;
+  gravity: number;
+  minVelocity: number;
+}
+
+export class PhysicsSystem extends BaseSimulationSystem {
+  private logger: Logger;
+  private physicsObjects = new Map<string, PhysicsState>();
+  private config: PhysicsConfig;
+
+  constructor(config: Partial<PhysicsConfig> = {}) {
+    super('PhysicsSystem', 10); // Priorité 10 (après les systèmes d'entrée)
+
+    this.logger = Logger.getInstance();
+    this.config = {
+      gravityEnabled: true,
+      airResistanceEnabled: true,
+      groundCollisionEnabled: true,
+      maxVelocity: 100,
+      maxAngularVelocity: 50,
+      airDensity: PHYSICAL_CONSTANTS.airDensity,
+      gravity: PHYSICAL_CONSTANTS.gravity,
+      minVelocity: 0.01,
+      timeStep: 1/60,
+      ...config
+    };
+  }
+
+  async initialize(): Promise<void> {
+    this.logger.info('PhysicsSystem initialized', 'PhysicsSystem');
+  }
+
+  update(context: SimulationContext): void {
+    const deltaTime = Math.min(context.deltaTime, this.config.timeStep);
+
+    // Mise à jour de tous les objets physiques
+    for (const [id, state] of this.physicsObjects.entries()) {
+      this.updatePhysicsObject(id, state, deltaTime);
+    }
+  }
+
+  reset(): void {
+    this.physicsObjects.clear();
+    this.logger.info('PhysicsSystem reset', 'PhysicsSystem');
+  }
+
+  dispose(): void {
+    this.physicsObjects.clear();
+    this.logger.info('PhysicsSystem disposed', 'PhysicsSystem');
+  }
+
+  /**
+   * Enregistre un objet physique dans le système
+   */
+  registerPhysicsObject(id: string, initialState: Partial<PhysicsState>): void {
+    const state: PhysicsState = {
+      position: new THREE.Vector3(),
+      velocity: new THREE.Vector3(),
+      acceleration: new THREE.Vector3(),
+      angularVelocity: new THREE.Vector3(),
+      angularAcceleration: new THREE.Vector3(),
+      mass: 1.0,
+      momentOfInertia: new THREE.Matrix3().identity(),
+      ...initialState
+    };
+
+    this.physicsObjects.set(id, state);
+    this.logger.debug(`Physics object registered: ${id}`, 'PhysicsSystem');
+  }
+
+  /**
+   * Désenregistre un objet physique
+   */
+  unregisterPhysicsObject(id: string): boolean {
+    const removed = this.physicsObjects.delete(id);
+    if (removed) {
+      this.logger.debug(`Physics object unregistered: ${id}`, 'PhysicsSystem');
+    }
+    return removed;
+  }
+
+  /**
+   * Obtient l'état physique d'un objet
+   */
+  getPhysicsState(id: string): PhysicsState | undefined {
+    return this.physicsObjects.get(id);
+  }
+
+  /**
+   * Applique une force à un objet
+   */
+  applyForce(id: string, force: THREE.Vector3, point?: THREE.Vector3): void {
+    const state = this.physicsObjects.get(id);
+    if (!state) return;
+
+    // F = ma => a = F/m
+    const acceleration = force.clone().divideScalar(state.mass);
+    state.acceleration.add(acceleration);
+
+    // Si un point d'application est spécifié, calculer le couple
+    if (point) {
+      const r = point.clone().sub(state.position);
+      const torque = r.clone().cross(force);
+      this.applyTorque(id, torque);
+    }
+  }
+
+  /**
+   * Applique un couple (torque) à un objet
+   */
+  applyTorque(id: string, torque: THREE.Vector3): void {
+    const state = this.physicsObjects.get(id);
+    if (!state) return;
+
+    // τ = Iα => α = I⁻¹τ
+    const angularAcceleration = torque.clone();
+    angularAcceleration.applyMatrix3(state.momentOfInertia.clone().invert());
+    state.angularAcceleration.add(angularAcceleration);
+  }
+
+  /**
+   * Met à jour la physique d'un objet
+   */
+  private updatePhysicsObject(id: string, state: PhysicsState, deltaTime: number): void {
+    // Appliquer la gravité
+    if (this.config.gravityEnabled) {
+      const gravity = new THREE.Vector3(0, -PHYSICAL_CONSTANTS.gravity, 0);
+      state.acceleration.add(gravity);
+    }
+
+    // Appliquer la résistance de l'air
+    if (this.config.airResistanceEnabled) {
+      this.applyAirResistance(state);
+    }
+
+    // Intégration des accélérations (méthode d'Euler)
+    state.velocity.add(state.acceleration.clone().multiplyScalar(deltaTime));
+    state.position.add(state.velocity.clone().multiplyScalar(deltaTime));
+
+    // Intégration angulaire
+    state.angularVelocity.add(state.angularAcceleration.clone().multiplyScalar(deltaTime));
+
+    // Limiter les vitesses
+    this.clampVelocities(state);
+
+    // Collision avec le sol
+    if (this.config.groundCollisionEnabled) {
+      this.handleGroundCollision(state);
+    }
+
+    // Réinitialiser les accélérations pour le prochain frame
+    state.acceleration.set(0, 0, 0);
+    state.angularAcceleration.set(0, 0, 0);
+  }
+
+  /**
+   * Applique la résistance de l'air
+   */
+  private applyAirResistance(state: PhysicsState): void {
+    if (state.velocity.lengthSq() < this.config.minVelocity * this.config.minVelocity) {
+      return;
+    }
+
+    // Force de traînée : F_d = 0.5 * ρ * v² * C_d * A
+    // Approximation simplifiée : F_d = -k * v (linéaire)
+    const dragCoefficient = 0.1; // Coefficient simplifié
+    const dragForce = state.velocity.clone()
+      .normalize()
+      .multiplyScalar(-dragCoefficient * state.velocity.lengthSq());
+
+    state.acceleration.add(dragForce.divideScalar(state.mass));
+  }
+
+  /**
+   * Limite les vitesses maximales
+   */
+  private clampVelocities(state: PhysicsState): void {
+    if (state.velocity.length() > this.config.maxVelocity) {
+      state.velocity.normalize().multiplyScalar(this.config.maxVelocity);
+    }
+
+    if (state.angularVelocity.length() > this.config.maxAngularVelocity) {
+      state.angularVelocity.normalize().multiplyScalar(this.config.maxAngularVelocity);
+    }
+  }
+
+  /**
+   * Gère les collisions avec le sol
+   */
+  private handleGroundCollision(state: PhysicsState): void {
+    const groundY = 0;
+
+    if (state.position.y <= groundY && state.velocity.y < 0) {
+      // Collision avec le sol
+      state.position.y = groundY;
+      state.velocity.y *= -0.3; // Coefficient de restitution (rebond)
+
+      // Friction
+      const friction = 0.8;
+      state.velocity.x *= friction;
+      state.velocity.z *= friction;
+
+      // Arrêter si la vitesse est très faible
+      if (Math.abs(state.velocity.y) < 0.01) {
+        state.velocity.y = 0;
+      }
+    }
+  }
+
+  /**
+   * Calcule les forces aérodynamiques (pour usage par d'autres systèmes)
+   */
+  calculateAerodynamicForces(
+    velocity: THREE.Vector3,
+    area: number,
+    liftCoeff: number,
+    dragCoeff: number,
+    normal: THREE.Vector3
+  ): { lift: THREE.Vector3, drag: THREE.Vector3 } {
+    const speed = velocity.length();
+    if (speed < this.config.minVelocity) {
+      return { lift: new THREE.Vector3(), drag: new THREE.Vector3() };
+    }
+
+    const velocityDir = velocity.clone().normalize();
+
+    // Force de portance (perpendiculaire à la vitesse)
+    const liftDir = normal.clone().cross(velocityDir).cross(velocityDir).normalize();
+    const lift = liftDir.multiplyScalar(0.5 * PHYSICAL_CONSTANTS.airDensity * speed * speed * area * liftCoeff);
+
+    // Force de traînée (opposée à la vitesse)
+    const drag = velocityDir.clone().multiplyScalar(-0.5 * PHYSICAL_CONSTANTS.airDensity * speed * speed * area * dragCoeff);
+
+    return { lift, drag };
+  }
+
+  /**
+   * Obtient tous les IDs des objets physiques
+   */
+  getPhysicsObjectIds(): string[] {
+    return Array.from(this.physicsObjects.keys());
+  }
+
+  /**
+   * Met à jour la configuration
+   */
+  updateConfig(newConfig: Partial<PhysicsConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    this.logger.info('PhysicsSystem config updated', 'PhysicsSystem');
+  }
+
+  /**
+   * Obtient les statistiques du système
+   */
+  getStats(): any {
+    return {
+      objectCount: this.physicsObjects.size,
+      config: this.config
+    };
+  }
+}
+
+=== simulation/systems/RenderSystem.ts ===
+
+/**
+ * RenderSystem.ts - Système de rendu Three.js
+ */
+
+import * as THREE from 'three';
+import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
+import { Logger } from '../../utils/Logging';
+
+export interface RenderState {
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  renderer: THREE.WebGLRenderer;
+  canvas: HTMLCanvasElement;
+  isRendering: boolean;
+  frameCount: number;
+  fps: number;
+  lastFrameTime: number;
+}
+
+export interface RenderConfig {
+  antialias: boolean;
+  shadowMapEnabled: boolean;
+  shadowMapType: THREE.ShadowMapType;
+  pixelRatio: number;
+  clearColor: number;
+  clearAlpha: number;
+  targetFPS: number;
+  vsync: boolean;
+  powerPreference: 'default' | 'high-performance' | 'low-power';
+}
+
+export class RenderSystem extends BaseSimulationSystem {
+  private logger: Logger;
+  private renderState: RenderState | null = null;
+  private config: RenderConfig;
+  private fpsCounter = { frames: 0, lastTime: 0, fps: 0 };
+
+  constructor(config: Partial<RenderConfig> = {}) {
+    super('RenderSystem', 100); // Basse priorité (rendu en dernier)
+
+    this.logger = Logger.getInstance();
+    this.config = {
+      antialias: true,
+      shadowMapEnabled: true,
+      shadowMapType: THREE.PCFSoftShadowMap,
+      pixelRatio: 1, // Valeur par défaut, sera mise à jour dans initialize()
+      clearColor: 0x87CEEB, // Bleu ciel
+      clearAlpha: 1.0,
+      targetFPS: 60,
+      vsync: true,
+      powerPreference: 'high-performance',
+      ...config
+    };
+  }
+
+  async initialize(): Promise<void> {
+    this.logger.info('RenderSystem initializing...', 'RenderSystem');
+
+    // Mettre à jour pixelRatio maintenant que window est disponible
+    if (typeof window !== 'undefined') {
+      this.config.pixelRatio = Math.min(window.devicePixelRatio, 2);
+    }
+
+    try {
+      await this.initializeRenderer();
+      this.logger.info('RenderSystem initialized successfully', 'RenderSystem');
+    } catch (error) {
+      this.logger.error(`RenderSystem initialization failed: ${error}`, 'RenderSystem');
+      throw error;
+    }
+  }
+
+  /**
+   * Initialise le renderer Three.js
+   */
+  private async initializeRenderer(): Promise<void> {
+    if (typeof document === 'undefined') {
+      throw new Error('RenderSystem requires a DOM environment');
+    }
+
+    // Créer le canvas
+    const canvas = document.createElement('canvas');
+    canvas.id = 'kite-simulator-canvas';
+
+    // Créer le renderer
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: this.config.antialias,
+      alpha: false,
+      powerPreference: this.config.powerPreference
+    });
+
+    // Configurer le renderer
+    renderer.setPixelRatio(this.config.pixelRatio);
+    renderer.setClearColor(this.config.clearColor, this.config.clearAlpha);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // Configurer les ombres
+    if (this.config.shadowMapEnabled) {
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = this.config.shadowMapType;
+    }
+
+    // Créer la scène
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(this.config.clearColor, 50, 200);
+
+    // Créer la caméra (sera configurée par le système de caméra séparé)
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    // Initialiser l'état de rendu
+    this.renderState = {
+      scene,
+      camera,
+      renderer,
+      canvas,
+      isRendering: false,
+      frameCount: 0,
+      fps: 0,
+      lastFrameTime: performance.now()
+    };
+
+    // Configurer la taille initiale
+    this.onResize();
+
+    // Ajouter le canvas au DOM
+    const container = document.getElementById('app') || document.body;
+    container.appendChild(canvas);
+
+    // Écouteur de redimensionnement
+    window.addEventListener('resize', this.onResize.bind(this));
+  }
+
+  update(context: SimulationContext): void {
+    if (!this.renderState || !this.renderState.isRendering) return;
+
+    // Calculer le FPS
+    this.updateFPS();
+
+    // Rendre la scène
+    this.renderState.renderer.render(this.renderState.scene, this.renderState.camera);
+
+    this.renderState.frameCount++;
+  }
+
+  /**
+   * Met à jour le compteur FPS
+   */
+  private updateFPS(): void {
+    if (!this.renderState) return;
+
+    const now = performance.now();
+    this.fpsCounter.frames++;
+
+    if (now - this.fpsCounter.lastTime >= 1000) {
+      this.renderState.fps = Math.round((this.fpsCounter.frames * 1000) / (now - this.fpsCounter.lastTime));
+      this.fpsCounter.frames = 0;
+      this.fpsCounter.lastTime = now;
+    }
+  }
+
+  /**
+   * Gestionnaire de redimensionnement de la fenêtre
+   */
+  private onResize(): void {
+    if (!this.renderState) return;
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Mettre à jour la caméra
+    if (this.renderState.camera instanceof THREE.PerspectiveCamera) {
+      this.renderState.camera.aspect = width / height;
+      this.renderState.camera.updateProjectionMatrix();
+    }
+
+    // Mettre à jour le renderer
+    this.renderState.renderer.setSize(width, height);
+  }
+
+  /**
+   * Démarre le rendu
+   */
+  startRendering(): void {
+    if (this.renderState) {
+      this.renderState.isRendering = true;
+      this.logger.info('Rendering started', 'RenderSystem');
+    }
+  }
+
+  /**
+   * Arrête le rendu
+   */
+  stopRendering(): void {
+    if (this.renderState) {
+      this.renderState.isRendering = false;
+      this.logger.info('Rendering stopped', 'RenderSystem');
+    }
+  }
+
+  /**
+   * Obtient l'état de rendu actuel
+   */
+  getRenderState(): Readonly<RenderState> | null {
+    return this.renderState;
+  }
+
+  /**
+   * Obtient la scène Three.js
+   */
+  getScene(): THREE.Scene | null {
+    return this.renderState?.scene || null;
+  }
+
+  /**
+   * Obtient la caméra
+   */
+  getCamera(): THREE.Camera | null {
+    return this.renderState?.camera || null;
+  }
+
+  /**
+   * Obtient le renderer
+   */
+  getRenderer(): THREE.WebGLRenderer | null {
+    return this.renderState?.renderer || null;
+  }
+
+  /**
+   * Obtient le canvas
+   */
+  getCanvas(): HTMLCanvasElement | null {
+    return this.renderState?.canvas || null;
+  }
+
+  /**
+   * Obtient les statistiques de rendu
+   */
+  getRenderStats(): { fps: number; frameCount: number; isRendering: boolean } {
+    if (!this.renderState) {
+      return { fps: 0, frameCount: 0, isRendering: false };
+    }
+
+    return {
+      fps: this.renderState.fps,
+      frameCount: this.renderState.frameCount,
+      isRendering: this.renderState.isRendering
+    };
+  }
+
+  /**
+   * Obtient la configuration actuelle
+   */
+  getConfig(): Readonly<RenderConfig> {
+    return this.config;
+  }
+
+  reset(): void {
+    if (this.renderState) {
+      this.renderState.frameCount = 0;
+      this.renderState.fps = 0;
+      this.renderState.lastFrameTime = performance.now();
+    }
+
+    this.fpsCounter = { frames: 0, lastTime: 0, fps: 0 };
+    this.logger.info('RenderSystem reset', 'RenderSystem');
+  }
+
+  dispose(): void {
+    if (this.renderState) {
+      // Supprimer les écouteurs
+      window.removeEventListener('resize', this.onResize.bind(this));
+
+      // Disposer le renderer
+      this.renderState.renderer.dispose();
+
+      // Supprimer le canvas du DOM
+      if (this.renderState.canvas.parentNode) {
+        this.renderState.canvas.parentNode.removeChild(this.renderState.canvas);
+      }
+
+      this.renderState = null;
+    }
+
+    this.logger.info('RenderSystem disposed', 'RenderSystem');
+  }
+}
+
+=== simulation/systems/WindSystem.ts ===
+
+/**
+ * WindSystem.ts - Système de simulation du vent
+ */
+
+import * as THREE from 'three';
+import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
+import { Logger } from '../../utils/Logging';
+import { MathUtils } from '../../utils/MathUtils';
+import { PHYSICAL_CONSTANTS } from '../../factories/presets/PhysicalPresets';
+
+export interface WindState {
+  baseDirection: THREE.Vector3; // Direction principale du vent
+  baseSpeed: number; // Vitesse de base du vent (m/s)
+  turbulence: number; // Intensité de la turbulence (0-1)
+  gustFrequency: number; // Fréquence des rafales (Hz)
+  gustAmplitude: number; // Amplitude des rafales
+  time: number; // Temps écoulé pour l'animation
+}
+
+export interface WindConfig {
+  baseSpeed: number;
+  baseDirection: THREE.Vector3;
+  turbulenceEnabled: boolean;
+  turbulenceIntensity: number;
+  gustsEnabled: boolean;
+  gustFrequency: number;
+  gustAmplitude: number;
+  windShearEnabled: boolean; // Variation de vitesse avec l'altitude
+  updateFrequency: number; // Fréquence de mise à jour (Hz)
+}
+
+export class WindSystem extends BaseSimulationSystem {
+  private logger: Logger;
+  private windState: WindState;
+  private config: WindConfig;
+  private lastUpdateTime: number = 0;
+
+  constructor(config: Partial<WindConfig> = {}) {
+    super('WindSystem', 5); // Priorité 5 (avant la physique)
+
+    this.logger = Logger.getInstance();
+    this.config = {
+      baseSpeed: 5.0, // 5 m/s vent léger
+      baseDirection: new THREE.Vector3(1, 0, 0), // Vent venant de l'est
+      turbulenceEnabled: true,
+      turbulenceIntensity: 0.3,
+      gustsEnabled: true,
+      gustFrequency: 0.1, // Une rafale toutes les 10 secondes
+      gustAmplitude: 2.0,
+      windShearEnabled: true,
+      updateFrequency: 10, // 10 Hz
+      ...config
+    };
+
+    // Normaliser la direction
+    this.config.baseDirection.normalize();
+
+    this.windState = {
+      baseDirection: this.config.baseDirection.clone(),
+      baseSpeed: this.config.baseSpeed,
+      turbulence: this.config.turbulenceIntensity,
+      gustFrequency: this.config.gustFrequency,
+      gustAmplitude: this.config.gustAmplitude,
+      time: 0
+    };
+  }
+
+  async initialize(): Promise<void> {
+    this.logger.info('WindSystem initialized', 'WindSystem');
+  }
+
+  update(context: SimulationContext): void {
+    // Mise à jour périodique pour éviter les calculs trop fréquents
+    if (context.totalTime - this.lastUpdateTime < 1.0 / this.config.updateFrequency) {
+      return;
+    }
+
+    this.lastUpdateTime = context.totalTime;
+    this.windState.time = context.totalTime;
+
+    // Calculer le vent apparent avec turbulence et rafales
+    this.updateWindState(context.deltaTime);
+  }
+
+  /**
+   * Met à jour l'état du vent avec turbulence et rafales
+   */
+  private updateWindState(deltaTime: number): void {
+    // Direction de base (peut être modifiée par des facteurs externes)
+    this.windState.baseDirection.copy(this.config.baseDirection);
+
+    // Ajouter turbulence si activée
+    if (this.config.turbulenceEnabled) {
+      this.addTurbulence(deltaTime);
+    }
+
+    // Ajouter rafales si activées
+    if (this.config.gustsEnabled) {
+      this.addGustEffect(deltaTime);
+    }
+
+    // Normaliser la direction après modifications
+    this.windState.baseDirection.normalize();
+  }
+
+  /**
+   * Ajoute de la turbulence au vent
+   */
+  private addTurbulence(deltaTime: number): void {
+    // Générer du bruit pseudo-aléatoire basé sur le temps
+    const noiseX = Math.sin(this.windState.time * 2.1) * Math.cos(this.windState.time * 1.3);
+    const noiseY = Math.sin(this.windState.time * 1.7) * Math.cos(this.windState.time * 2.4);
+    const noiseZ = Math.sin(this.windState.time * 1.9) * Math.cos(this.windState.time * 1.8);
+
+    // Appliquer l'intensité de la turbulence
+    const turbulenceVector = new THREE.Vector3(noiseX, noiseY, noiseZ);
+    turbulenceVector.multiplyScalar(this.config.turbulenceIntensity * 0.1);
+
+    // Ajouter à la direction
+    this.windState.baseDirection.add(turbulenceVector);
+  }
+
+  /**
+   * Ajoute l'effet des rafales
+   */
+  private addGustEffect(deltaTime: number): void {
+    // Calculer l'amplitude de la rafale actuelle
+    const gustPhase = Math.sin(this.windState.time * this.config.gustFrequency * Math.PI * 2);
+    const gustStrength = Math.max(0, gustPhase) * this.config.gustAmplitude;
+
+    // Rafales principalement dans la direction du vent
+    const gustVector = this.config.baseDirection.clone();
+    gustVector.multiplyScalar(gustStrength * 0.1);
+
+    this.windState.baseDirection.add(gustVector);
+  }
+
+  /**
+   * Calcule le vent apparent à une position donnée
+   * @param position Position dans l'espace 3D
+   * @param objectVelocity Vitesse de l'objet (pour vent relatif)
+   * @returns Vecteur vent apparent
+   */
+  getApparentWind(position: THREE.Vector3, objectVelocity: THREE.Vector3 = new THREE.Vector3()): THREE.Vector3 {
+    // Vent de base
+    let wind = this.windState.baseDirection.clone();
+    wind.multiplyScalar(this.windState.baseSpeed);
+
+    // Ajouter cisaillement du vent (variation avec l'altitude)
+    if (this.config.windShearEnabled) {
+      wind = this.applyWindShear(wind, position.y);
+    }
+
+    // Vent apparent = vent absolu - vitesse de l'objet
+    const apparentWind = wind.clone();
+    apparentWind.sub(objectVelocity);
+
+    return apparentWind;
+  }
+
+  /**
+   * Applique le cisaillement du vent (variation avec l'altitude)
+   */
+  private applyWindShear(wind: THREE.Vector3, altitude: number): THREE.Vector3 {
+    // Le vent augmente avec l'altitude selon une loi logarithmique simplifiée
+    // En réalité, c'est plus complexe, mais cette approximation suffit
+    const shearFactor = Math.max(0.5, Math.log(Math.max(1, altitude + 1)) * 0.3 + 0.7);
+
+    const shearedWind = wind.clone();
+    shearedWind.multiplyScalar(shearFactor);
+
+    return shearedWind;
+  }
+
+  /**
+   * Obtient l'état actuel du vent
+   */
+  getWindState(): Readonly<WindState> {
+    return this.windState;
+  }
+
+  /**
+   * Modifie la direction du vent
+   */
+  setWindDirection(direction: THREE.Vector3): void {
+    this.config.baseDirection.copy(direction);
+    this.config.baseDirection.normalize();
+    this.windState.baseDirection.copy(this.config.baseDirection);
+  }
+
+  /**
+   * Modifie la vitesse du vent
+   */
+  setWindSpeed(speed: number): void {
+    this.config.baseSpeed = Math.max(0, speed);
+    this.windState.baseSpeed = this.config.baseSpeed;
+  }
+
+  /**
+   * Obtient la configuration actuelle
+   */
+  getConfig(): Readonly<WindConfig> {
+    return this.config;
+  }
+
+  reset(): void {
+    this.windState.time = 0;
+    this.windState.baseDirection.copy(this.config.baseDirection);
+    this.windState.baseSpeed = this.config.baseSpeed;
+    this.lastUpdateTime = 0;
+    this.logger.info('WindSystem reset', 'WindSystem');
+  }
+
+  dispose(): void {
+    // Pas de ressources spécifiques à nettoyer
+    this.logger.info('WindSystem disposed', 'WindSystem');
+  }
+}
+
+=== simulation/systems/index.ts ===
+
+/**
+ * systems/index.ts - Export des systèmes de simulation
+ *
+ * Point d'entrée centralisé pour tous les systèmes de simulation.
+ * Permet d'importer facilement tous les systèmes depuis un seul endroit.
+ */
+
+export { PhysicsSystem, type PhysicsState, type PhysicsConfig } from './PhysicsSystem';
+export { WindSystem, type WindState, type WindConfig } from './WindSystem';
+export { InputSystem, type InputState, type InputConfig } from './InputSystem';
+export { RenderSystem, type RenderState, type RenderConfig } from './RenderSystem';
+
 === simulation/types/BridleTypes.ts ===
 
 /**
@@ -7678,5 +10346,595 @@ export interface ObjectMetadata {
   tags?: string[];
   author?: string;
   version?: string;
+}
+
+=== utils/GeometryUtils.ts ===
+
+/**
+ * GeometryUtils.ts - Utilitaires géométriques pour la simulation 3D
+ */
+
+import * as THREE from 'three';
+
+export class GeometryUtils {
+  /**
+   * Calcule l'aire d'un triangle 3D
+   */
+  static triangleArea(v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3): number {
+    const edge1 = v2.clone().sub(v1);
+    const edge2 = v3.clone().sub(v1);
+    const cross = edge1.cross(edge2);
+    return cross.length() * 0.5;
+  }
+
+  /**
+   * Calcule la normale d'un triangle
+   */
+  static triangleNormal(v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3): THREE.Vector3 {
+    const edge1 = v2.clone().sub(v1);
+    const edge2 = v3.clone().sub(v1);
+    return edge1.cross(edge2).normalize();
+  }
+
+  /**
+   * Calcule le centroïde d'un triangle
+   */
+  static triangleCentroid(v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3): THREE.Vector3 {
+    return v1.clone().add(v2).add(v3).divideScalar(3);
+  }
+
+  /**
+   * Vérifie si un point est à l'intérieur d'un triangle (dans le plan)
+   */
+  static pointInTriangle2D(point: THREE.Vector2, v1: THREE.Vector2, v2: THREE.Vector2, v3: THREE.Vector2): boolean {
+    const d1 = this.sign(point, v1, v2);
+    const d2 = this.sign(point, v2, v3);
+    const d3 = this.sign(point, v3, v1);
+
+    const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(hasNeg && hasPos);
+  }
+
+  /**
+   * Calcule le barycentre d'un ensemble de points
+   */
+  static centroid(points: THREE.Vector3[]): THREE.Vector3 {
+    if (points.length === 0) return new THREE.Vector3();
+
+    const sum = points.reduce((acc, point) => acc.add(point), new THREE.Vector3());
+    return sum.divideScalar(points.length);
+  }
+
+  /**
+   * Calcule la bounding box d'un ensemble de points
+   */
+  static boundingBox(points: THREE.Vector3[]): { min: THREE.Vector3; max: THREE.Vector3 } {
+    if (points.length === 0) {
+      return { min: new THREE.Vector3(), max: new THREE.Vector3() };
+    }
+
+    const min = points[0].clone();
+    const max = points[0].clone();
+
+    for (let i = 1; i < points.length; i++) {
+      min.min(points[i]);
+      max.max(points[i]);
+    }
+
+    return { min, max };
+  }
+
+  /**
+   * Projette un point sur un plan défini par un point et une normale
+   */
+  static projectPointOnPlane(point: THREE.Vector3, planePoint: THREE.Vector3, planeNormal: THREE.Vector3): THREE.Vector3 {
+    const toPoint = point.clone().sub(planePoint);
+    const distance = toPoint.dot(planeNormal);
+    return point.clone().sub(planeNormal.clone().multiplyScalar(distance));
+  }
+
+  /**
+   * Calcule la distance d'un point à un plan
+   */
+  static pointToPlaneDistance(point: THREE.Vector3, planePoint: THREE.Vector3, planeNormal: THREE.Vector3): number {
+    const toPoint = point.clone().sub(planePoint);
+    return toPoint.dot(planeNormal);
+  }
+
+  /**
+   * Vérifie si deux segments se croisent (2D)
+   */
+  static segmentsIntersect2D(
+    a1: THREE.Vector2, a2: THREE.Vector2,
+    b1: THREE.Vector2, b2: THREE.Vector2
+  ): boolean {
+    const denom = (a1.x - a2.x) * (b1.y - b2.y) - (a1.y - a2.y) * (b1.x - b2.x);
+    if (Math.abs(denom) < 1e-6) return false; // Parallèles
+
+    const t = ((a1.x - b1.x) * (b1.y - b2.y) - (a1.y - b1.y) * (b1.x - b2.x)) / denom;
+    const u = -((a1.x - a2.x) * (a1.y - b1.y) - (a1.y - a2.y) * (a1.x - b1.x)) / denom;
+
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  }
+
+  /**
+   * Calcule l'angle solide d'un triangle vu depuis un point
+   */
+  static solidAngle(v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3, viewpoint: THREE.Vector3): number {
+    const a = v1.clone().sub(viewpoint).normalize();
+    const b = v2.clone().sub(viewpoint).normalize();
+    const c = v3.clone().sub(viewpoint).normalize();
+
+    const numerator = Math.abs(a.dot(b.cross(c)));
+    const denominator = 1 + a.dot(b) + b.dot(c) + c.dot(a);
+    return 2 * Math.atan2(numerator, denominator);
+  }
+
+  /**
+   * Génère des points sur une sphère
+   */
+  static fibonacciSphere(samples: number, radius: number = 1): THREE.Vector3[] {
+    const points: THREE.Vector3[] = [];
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Angle d'or
+
+    for (let i = 0; i < samples; i++) {
+      const y = 1 - (i / (samples - 1)) * 2; // y entre -1 et 1
+      const radiusAtY = Math.sqrt(1 - y * y);
+
+      const theta = phi * i;
+
+      const x = Math.cos(theta) * radiusAtY;
+      const z = Math.sin(theta) * radiusAtY;
+
+      points.push(new THREE.Vector3(x, y, z).multiplyScalar(radius));
+    }
+
+    return points;
+  }
+
+  /**
+   * Fonction auxiliaire pour pointInTriangle2D
+   */
+  private static sign(p1: THREE.Vector2, p2: THREE.Vector2, p3: THREE.Vector2): number {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+  }
+}
+
+=== utils/Logging.ts ===
+
+/**
+ * Logging.ts - Système de logging configurable pour la simulation
+ */
+
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+  NONE = 4
+}
+
+export interface LogEntry {
+  level: LogLevel;
+  message: string;
+  timestamp: number;
+  category?: string;
+  data?: any;
+}
+
+export class Logger {
+  private static instance: Logger;
+  private logLevel: LogLevel = LogLevel.INFO;
+  private logs: LogEntry[] = [];
+  private maxLogs: number = 1000;
+  private categories: Set<string> = new Set();
+
+  private constructor() {}
+
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger();
+    }
+    return Logger.instance;
+  }
+
+  /**
+   * Configure le niveau de log minimum
+   */
+  setLogLevel(level: LogLevel): void {
+    this.logLevel = level;
+  }
+
+  /**
+   * Active/désactive une catégorie de logs
+   */
+  setCategoryEnabled(category: string, enabled: boolean): void {
+    if (enabled) {
+      this.categories.add(category);
+    } else {
+      this.categories.delete(category);
+    }
+  }
+
+  /**
+   * Log de debug
+   */
+  debug(message: string, category?: string, data?: any): void {
+    this.log(LogLevel.DEBUG, message, category, data);
+  }
+
+  /**
+   * Log d'information
+   */
+  info(message: string, category?: string, data?: any): void {
+    this.log(LogLevel.INFO, message, category, data);
+  }
+
+  /**
+   * Log d'avertissement
+   */
+  warn(message: string, category?: string, data?: any): void {
+    this.log(LogLevel.WARN, message, category, data);
+  }
+
+  /**
+   * Log d'erreur
+   */
+  error(message: string, category?: string, data?: any): void {
+    this.log(LogLevel.ERROR, message, category, data);
+  }
+
+  /**
+   * Log générique
+   */
+  private log(level: LogLevel, message: string, category?: string, data?: any): void {
+    // Vérifier le niveau
+    if (level < this.logLevel) return;
+
+    // Vérifier la catégorie si spécifiée
+    if (category && !this.categories.has(category)) return;
+
+    const entry: LogEntry = {
+      level,
+      message,
+      timestamp: Date.now(),
+      category,
+      data
+    };
+
+    // Ajouter aux logs internes
+    this.logs.push(entry);
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift(); // Supprimer le plus ancien
+    }
+
+    // Afficher dans la console selon le niveau
+    const prefix = category ? `[${category}]` : '';
+    const formattedMessage = `${prefix} ${message}`;
+
+    switch (level) {
+      case LogLevel.DEBUG:
+        console.debug(`🐛 ${formattedMessage}`, data || '');
+        break;
+      case LogLevel.INFO:
+        console.info(`ℹ️ ${formattedMessage}`, data || '');
+        break;
+      case LogLevel.WARN:
+        console.warn(`⚠️ ${formattedMessage}`, data || '');
+        break;
+      case LogLevel.ERROR:
+        console.error(`❌ ${formattedMessage}`, data || '');
+        break;
+    }
+  }
+
+  /**
+   * Obtient tous les logs
+   */
+  getLogs(level?: LogLevel, category?: string): LogEntry[] {
+    return this.logs.filter(entry => {
+      if (level !== undefined && entry.level < level) return false;
+      if (category && entry.category !== category) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Obtient les derniers logs
+   */
+  getRecentLogs(count: number = 10): LogEntry[] {
+    return this.logs.slice(-count);
+  }
+
+  /**
+   * Efface tous les logs
+   */
+  clearLogs(): void {
+    this.logs = [];
+  }
+
+  /**
+   * Exporte les logs au format JSON
+   */
+  exportLogs(): string {
+    return JSON.stringify(this.logs, null, 2);
+  }
+
+  /**
+   * Importe des logs depuis JSON
+   */
+  importLogs(json: string): void {
+    try {
+      const imported = JSON.parse(json) as LogEntry[];
+      this.logs.push(...imported);
+      // Garder seulement les maxLogs plus récents
+      if (this.logs.length > this.maxLogs) {
+        this.logs = this.logs.slice(-this.maxLogs);
+      }
+    } catch (error) {
+      this.error('Erreur lors de l\'import des logs', 'Logger', error);
+    }
+  }
+
+  /**
+   * Statistiques des logs
+   */
+  getStats(): {
+    total: number;
+    byLevel: Record<LogLevel, number>;
+    byCategory: Record<string, number>;
+  } {
+    const byLevel = {
+      [LogLevel.DEBUG]: 0,
+      [LogLevel.INFO]: 0,
+      [LogLevel.WARN]: 0,
+      [LogLevel.ERROR]: 0,
+      [LogLevel.NONE]: 0
+    };
+
+    const byCategory: Record<string, number> = {};
+
+    for (const entry of this.logs) {
+      byLevel[entry.level]++;
+
+      if (entry.category) {
+        byCategory[entry.category] = (byCategory[entry.category] || 0) + 1;
+      }
+    }
+
+    return {
+      total: this.logs.length,
+      byLevel,
+      byCategory
+    };
+  }
+}
+
+// Instance globale pour utilisation facile
+export const log = Logger.getInstance();
+
+=== utils/MathUtils.ts ===
+
+/**
+ * MathUtils.ts - Utilitaires mathématiques pour la simulation 3D
+ */
+
+import * as THREE from 'three';
+
+export class MathUtils {
+  /**
+   * Clamp une valeur entre min et max
+   */
+  static clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  /**
+   * Interpolation linéaire
+   */
+  static lerp(a: number, b: number, t: number): number {
+    return a + (b - a) * MathUtils.clamp(t, 0, 1);
+  }
+
+  /**
+   * Interpolation sphérique (pour les rotations)
+   */
+  static slerp(q1: THREE.Quaternion, q2: THREE.Quaternion, t: number): THREE.Quaternion {
+    return new THREE.Quaternion().slerpQuaternions(q1, q2, MathUtils.clamp(t, 0, 1));
+  }
+
+  /**
+   * Distance euclidienne entre deux points 3D
+   */
+  static distance(p1: THREE.Vector3, p2: THREE.Vector3): number {
+    return p1.distanceTo(p2);
+  }
+
+  /**
+   * Distance au carré (plus rapide pour les comparaisons)
+   */
+  static distanceSquared(p1: THREE.Vector3, p2: THREE.Vector3): number {
+    return p1.distanceToSquared(p2);
+  }
+
+  /**
+   * Angle entre deux vecteurs (en radians)
+   */
+  static angleBetween(v1: THREE.Vector3, v2: THREE.Vector3): number {
+    return v1.angleTo(v2);
+  }
+
+  /**
+   * Projection d'un vecteur sur un autre
+   */
+  static project(v: THREE.Vector3, onto: THREE.Vector3): THREE.Vector3 {
+    const ontoNormalized = onto.clone().normalize();
+    return ontoNormalized.multiplyScalar(v.dot(ontoNormalized));
+  }
+
+  /**
+   * Composante perpendiculaire d'un vecteur par rapport à un autre
+   */
+  static perpendicular(v: THREE.Vector3, to: THREE.Vector3): THREE.Vector3 {
+    return v.clone().sub(this.project(v, to));
+  }
+
+  /**
+   * Vérifie si un nombre est proche de zéro
+   */
+  static isZero(value: number, epsilon: number = 1e-6): boolean {
+    return Math.abs(value) < epsilon;
+  }
+
+  /**
+   * Vérifie si deux nombres sont égaux avec une tolérance
+   */
+  static equals(a: number, b: number, epsilon: number = 1e-6): boolean {
+    return Math.abs(a - b) < epsilon;
+  }
+
+  /**
+   * Génère un nombre aléatoire entre min et max
+   */
+  static random(min: number = 0, max: number = 1): number {
+    return Math.random() * (max - min) + min;
+  }
+
+  /**
+   * Convertit degrés en radians
+   */
+  static degToRad(degrees: number): number {
+    return degrees * Math.PI / 180;
+  }
+
+  /**
+   * Convertit radians en degrés
+   */
+  static radToDeg(radians: number): number {
+    return radians * 180 / Math.PI;
+  }
+
+  /**
+   * Normalise un angle en radians entre -PI et PI
+   */
+  static normalizeAngle(angle: number): number {
+    while (angle > Math.PI) angle -= 2 * Math.PI;
+    while (angle < -Math.PI) angle += 2 * Math.PI;
+    return angle;
+  }
+
+  /**
+   * Interpolation smoothstep (plus douce que lerp)
+   */
+  static smoothstep(edge0: number, edge1: number, x: number): number {
+    const t = MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
+  /**
+   * Fonction de easing (ease-in-out)
+   */
+  static easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  }
+}
+
+=== utils/UidGenerator.ts ===
+
+/**
+ * UidGenerator.ts - Générateur d'identifiants uniques
+ */
+
+export class UidGenerator {
+  private static counter = 0;
+  private static readonly chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+  /**
+   * Génère un UID simple basé sur timestamp et compteur
+   */
+  static generate(prefix: string = ''): string {
+    const timestamp = Date.now().toString(36);
+    const count = (this.counter++).toString(36);
+    const random = Math.random().toString(36).substr(2, 5);
+    return `${prefix}${timestamp}${count}${random}`;
+  }
+
+  /**
+   * Génère un UID court (8 caractères)
+   */
+  static generateShort(): string {
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += this.chars.charAt(Math.floor(Math.random() * this.chars.length));
+    }
+    return result;
+  }
+
+  /**
+   * Génère un UID basé sur des propriétés d'objet
+   */
+  static generateFromObject(obj: any, properties: string[]): string {
+    let hash = 0;
+    const str = properties.map(prop => obj[prop] || '').join('|');
+
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir en 32 bits
+    }
+
+    return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Génère un UUID v4 standard
+   */
+  static generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * Génère un ID séquentiel
+   */
+  static generateSequential(prefix: string = 'id_'): string {
+    return `${prefix}${(this.counter++).toString().padStart(6, '0')}`;
+  }
+
+  /**
+   * Réinitialise le compteur (utile pour les tests)
+   */
+  static reset(): void {
+    this.counter = 0;
+  }
+
+  /**
+   * Vérifie si une chaîne est un UID valide (format de base)
+   */
+  static isValid(uid: string): boolean {
+    // Vérification basique : contient des lettres, chiffres, et fait une longueur raisonnable
+    return /^[A-Za-z0-9_-]{8,}$/.test(uid);
+  }
+
+  /**
+   * Génère un hash simple d'une chaîne
+   */
+  static hashString(str: string): string {
+    let hash = 0;
+    if (str.length === 0) return hash.toString(36);
+
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir en 32 bits
+    }
+
+    return Math.abs(hash).toString(36);
+  }
 }
 
