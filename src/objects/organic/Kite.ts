@@ -37,6 +37,7 @@ import { Primitive } from "../../core/Primitive";
 import { FrameFactory } from "../../factories/FrameFactory";
 import { SurfaceFactory } from "../../factories/SurfaceFactory";
 import { PointFactory, BridleLengths } from "../../factories/PointFactory";
+import { FactoryRegistry } from "../../factories/FactoryRegistry";
 import { CONFIG } from "../../simulation/config/SimulationConfig";
 
 export class Kite extends StructuredObject implements ICreatable {

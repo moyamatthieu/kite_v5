@@ -1,93 +1,88 @@
 /**
  * FrameFactory.ts - Factory pour créer des structures filaires (frames)
- * 
- * Pattern actuel KISS : Points → Cylindres entre points
- * Compatible avec buildStructure() de StructuredObject
  */
 
-import { BaseFactory, FactoryParams } from '../base/BaseFactory';
+import { BaseFactory, FactoryMetadata } from './FactoryRegistry';
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
 
-export interface FrameParams extends FactoryParams {
-  diameter?: number;     // Diamètre des tubes
-  material?: string;     // Couleur/matériau
-  points?: Array<[string, number[]]>;  // Points nommés
-  connections?: Array<[string, string]>; // Connexions entre points
+export interface FrameParams {
+  diameter?: number;
+  material?: string;
+  points?: Array<[string, number[]]>;
+  connections?: Array<[string, string]>;
 }
 
 /**
  * Factory pour créer des structures filaires
- * 
- * TODO: Questions pour évolution future
- * - [ ] Supporter différents profils (carré, rond, I-beam) ? uniquemet rond
- * - [ ] Ajouter des jonctions/connecteurs aux intersections ?  non 
- * - [ ] Calculer automatiquement les connexions optimales ? non
- * - [ ] Supporter des courbes (splines) entre points ? non
- * - [ ] Ajouter contraintes mécaniques (résistance, poids) ? plus tard
-  */
-export class FrameFactory extends BaseFactory<StructuredObject & ICreatable> {
-  protected metadata = {
-    category: 'structure',
-    name: 'Frame',
-    description: 'Structure filaire paramétrique',
-    tags: ['frame', 'structure', 'squelette'],
-    complexity: 'simple' as const
-  };
+ */
+export class FrameFactory implements BaseFactory {
+  getSupportedTypes(): string[] {
+    return ['frame', 'structure'];
+  }
 
-  protected getDefaultParams(): FrameParams {
+  getMetadata(): FactoryMetadata {
     return {
-      diameter: 0.01,
-      material: '#333333',
-      points: [],
-      connections: []
+      id: 'frame_factory',
+      name: 'Frame Factory',
+      version: '1.0.0',
+      description: 'Creates wireframe structures from connected points',
+      supportedTypes: this.getSupportedTypes(),
+      dependencies: []
     };
   }
 
-  createObject(params?: FrameParams): StructuredObject & ICreatable {
-    const mergedParams = this.mergeParams(params) as FrameParams;
-    
+  createObject(type: string, config: FrameParams = {}): StructuredObject & ICreatable {
+    const params = {
+      diameter: 0.01,
+      material: '#333333',
+      points: [],
+      connections: [],
+      ...config
+    };
+
     class FrameObject extends StructuredObject implements ICreatable {
       constructor() {
         super("Frame", false);
       }
-      
+
       protected definePoints(): void {
-        // Ajouter les points fournis
-        if (mergedParams.points) {
-          mergedParams.points.forEach(([name, position]) => {
+        if (params.points) {
+          params.points.forEach(([name, position]) => {
             this.setPoint(name, position as [number, number, number]);
           });
         }
       }
-      
+
       protected buildStructure(): void {
-        // Créer les cylindres entre les points connectés
-        if (mergedParams.connections) {
-          mergedParams.connections.forEach(([point1, point2]) => {
+        if (params.connections) {
+          params.connections.forEach(([point1, point2]) => {
             this.addCylinderBetweenPoints(
-              point1, 
-              point2, 
-              mergedParams.diameter || 0.01,
-              mergedParams.material || '#333333'
+              point1,
+              point2,
+              params.diameter || 0.01,
+              params.material || '#333333'
             );
           });
         }
       }
-      
+
       protected buildSurfaces(): void {
         // Pas de surfaces pour un frame
       }
-      
-      // Implémentation ICreatable
+
       create(): this { return this; }
       getName(): string { return 'Frame'; }
       getDescription(): string { return 'Structure filaire'; }
-      getPrimitiveCount(): number { return (mergedParams.connections || []).length; }
+      getPrimitiveCount(): number { return params.connections?.length || 0; }
     }
-    
+
     const frame = new FrameObject();
     frame.init();
     return frame;
+  }
+
+  dispose(): void {
+    // Cleanup if needed
   }
 }

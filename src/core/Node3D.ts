@@ -23,6 +23,7 @@
  */
 
 import * as THREE from 'three';
+import { SceneManager } from './SceneManager';
 
 /**
  * Transform3D compatible Godot
@@ -56,19 +57,23 @@ export class Node3D extends THREE.Group {
     
     // 🔧 État interne
     protected isReady: boolean = false;
-    
+    protected active: boolean = true;
+
     constructor(name: string = 'Node3D') {
         super();
         this.name = name;
         this.nodeId = this.generateNodeId();
-        
+
         // Transform3D unifié
         this.transform = {
             position: this.position,
             rotation: this.rotation,
             scale: this.scale
         };
-        
+
+        // Auto-enregistrement dans SceneManager
+        SceneManager.getInstance().register(this);
+
         // Auto-initialisation
         this.callReady();
     }
@@ -210,6 +215,62 @@ export class Node3D extends THREE.Group {
                 }
             });
         }
+    }
+    
+    /**
+     * Active/désactive le node
+     */
+    public setActive(active: boolean): void {
+        this.active = active;
+    }
+
+    /**
+     * Vérifie si le node est actif
+     */
+    public isActive(): boolean {
+        return this.active;
+    }
+
+    /**
+     * Obtient le nom du node
+     */
+    public getName(): string {
+        return this.name;
+    }
+
+    /**
+     * Appelé quand le node est enregistré dans SceneManager
+     */
+    public onRegister(): void {
+        // À overrider dans les sous-classes
+    }
+
+    /**
+     * Appelé quand le node est désenregistré de SceneManager
+     */
+    public onUnregister(): void {
+        // À overrider dans les sous-classes
+    }
+
+    /**
+     * Détruit le node et nettoie les ressources
+     */
+    public destroy(): void {
+        // Désenregistrer du SceneManager
+        SceneManager.getInstance().unregister(this);
+
+        // Nettoyer les signaux
+        this.signals.clear();
+
+        // Nettoyer les enfants
+        this.children.forEach(child => {
+            if (child instanceof Node3D) {
+                child.destroy();
+            }
+        });
+
+        // Nettoyer Three.js
+        this.clear();
     }
     
     // === 🏷️ Métadonnées et Debug ===

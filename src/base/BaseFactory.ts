@@ -6,6 +6,7 @@
 
 import { StructuredObject } from '../core/StructuredObject';
 import { ICreatable } from '../types/index';
+import { BaseFactory as RegistryBaseFactory, FactoryMetadata } from '../factories/FactoryRegistry';
 
 export interface FactoryParams {
   [key: string]: any;
@@ -80,5 +81,12 @@ export abstract class BaseFactory<T extends StructuredObject & ICreatable> {
       ...this.getDefaultParams(),
       ...params
     };
+  }
+
+  /**
+   * Nettoyer les ressources de la factory
+   */
+  dispose(): void {
+    // À surcharger dans les classes dérivées si nécessaire
   }
 }

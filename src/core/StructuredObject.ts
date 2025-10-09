@@ -33,6 +33,7 @@ import { Position3D, NamedPoint, SurfaceOptions, MaterialConfig } from '../types
 
 import { Primitive } from './Primitive';
 import { Node3D } from './Node3D';
+import { DebugLayer } from './DebugLayer';
 
 /**
  * Classe abstraite de base pour tous les objets 3D structurés
@@ -43,17 +44,22 @@ export abstract class StructuredObject extends Node3D {
    * Points anatomiques nommés de l'objet
    */
   protected points: Map<string, THREE.Vector3> = new Map();
-  
+
   /**
    * Points avec marqueurs visuels (debug)
    */
   protected namedPoints: NamedPoint[] = [];
-  
+
+  /**
+   * Couche de debug séparée
+   */
+  protected debugLayer: DebugLayer;
+
   /**
    * Affichage des labels en mode debug
    */
   public showDebugPoints: boolean = false;
-  
+
   /**
    * Affichage des labels de texte
    */
@@ -63,6 +69,16 @@ export abstract class StructuredObject extends Node3D {
     super(name);
     this.nodeType = 'StructuredObject';
     this.showDebugPoints = showDebugPoints;
+
+    // Initialiser la couche de debug
+    this.debugLayer = new DebugLayer(this, {
+      showPoints: showDebugPoints,
+      showLabels: false,
+      showNormals: false,
+      showAxes: false,
+      pointSize: 0.02
+    });
+
     // L'initialisation sera appelée par la classe enfant après configuration
   }
 
@@ -72,16 +88,14 @@ export abstract class StructuredObject extends Node3D {
   protected initialize(): void {
     // Vider le groupe au cas où
     this.clear();
-    
+
     // Construire l'objet dans l'ordre
     this.definePoints();
     this.buildStructure();
     this.buildSurfaces();
-    
-    // Afficher les points de debug si demandé
-    if (this.showDebugPoints) {
-      this.createDebugMarkers();
-    }
+
+    // Mettre à jour la couche de debug
+    this.updateDebugLayer();
   }
 
   /**
@@ -229,23 +243,18 @@ export abstract class StructuredObject extends Node3D {
   }
 
   /**
-   * Crée des marqueurs visuels pour tous les points (debug)
+   * Met à jour la couche de debug avec les points actuels
    */
-  protected createDebugMarkers(): void {
-    this.points.forEach((position, name) => {
-      // Petite sphère jaune pour marquer le point
-      const marker = Primitive.sphere(0.02, '#ffff00');
-      marker.position.copy(position);
-      this.add(marker);
-      
-      // Ajouter label texte si activé
-      if (this.showLabels) {
-        const label = this.createTextLabel(name);
-        label.position.copy(position);
-        label.position.y += 0.05; // Décaler le label au-dessus du point
-        this.add(label);
+  protected updateDebugLayer(): void {
+    // Vider la couche de debug
+    this.debugLayer.clear();
+
+    if (this.showDebugPoints) {
+      // Ajouter tous les points nommés
+      for (const [name, position] of this.points.entries()) {
+        this.debugLayer.addPoint(position, 0xffff00, this.showLabels ? name : undefined);
       }
-    });
+    }
   }
   
   /**
@@ -289,24 +298,20 @@ export abstract class StructuredObject extends Node3D {
    */
   public setShowDebugPoints(show: boolean): void {
     this.showDebugPoints = show;
-    // Reconstruire l'objet pour appliquer le changement
-    this.initialize();
+    this.debugLayer.setShowPoints(show);
   }
-  
+
   /**
    * Active/désactive l'affichage des labels de texte
    */
   public setShowLabels(show: boolean): void {
     this.showLabels = show;
+    this.debugLayer.setShowLabels(show);
     // Si les points de debug ne sont pas activés et qu'on veut les labels, activer les deux
     if (show && !this.showDebugPoints) {
-      this.showDebugPoints = true;
+      this.setShowDebugPoints(true);
     }
-    // Reconstruire l'objet pour appliquer le changement
-    this.initialize();
-  }
-
-  /**
+  }  /**
    * Retourne tous les noms de points définis
    */
   public getPointNames(): string[] {

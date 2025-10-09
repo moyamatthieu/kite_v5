@@ -5,4 +5,4 @@
  * tout en redirigeant vers la nouvelle structure modulaire
  */
 
-export { Simulation } from './simulation/SimulationApp';
+export { SimulationApp as Simulation } from './simulation/SimulationApp';
