@@ -28,11 +28,12 @@ export interface KiteParams {
 export class PointFactory {
   /**
    * Longueurs de brides par défaut (en mètres)
+   * LONGUEURS IDENTIQUES : L'équilibre géométrique vient de la structure, pas des brides
    */
   private static readonly DEFAULT_BRIDLE_LENGTHS: BridleLengths = {
-    nez: 0.68,     // 68cm du NEZ au CTRL
-    inter: 0.5,    // 50cm du INTER au CTRL
-    centre: 0.5,   // 50cm du CENTRE au CTRL
+    nez: 0.65,     // 65cm - identique pour toutes les brides
+    inter: 0.65,   // 65cm - identique pour toutes les brides
+    centre: 0.65,  // 65cm - identique pour toutes les brides
   };
 
   /**
@@ -130,22 +131,19 @@ export class PointFactory {
     const interGauchePos: [number, number, number] = [interGaucheX, centreY, 0];
     const interDroitPos: [number, number, number] = [interDroitX, centreY, 0];
 
-    // Calculer les positions des points de contrôle depuis les longueurs de brides
-    const ctrlGauche = PointFactory.calculateControlPoint(
-      nezPos,
-      interGauchePos,
-      centrePos,
-      bridleLengths,
-      'left'
-    );
-
+    // Calculer la position du point de contrôle DROIT par trilatération.
+    // Le point GAUCHE sera déduit par symétrie pour garantir une géométrie parfaite.
     const ctrlDroit = PointFactory.calculateControlPoint(
       nezPos,
-      interDroitPos,
+      interDroitPos, // Utilise le point d'ancrage droit
       centrePos,
       bridleLengths,
       'right'
     );
+
+    // Le point de contrôle GAUCHE est le miroir du point droit par rapport à l'axe YZ.
+    // On prend la position du point droit et on inverse simplement sa coordonnée X.
+    const ctrlGauche: [number, number, number] = [-ctrlDroit[0], ctrlDroit[1], ctrlDroit[2]];
 
     // Retourner la Map exactement comme dans le code original
     return new Map<string, [number, number, number]>([

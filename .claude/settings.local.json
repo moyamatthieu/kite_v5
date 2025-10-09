@@ -22,7 +22,8 @@
       "Bash(npx ts-node --esm -e \"import(''./src/simulation/config/KiteGeometry'').then(m => console.log(''Masse:'', m.KiteGeometry.TOTAL_MASS, ''kg''))\")",
       "Bash(npm install)",
       "mcp__ide__getDiagnostics",
-      "Bash(timeout 10 npm run dev)"
+      "Bash(timeout 10 npm run dev)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,5 +1,9 @@
 /**
- * SimulationConfig.ts - Configuration     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
+ * SimulationConfig.ts - Configuration         // C  // Facteurs d'échelle aérodynamiques équilibrés
+  liftScale: 1.2, // Facteur de portance
+  dragScale: 1.2, // Facteur de traînée (équilibré avec portance)ficients d'amortissement (en 1/s) - appliqués avec formule exponentielle
+  linearDampingCoeff: 0.2, // Amortissement linéaire modéré
+  angularDragFactor: 1.0, // Amortissement angulaire équilibré pour stabilisation naturelleamping coefficients (en 1/s) - appliqués avec formule exponentielle
   linearDampingCoeff: 1.5, // 🔧 RÉALISTE: Friction aérodynamique modérée pour stabilisation naturelle
     // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
   angularDragFactor: 5.0, // 🔧 STABILITÉ CRITIQUE: Très fort amortissement pour éviter rotation excessive
@@ -46,13 +50,14 @@ export const CONFIG = {
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     // Damping coefficients (en 1/s) - appliqués avec formule exponentielle
-  linearDampingCoeff: 0.8, // 🔧 VIVACITÉ: Réduit pour plus de réactivité
-    // Angular damping : UN SEUL mécanisme (angular drag proportionnel à ω)
-  angularDragFactor: 4.0, // 🔧 VIVACITÉ: Réduit pour plus de mouvement dynamique
+  linearDampingCoeff: 1, // 🔧 FIX INERTIE: Drastiquement réduit pour réactivité immédiate
+    // 🔴 SOLUTION #2 : Amortissement angulaire réduit pour équilibre naturel
+  angularDragFactor: 1.5, // � ÉQUILIBRE: Réduit de 5.0 → 1.0 pour permettre stabilisation naturelle
   },
   aero: {
-  liftScale: 1.2, // 🔧 VIVACITÉ: Augmenté pour compenser vent faible (20 km/h)
-  dragScale: 0.8, // 🔧 VIVACITÉ: Augmenté proportionnellement
+  // 🔴 SOLUTION #2 : Forces aérodynamiques équilibrées
+  liftScale: 1.2, // � ÉQUILIBRÉ: Réduit de 1.5 → 1.2 
+  dragScale: 1.2, // � ÉQUILIBRÉ: Maintenu à 1.2 (cohérent avec lift)
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
@@ -65,6 +70,8 @@ export const CONFIG = {
     area: KiteGeometry.TOTAL_AREA, // m² - Surface totale (calculée automatiquement)
     inertia: KiteGeometry.INERTIA, // kg·m² - Moment d'inertie (I ≈ m·r², calculé automatiquement)
     minHeight: 0, // m - Altitude minimale (plus haut pour éviter le sol)
+    // 🔧 MAILLAGE FIN PARAMÉTRABLE (défaut = niveau 1 = 16 triangles)
+    defaultMeshSubdivisionLevel: 1, // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
   },
   lines: {
     defaultLength: 15, // m - Longueur par défaut
@@ -109,26 +116,26 @@ export const CONFIG = {
   },
   initialization: {
     initialKiteY: 7.0, // m - Altitude initiale du kite
-    initialDistanceFactor: 0.99, // Sans unité - Facteur de distance initiale (95% de longueur ligne)
+    initialDistanceFactor: 0.98, // Sans unité - Facteur de distance initiale (98% de longueur ligne → lignes légèrement tendues au départ)
   },
   visualization: {
     lineWidth: 2, // pixels - Largeur des lignes de contrôle
   },
   debug: {
     // Seuils de tension des brides pour couleurs visuelles
-    bridleTensionLow: 20, // N - Seuil tension molle (vert)
+    bridleTensionLow: 1, // N - Seuil tension molle (vert)
     bridleTensionHigh: 100, // N - Seuil tension élevée (rouge)
     // Seuils pour vecteurs debug
     minVectorLength: 0.01, // m - Longueur minimale pour afficher un vecteur
     minVelocityDisplay: 0.1, // m/s - Vitesse minimale pour afficher vecteur vitesse
   },
   input: {
-    rotationSpeed: 2.5, // rad/s - Vitesse de rotation de la barre (input utilisateur)
+    rotationSpeed: 0.5, // rad/s - Vitesse de rotation de la barre (input utilisateur)
     returnSpeed: 3.0, // rad/s - Vitesse de retour au centre de la barre
-    maxRotation: Math.PI / 4, // rad - Rotation maximale de la barre (45°)
+    maxRotation: Math.PI / 3, // rad - Rotation maximale de la barre (°)
   },
   kiteInertia: {
     gyrationDivisor: Math.sqrt(2), // Sans unité - Diviseur pour rayon de giration (wingspan / √2)
-    inertiaFactor: 0.5, // Sans unité - Facteur ajustement inertie (compromis stabilité/réactivité)
+    inertiaFactor: 1, // Sans unité - Facteur ajustement inertie (compromis stabilité/réactivité)
   },
 };

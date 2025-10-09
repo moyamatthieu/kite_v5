@@ -2,7 +2,7 @@
  * PhysicsEngine.ts - Moteur physique principal de la simulation Kite
  *
  * Rôle :
- *   - Orchestration de tous les calculs physiques du cerf-volant (vent, lignes, forces, contrôles)
+ *   - Orchestration de tou    // C      gravity,  // Gravité distribuée par surfacelcul des forces aérodynamiques et gravitationnelles distribuées calculs physiques du cerf-volant (vent, lignes, forces, contrôles)
  *   - Point d'entrée pour la boucle de simulation physique (appelé à chaque frame)
  *   - Centralise l'accès aux sous-modules physiques
  *
@@ -56,6 +56,8 @@ export class PhysicsEngine {
   private controlBarManager: ControlBarManager;
   private lastLogTime: number = 0;
   private readonly LOG_INTERVAL: number = 1000; // Log toutes les 1000ms (1 seconde)
+  private startTime: number = Date.now(); // Temps de démarrage pour elapsed time
+  private frameCount: number = 0; // Compteur de frames
 
   constructor(kite: Kite, controlBarPosition: THREE.Vector3) {
     this.windSimulator = new WindSimulator();
@@ -104,7 +106,7 @@ export class PhysicsEngine {
     const kiteState = this.kiteController.getState();
 
     // 🔍 DEBUG: Vérifier la vitesse du kite pour comprendre le vent apparent faible - DISABLED for performance
-    // console.log(`🔍 KITE VELOCITY: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Magnitude: ${kiteState.velocity.length().toFixed(2)} m/s`);
+
 
     const apparentWind = this.windSimulator.getApparentWind(
       kiteState.velocity,
@@ -112,7 +114,7 @@ export class PhysicsEngine {
     );
 
 
-    // PHYSIQUE ÉMERGENTE : Forces aéro + gravité distribuée calculées par surface
+    // � PHYSIQUE ÉMERGENTE : Forces aéro + gravité distribuée calculées par surface
     // - Chaque surface porte une fraction de la masse (fabric + frame + accessoires)
     // - Gravité appliquée au centre géométrique de chaque surface
     // - Le couple gravitationnel émerge naturellement de r × F_gravity
@@ -120,7 +122,7 @@ export class PhysicsEngine {
     const {
       lift,
       drag,
-      gravity,  // 🔴 BUG FIX #1 : Gravité retournée séparément (purement verticale)
+      gravity,  // � RESTAURÉ : Gravité distribuée (plus réaliste physiquement)
       torque: totalTorque,  // Inclut déjà couple aéro + couple gravitationnel !
     } = AerodynamicsCalculator.calculateForces(
       apparentWind, 
@@ -129,28 +131,6 @@ export class PhysicsEngine {
       kiteState.velocity,
       kiteState.angularVelocity
     );
-
-    // 📊 LOG COMPLET toutes les secondes
-    const currentTime = Date.now();
-    if (currentTime - this.lastLogTime >= this.LOG_INTERVAL) {
-      this.lastLogTime = currentTime;
-      console.log('\n═══════════════════════════════════════════════════════');
-      console.log('📊 ÉTAT COMPLET DU KITE');
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(`📍 Position: (${kite.position.x.toFixed(2)}, ${kite.position.y.toFixed(2)}, ${kite.position.z.toFixed(2)}) m`);
-      console.log(`🎯 Distance au pilote: ${kite.position.length().toFixed(2)} m`);
-      console.log(`💨 Vent apparent: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s`);
-      console.log(`🚀 Vitesse kite: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s`);
-      console.log(`🔄 Vitesse angulaire: (${kiteState.angularVelocity.x.toFixed(2)}, ${kiteState.angularVelocity.y.toFixed(2)}, ${kiteState.angularVelocity.z.toFixed(2)}) rad/s | Mag: ${kiteState.angularVelocity.length().toFixed(2)} rad/s`);
-      console.log('───────────────────────────────────────────────────────');
-      console.log(`⬆️  Portance: (${lift.x.toFixed(2)}, ${lift.y.toFixed(2)}, ${lift.z.toFixed(2)}) N | Mag: ${lift.length().toFixed(2)} N`);
-      console.log(`🌪️  Traînée: (${drag.x.toFixed(2)}, ${drag.y.toFixed(2)}, ${drag.z.toFixed(2)}) N | Mag: ${drag.length().toFixed(2)} N`);
-      console.log(`⚖️  Gravité: (${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)}, ${gravity.z.toFixed(2)}) N | Mag: ${gravity.length().toFixed(2)} N`);
-      const totalForceCalc = new THREE.Vector3().add(lift).add(drag).add(gravity);
-      console.log(`📐 Force totale: (${totalForceCalc.x.toFixed(2)}, ${totalForceCalc.y.toFixed(2)}, ${totalForceCalc.z.toFixed(2)}) N | Mag: ${totalForceCalc.length().toFixed(2)} N`);
-      console.log(`🔃 Couple total: (${totalTorque.x.toFixed(2)}, ${totalTorque.y.toFixed(2)}, ${totalTorque.z.toFixed(2)}) N⋅m | Mag: ${totalTorque.length().toFixed(2)} N⋅m`);
-      console.log('═══════════════════════════════════════════════════════\n');
-    }
 
     // CALCUL DES TENSIONS (pour affichage/debug uniquement)
     // Les lignes ne TIRENT PAS le kite - elles le RETIENNENT à distance max
@@ -163,16 +143,24 @@ export class PhysicsEngine {
     // Les contraintes géométriques sont appliquées par ConstraintSolver.enforceBridleConstraints()
     const bridleTensions = this.bridleSystem.calculateBridleTensions(kite);
 
+    // Incrémenter le compteur de frames
+    this.frameCount++;
+
+    // 📊 LOG COMPLET toutes les secondes
+    const currentTime = Date.now();
+    if (currentTime - this.lastLogTime >= this.LOG_INTERVAL) {
+      this.lastLogTime = currentTime;
+      this.logPhysicsState(kite, kiteState, apparentWind, lift, drag, gravity, totalTorque, bridleTensions, deltaTime, currentTime);
+    }
+
     // Mettre à jour la visualisation des brides selon leurs tensions
     kite.updateBridleVisualization(bridleTensions);
 
-    // 🔴 BUG FIX #1 : Somme vectorielle CORRECTE des forces (2ème loi de Newton)
-    // Maintenant lift et drag sont PUREMENT aérodynamiques
-    // Gravité est ajoutée séparément (pas mélangée dans lift/drag)
+    // Somme vectorielle des forces (2ème loi de Newton : F = ma)
     const totalForce = new THREE.Vector3()
       .add(lift)     // Portance aérodynamique (perpendiculaire au vent)
       .add(drag)     // Traînée aérodynamique (parallèle au vent)
-      .add(gravity); // Gravité (purement verticale, non décomposée)
+      .add(gravity); // Gravité distribuée (déjà calculée par surface)
       // PAS de forces de lignes - elles sont des contraintes géométriques
 
     // Couple total = moment aérodynamique + moment gravitationnel (émergent)
@@ -240,5 +228,74 @@ export class PhysicsEngine {
    */
   getForceSmoothing(): number {
     return this.kiteController.getForceSmoothing();
+  }
+
+  /**
+   * Affiche l'état physique complet du kite (appelé toutes les secondes)
+   */
+  private logPhysicsState(
+    kite: Kite,
+    kiteState: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
+    apparentWind: THREE.Vector3,
+    lift: THREE.Vector3,
+    drag: THREE.Vector3,
+    gravity: THREE.Vector3,
+    totalTorque: THREE.Vector3,
+    bridleTensions: { leftNez: number; rightNez: number; leftInter: number; rightInter: number; leftCentre: number; rightCentre: number },
+    deltaTime: number,
+    currentTime: number
+  ): void {
+    // Calculs supplémentaires pour le log
+    const elapsedTime = (currentTime - this.startTime) / 1000; // en secondes
+    const euler = new THREE.Euler().setFromQuaternion(kite.quaternion, 'XYZ');
+    const pitch = euler.x * (180 / Math.PI); // Convertir en degrés
+    const roll = euler.z * (180 / Math.PI);
+    const yaw = euler.y * (180 / Math.PI);
+
+    // Tensions des lignes
+    const lineTensions = this.lineSystem.getTensions();
+
+    // Accélération (approximation : F/m)
+    const totalForceCalc = new THREE.Vector3().add(lift).add(drag).add(gravity);
+    const acceleration = totalForceCalc.clone().divideScalar(CONFIG.kite.mass);
+
+    // Ratio portance/traînée
+    const liftMag = lift.length();
+    const dragMag = drag.length();
+    const ldRatio = dragMag > 0.01 ? liftMag / dragMag : 0;
+
+    console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
+    console.log(`║ 📊 ÉTAT COMPLET DU KITE - Frame #${this.frameCount.toString().padStart(6, '0')}                              ║`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ ⏱️  Temps: ${elapsedTime.toFixed(3)}s | Δt: ${(deltaTime * 1000).toFixed(2)}ms | FPS: ${(1/deltaTime).toFixed(1)}    ║`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 📍 POSITION & ORIENTATION                                                 ║`);
+    console.log(`║    Position: (${kite.position.x.toFixed(2)}, ${kite.position.y.toFixed(2)}, ${kite.position.z.toFixed(2)}) m`);
+    console.log(`║    Distance pilote: ${kite.position.length().toFixed(2)} m`);
+    console.log(`║    Angles: Pitch ${pitch.toFixed(1)}° | Roll ${roll.toFixed(1)}° | Yaw ${yaw.toFixed(1)}°`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 🚀 CINÉMATIQUE                                                            ║`);
+    console.log(`║    Vitesse: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s`);
+    console.log(`║    Accélération: (${acceleration.x.toFixed(2)}, ${acceleration.y.toFixed(2)}, ${acceleration.z.toFixed(2)}) m/s² | Mag: ${acceleration.length().toFixed(2)} m/s²`);
+    console.log(`║    Vit. angulaire: (${kiteState.angularVelocity.x.toFixed(2)}, ${kiteState.angularVelocity.y.toFixed(2)}, ${kiteState.angularVelocity.z.toFixed(2)}) rad/s | Mag: ${kiteState.angularVelocity.length().toFixed(2)} rad/s`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 💨 AÉRODYNAMIQUE                                                          ║`);
+    console.log(`║    Vent apparent: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s`);
+    console.log(`║    Portance: (${lift.x.toFixed(2)}, ${lift.y.toFixed(2)}, ${lift.z.toFixed(2)}) N | Mag: ${liftMag.toFixed(2)} N`);
+    console.log(`║    Traînée: (${drag.x.toFixed(2)}, ${drag.y.toFixed(2)}, ${drag.z.toFixed(2)}) N | Mag: ${dragMag.toFixed(2)} N`);
+    console.log(`║    Ratio L/D: ${ldRatio.toFixed(2)}`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ ⚖️  FORCES & COUPLES                                                       ║`);
+    console.log(`║    Gravité: (${gravity.x.toFixed(2)}, ${gravity.y.toFixed(2)}, ${gravity.z.toFixed(2)}) N | Mag: ${gravity.length().toFixed(2)} N`);
+    console.log(`║    Force totale: (${totalForceCalc.x.toFixed(2)}, ${totalForceCalc.y.toFixed(2)}, ${totalForceCalc.z.toFixed(2)}) N | Mag: ${totalForceCalc.length().toFixed(2)} N`);
+    console.log(`║    Couple total: (${totalTorque.x.toFixed(2)}, ${totalTorque.y.toFixed(2)}, ${totalTorque.z.toFixed(2)}) N⋅m | Mag: ${totalTorque.length().toFixed(2)} N⋅m`);
+    console.log('╠═══════════════════════════════════════════════════════════════════════════╣');
+    console.log(`║ 🪢 TENSIONS                                                                ║`);
+    console.log(`║    Ligne gauche: ${lineTensions.left.toFixed(2)} N | Ligne droite: ${lineTensions.right.toFixed(2)} N`);
+    console.log(`║    Asymétrie: ${(lineTensions.left - lineTensions.right).toFixed(2)} N (${((lineTensions.left - lineTensions.right) / Math.max(lineTensions.left, lineTensions.right) * 100).toFixed(1)}%)`);
+    console.log(`║    Brides: NEZ L/R: ${bridleTensions.leftNez.toFixed(1)}/${bridleTensions.rightNez.toFixed(1)} N`);
+    console.log(`║            INTER L/R: ${bridleTensions.leftInter.toFixed(1)}/${bridleTensions.rightInter.toFixed(1)} N`);
+    console.log(`║            CENTRE L/R: ${bridleTensions.leftCentre.toFixed(1)}/${bridleTensions.rightCentre.toFixed(1)} N`);
+    console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
   }
 }

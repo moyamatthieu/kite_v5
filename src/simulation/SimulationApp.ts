@@ -14,6 +14,7 @@ import { PhysicsEngine } from "./physics/PhysicsEngine";
 import { InputHandler } from "./controllers/InputHandler";
 import { UIManager } from "./ui/UIManager";
 import { CONFIG } from "./config/SimulationConfig";
+import { KiteGeometry } from "./config/KiteGeometry";
 
 export class Simulation {
   private renderManager: RenderManager;
@@ -42,6 +43,9 @@ export class Simulation {
       this.debugRenderer = new DebugRenderer(this.renderManager);
       this.inputHandler = new InputHandler();
       this.clock = new THREE.Clock();
+
+      // 🔧 Initialiser le niveau de subdivision du maillage
+      KiteGeometry.setMeshSubdivisionLevel(CONFIG.kite.defaultMeshSubdivisionLevel);
 
       this.setupControlBar();
       this.setupKite();

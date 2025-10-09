@@ -494,11 +494,11 @@ export class DebugRenderer {
     // Pour chaque surface avec sa masse
     KiteGeometry.SURFACES_WITH_MASS.forEach((surface: any, surfaceIndex: number) => {
       // Centre géométrique de la surface (coordonnées locales)
-      const centre = surface.vertices[0]
-        .clone()
-        .add(surface.vertices[1])
-        .add(surface.vertices[2])
-        .divideScalar(3);
+      const centre = KiteGeometry.calculateTriangleCentroid(
+        surface.vertices[0],
+        surface.vertices[1], 
+        surface.vertices[2]
+      );
 
       // Transformer en coordonnées monde
       const centerWorld = kite.localToWorld(centre.clone());

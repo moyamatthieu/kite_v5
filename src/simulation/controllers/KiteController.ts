@@ -99,12 +99,11 @@ export class KiteController {
     // Utiliser les forces lissées pour la physique
     const newPosition = this.integratePhysics(this.smoothedForce, deltaTime);
 
-    // 🔴 BUG FIX #3 : Résolution ITÉRATIVE des contraintes pour convergence
+    // Résolution itérative des contraintes PBD pour convergence stable
     // Les contraintes lignes ↔ brides s'influencent mutuellement
     // Une seule passe n'est pas suffisante - il faut itérer jusqu'à convergence
-    const MAX_CONSTRAINT_ITERATIONS = 2;  // 🔧 PHASE 3: Réduit (3 → 2) pour moins de sur-contrainte
-    
-    for (let iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; iter++) {
+
+    for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
       // Appliquer les contraintes de lignes (Position-Based Dynamics)
       // Le solveur peut modifier newPosition ainsi que state.velocity / state.angularVelocity
       try {

@@ -1,6 +1,7 @@
 import { PhysicsEngine } from "../physics/PhysicsEngine";
 import { CONFIG } from "../config/SimulationConfig";
 import { DebugRenderer } from "../rendering/DebugRenderer";
+import { KiteGeometry } from "../config/KiteGeometry";
 
 /**
  * Gestionnaire de l'interface utilisateur
@@ -201,6 +202,25 @@ export class UIManager {
         const dragFactor = parseFloat(angularDampingSlider.value);
         CONFIG.physics.angularDragFactor = dragFactor;
         angularDampingValue.textContent = dragFactor.toFixed(2);
+      };
+    }
+
+    // 🔧 Contrôle du niveau de subdivision du maillage
+    const meshLevelSlider = document.getElementById(
+      "mesh-subdivision-level"
+    ) as HTMLInputElement;
+    const meshLevelValue = document.getElementById("mesh-subdivision-level-value");
+    if (meshLevelSlider && meshLevelValue) {
+      meshLevelSlider.value = CONFIG.kite.defaultMeshSubdivisionLevel.toString();
+      meshLevelValue.textContent = `${CONFIG.kite.defaultMeshSubdivisionLevel} (${Math.pow(4, CONFIG.kite.defaultMeshSubdivisionLevel + 1)} triangles)`;
+
+      meshLevelSlider.oninput = () => {
+        const level = parseInt(meshLevelSlider.value);
+        CONFIG.kite.defaultMeshSubdivisionLevel = level;
+        KiteGeometry.setMeshSubdivisionLevel(level);
+        const triangleCount = Math.pow(4, level + 1);
+        meshLevelValue.textContent = `${level} (${triangleCount} triangles)`;
+        console.log(`🔧 Maillage changé : niveau ${level} = ${triangleCount} triangles`);
       };
     }
 

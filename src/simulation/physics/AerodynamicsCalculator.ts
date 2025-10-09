@@ -1,28 +1,17 @@
 /**
- * AerodynamicsCalculator.ts - Calculateur de forces aérodynamiques pour le cerf-volant
+ * AerodynamicsCalculator.ts - Calculateur de forces aérodynamiques distribuées
  *
- * Rôle :
- *   - Calcule les forces de portance, traînée, friction et résultante sur chaque surface du kite
- *   - Utilisé pour déterminer le mouvement du kite face au vent
- *   - Fournit les vecteurs de force pour le rendu debug et la physique
+ * Calcule les forces aérodynamiques (portance, traînée) et gravitationnelles 
+ * distribuées sur chaque surface du kite selon les principes de la mécanique des fluides.
  *
- * Dépendances principales :
- *   - KiteGeometry.ts : Définition des surfaces et géométrie du kite
- *   - PhysicsConstants.ts : Constantes physiques globales
- *   - SimulationConfig.ts : Paramètres de simulation
- *   - Types/PhysicsTypes.ts : Typage des forces et surfaces
+ * Modèle physique :
+ *   - Portance : CL = sin(α)×cos(α) (plaqu      gravity: gravityForce,  // Gravité distribuée par surface plane)
+ *   - Traînée : CD = sin²(α) (plaque plane)
+ *   - Gravité distribuée par masse surfacique
+ *   - Couples émergents de la distribution spatiale des forces
  *
- * Relation avec les fichiers adjacents :
- *   - PhysicsEngine.ts : Utilise AerodynamicsCalculator pour calculer les forces à chaque frame
- *   - Les autres modules du dossier 'physics' (WindSimulator, LineSystem) fournissent les données nécessaires au calcul
- *
- * Utilisation typique :
- *   - Appelé par PhysicsEngine et DebugRenderer pour obtenir les forces aérodynamiques
- *
- * Voir aussi :
- *   - src/simulation/physics/PhysicsEngine.ts
- *   - src/simulation/config/KiteGeometry.ts
- *   - src/simulation/types/PhysicsTypes.ts
+ * @see PhysicsEngine.ts - Utilise les forces calculées
+ * @see KiteGeometry.ts - Définit les surfaces et masses
  */
 import * as THREE from "three";
 
@@ -37,6 +26,43 @@ import { SurfaceForce } from "../types/PhysicsTypes";
  * Calcule comment le vent pousse sur le cerf-volant selon sa forme et orientation
  */
 export class AerodynamicsCalculator {
+  // Constantes de calculs aérodynamiques
+  private static readonly HALF_AIR_DENSITY = 0.5 * CONFIG.physics.airDensity;
+  private static readonly MIN_WIND_SPEED = 0.01; // m/s - seuil minimal pour calculs aéro
+
+  /**
+   * Calcule le couple (moment) d'une force appliquée à un point
+   * Méthode utilitaire pour éviter la répétition de new THREE.Vector3().crossVectors()
+   */
+  private static calculateTorque(lever: THREE.Vector3, force: THREE.Vector3): THREE.Vector3 {
+    return new THREE.Vector3().crossVectors(lever, force);
+  }
+
+  /**
+   * Calcule la normale d'un triangle dans l'espace monde
+   * Méthode utilitaire pour éviter la duplication de code
+   *
+   * @param surface - Surface triangulaire avec vertices
+   * @param kiteOrientation - Quaternion d'orientation du kite (optionnel)
+   * @returns Vecteur normal unitaire dans l'espace monde
+   */
+  private static calculateSurfaceNormal(
+    surface: { vertices: THREE.Vector3[] },
+    kiteOrientation?: THREE.Quaternion
+  ): THREE.Vector3 {
+    // Calcul des arêtes du triangle
+    const edge1 = surface.vertices[1].clone().sub(surface.vertices[0]);
+    const edge2 = surface.vertices[2].clone().sub(surface.vertices[0]);
+    
+    // Normale locale (produit vectoriel normalisé)
+    const normal = new THREE.Vector3()
+      .crossVectors(edge1, edge2)
+      .normalize();
+    
+    // Transformation dans l'espace monde si orientation fournie
+    return kiteOrientation ? normal.applyQuaternion(kiteOrientation) : normal;
+  }
+
   /**
    * Calcule comment le vent pousse sur le cerf-volant
    *
@@ -59,7 +85,7 @@ export class AerodynamicsCalculator {
   ): {
     lift: THREE.Vector3;
     drag: THREE.Vector3;
-    gravity: THREE.Vector3;  // 🔴 BUG FIX #1 : Gravité retournée séparément
+    gravity: THREE.Vector3;  // Gravité distribuée par surface
     torque: THREE.Vector3;
     leftForce?: THREE.Vector3;
     rightForce?: THREE.Vector3;
@@ -70,15 +96,14 @@ export class AerodynamicsCalculator {
       return {
         lift: new THREE.Vector3(),
         drag: new THREE.Vector3(),
-        gravity: new THREE.Vector3(),  // 🔴 BUG FIX #1 : Retourner gravité même si vent nul
+        gravity: new THREE.Vector3(),  // Pas de gravité si vent nul
         torque: new THREE.Vector3(),
         surfaceForces: [],
       };
     }
 
     const windDir = apparentWind.clone().normalize();
-    const dynamicPressure =
-      0.5 * CONFIG.physics.airDensity * windSpeed * windSpeed;
+    const dynamicPressure = AerodynamicsCalculator.HALF_AIR_DENSITY * windSpeed * windSpeed;
 
     // Forces séparées pour gauche et droite
     const leftForce = new THREE.Vector3();
@@ -86,11 +111,10 @@ export class AerodynamicsCalculator {
     const totalForce = new THREE.Vector3();
     const totalTorque = new THREE.Vector3();
     
-    // 🔴 BUG FIX #4 : Accumuler lift/drag SÉPARÉMENT avec coefficients corrects
-    // Utiliser formules plaque plane : CL = sin(α)×cos(α), CD = sin²(α)
+    // Accumulation des forces par type (formules plaque plane : CL = sin(α)×cos(α), CD = sin²(α))
     const totalLift = new THREE.Vector3();      // Portance totale
     const totalDrag = new THREE.Vector3();      // Traînée totale
-    const gravityForce = new THREE.Vector3();   // Gravité séparée
+    const gravityForce = new THREE.Vector3();   // Gravité distribuée par surface/frame
     
     // Séparation couples aéro et gravité pour scaling cohérent
     const aeroTorque = new THREE.Vector3();
@@ -101,7 +125,19 @@ export class AerodynamicsCalculator {
 
     // On examine chaque triangle du cerf-volant un par un
     // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
-    KiteGeometry.SURFACES_WITH_MASS.forEach((surface, surfaceIndex) => {
+    KiteGeometry.SUBDIVIDED_SURFACES.forEach((surface, surfaceIndex) => {
+      // 🔴 MAILLAGE FIN : Distribuer la masse proportionnellement à l'aire
+      // Trouver quelle surface originale contient ce sous-triangle
+      const trianglesPerSurface = KiteGeometry.TRIANGLES_PER_SURFACE_AT_LEVEL(
+        KiteGeometry.getMeshSubdivisionLevel()
+      );
+      const originalSurfaceIndex = Math.floor(surfaceIndex / trianglesPerSurface);
+      const originalSurfaceMass = KiteGeometry.SURFACE_MASSES[originalSurfaceIndex];
+
+      // Distribuer la masse proportionnellement à l'aire relative
+      const totalAreaForOriginal = KiteGeometry.SURFACES[originalSurfaceIndex].area;
+      const massRatio = surface.area / totalAreaForOriginal;
+      const surfaceMass = originalSurfaceMass * massRatio;
       // 🔴 DÉSACTIVATION TEMPORAIRE du vent apparent local pour debug
       // Le calcul local peut réduire trop fortement le vent perçu en rotation
       
@@ -119,16 +155,7 @@ export class AerodynamicsCalculator {
       // Pour comprendre comment le vent frappe ce triangle,
       // on doit savoir dans quelle direction il "regarde"
       // (comme l'orientation d'un panneau solaire)
-      const edge1 = surface.vertices[1].clone().sub(surface.vertices[0]);
-      const edge2 = surface.vertices[2].clone().sub(surface.vertices[0]);
-      const normaleLocale = new THREE.Vector3()
-        .crossVectors(edge1, edge2)
-        .normalize();
-
-      // 2. Rotation de la normale selon l'orientation du kite
-      const normaleMonde = normaleLocale
-        .clone()
-        .applyQuaternion(kiteOrientation);
+      const normaleMonde = AerodynamicsCalculator.calculateSurfaceNormal(surface, kiteOrientation);
 
       // Calcul de l'angle d'incidence pour une plaque plane (cerf-volant)
       // α = angle entre la direction du vent et la surface
@@ -156,7 +183,7 @@ export class AerodynamicsCalculator {
       // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
       // if (surfaceIndex === 0) {
       //   const alphaDeg = Math.asin(sinAlpha) * 180 / Math.PI;
-      //   console.log(`Surface ${surfaceIndex}: α=${alphaDeg.toFixed(1)}°, CL=${CL.toFixed(3)}, CD=${CD.toFixed(3)}, q=${dynamicPressure.toFixed(2)}Pa, A=${surface.area.toFixed(4)}m²`);
+
       // }
       
       // Direction : normale à la surface, orientée face au vent
@@ -190,12 +217,12 @@ export class AerodynamicsCalculator {
       // Chaque surface porte une fraction de la masse totale
       // La gravité est appliquée au centre géométrique de chaque surface
       // → Couple gravitationnel émerge naturellement de r × F_gravity
-      const gravity = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
+      const gravity = new THREE.Vector3(0, -surfaceMass * CONFIG.physics.gravity, 0);
       
-      // 🔴 BUG FIX #4 : Accumuler lift/drag SÉPARÉMENT (pas de décomposition !)
-      totalLift.add(liftForce);       // Portance accumulée
-      totalDrag.add(dragForce);       // Traînée accumulée
-      gravityForce.add(gravity);      // Gravité séparée
+      // Accumulation des forces par type
+      totalLift.add(liftForce);
+      totalDrag.add(dragForce);
+      gravityForce.add(gravity);
       
       // Force totale sur cette surface = aéro + gravité
       const totalSurfaceForce = aeroForce.clone().add(gravity);
@@ -205,14 +232,14 @@ export class AerodynamicsCalculator {
       const drag = dragForce.clone();
 
       // 6. Centre de pression = centre géométrique du triangle
-      const centre = surface.vertices[0]
-        .clone()
-        .add(surface.vertices[1])
-        .add(surface.vertices[2])
-        .divideScalar(3);
+      const centre = KiteGeometry.calculateTriangleCentroid(
+        surface.vertices[0],
+        surface.vertices[1], 
+        surface.vertices[2]
+      );
 
       // 🔍 DEBUG TOUTES les surfaces : géométrie + forces - DISABLED for performance
-      // console.log(`🔍 Surface ${surfaceIndex}: Centre=(${centre.x.toFixed(3)}, ${centre.y.toFixed(3)}, ${centre.z.toFixed(3)}), Normale=(${normaleMonde.x.toFixed(2)}, ${normaleMonde.y.toFixed(2)}, ${normaleMonde.z.toFixed(2)}), Force=(${totalSurfaceForce.x.toFixed(2)}, ${totalSurfaceForce.y.toFixed(2)}, ${totalSurfaceForce.z.toFixed(2)})`);
+
 
       // On note si cette force est sur le côté gauche ou droit
       // C'est important car si un côté a plus de force,
@@ -252,25 +279,15 @@ export class AerodynamicsCalculator {
       // Séparation couples aéro et gravité pour scaling cohérent :
       // - Couple aéro : sera scalé proportionnellement aux forces (liftScale/dragScale)
       // - Couple gravité : physique pure, pas de scaling
+      // Note: centre est déjà en coordonnées locales, on applique seulement la rotation
       const centreWorldForTorque = centre.clone().applyQuaternion(kiteOrientation);
       
-      // Couple aérodynamique (lift + drag)
-      const aeroTorqueSurface = new THREE.Vector3().crossVectors(centreWorldForTorque, aeroForce);
-      aeroTorque.add(aeroTorqueSurface);
-      
-      // Couple gravitationnel (émergent de la distribution de masse)
-      const gravityTorqueSurface = new THREE.Vector3().crossVectors(centreWorldForTorque, gravity);
-      gravityTorque.add(gravityTorqueSurface);
-      
-      // Couple total pour cette surface
-      const torque = new THREE.Vector3().crossVectors(centreWorldForTorque, totalSurfaceForce);
-      totalTorque.add(torque);
+      // Couples calculés via méthode utilitaire
+      aeroTorque.add(AerodynamicsCalculator.calculateTorque(centreWorldForTorque, aeroForce));
+      gravityTorque.add(AerodynamicsCalculator.calculateTorque(centreWorldForTorque, gravity));
+      totalTorque.add(AerodynamicsCalculator.calculateTorque(centreWorldForTorque, totalSurfaceForce));
 
-    // console.log("Surface Index:", surfaceIndex);
-    // console.log("Lift Vector:", lift);
-    // console.log("Drag Vector:", drag);
-    // console.log("Normal Vector:", normaleMonde);
-    // console.log("Wind Direction:", windDir);
+
     });
 
     // PHYSIQUE ÉMERGENTE : Le couple vient de la différence G/D
@@ -286,12 +303,7 @@ export class AerodynamicsCalculator {
 
     // 🔍 DEBUG : Afficher forces calculées - DISABLED for performance
     // Uncomment for debugging:
-    // console.log('=== FORCES AÉRODYNAMIQUES (TOTALES APRÈS SCALING) ===');
-    // console.log('Lift:', lift.toArray().map(v => v.toFixed(2)), 'Magnitude:', lift.length().toFixed(2), 'N');
-    // console.log('Drag:', drag.toArray().map(v => v.toFixed(2)), 'Magnitude:', drag.length().toFixed(2), 'N');
-    // console.log('Gravity:', gravityForce.toArray().map(v => v.toFixed(2)), 'Magnitude:', gravityForce.length().toFixed(2), 'N');
-    // console.log('Ratio L/W:', (lift.length() / gravityForce.length()).toFixed(2));
-    // console.log('Wind speed:', apparentWind.length().toFixed(2), 'm/s');
+
 
     // 🔍 DEBUG CRITIQUE : Asymétrie gauche/droite - DISABLED for performance
     // const leftMag = leftForce.length();
@@ -301,9 +313,7 @@ export class AerodynamicsCalculator {
     // const leftArr = leftForce.toArray();
     // const rightArr = rightForce.toArray();
     // const diffArr = leftForce.clone().sub(rightForce).toArray();
-    // console.log(`🔍 LEFT FORCE: (${leftArr[0].toFixed(2)}, ${leftArr[1].toFixed(2)}, ${leftArr[2].toFixed(2)}) | Mag: ${leftMag.toFixed(2)} N`);
-    // console.log(`🔍 RIGHT FORCE: (${rightArr[0].toFixed(2)}, ${rightArr[1].toFixed(2)}, ${rightArr[2].toFixed(2)}) | Mag: ${rightMag.toFixed(2)} N`);
-    // console.log(`🔍 ASYMMETRY: ${asymmetry.toFixed(2)} N (${asymmetryPercent.toFixed(1)}%) | Diff: (${diffArr[0].toFixed(2)}, ${diffArr[1].toFixed(2)}, ${diffArr[2].toFixed(2)})`);
+
 
     // CORRECTION CRITIQUE : Scaling cohérent du couple aérodynamique
     // Le couple DOIT être scalé proportionnellement aux forces aéro pour cohérence physique
@@ -318,7 +328,7 @@ export class AerodynamicsCalculator {
     return {
       lift,
       drag,
-      gravity: gravityForce,  // 🔴 BUG FIX #1 : Retourner gravité séparément
+      gravity: gravityForce,  // � RESTAURÉ : Gravité distribuée par surface
       torque: finalTorque,  // Couple cohérent avec forces scalées
       leftForce, // Exposer les forces pour analyse
       rightForce, // Permet de voir l'asymétrie émergente
@@ -354,12 +364,7 @@ export class AerodynamicsCalculator {
     const weightedNormal = new THREE.Vector3();
 
     KiteGeometry.SURFACES.forEach((surface) => {
-      const edge1 = surface.vertices[1].clone().sub(surface.vertices[0]);
-      const edge2 = surface.vertices[2].clone().sub(surface.vertices[0]);
-      const normaleMonde = new THREE.Vector3()
-        .crossVectors(edge1, edge2)
-        .normalize()
-        .applyQuaternion(kiteOrientation);
+      const normaleMonde = AerodynamicsCalculator.calculateSurfaceNormal(surface, kiteOrientation);
 
       const facing = windDir.dot(normaleMonde);
       const cosIncidence = Math.max(0, Math.abs(facing));

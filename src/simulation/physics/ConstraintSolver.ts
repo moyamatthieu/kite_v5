@@ -69,11 +69,11 @@ export class ConstraintSolver {
 
     // Résolution PBD pour chaque ligne
     const solveLine = (ctrlLocal: THREE.Vector3, handle: THREE.Vector3) => {
-      const q = kite.quaternion;
-      const cpWorld = ctrlLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
+      // Utiliser position prédite pour transformation locale→monde
+      const originalPos = kite.position.clone();
+      kite.position.copy(predictedPosition);
+      const cpWorld = kite.localToWorld(ctrlLocal);
+      kite.position.copy(originalPos);
       const diff = cpWorld.clone().sub(handle);
       const dist = diff.length();
 
@@ -102,11 +102,9 @@ export class ConstraintSolver {
       }
 
       // Correction de vitesse
-      const q2 = kite.quaternion;
-      const cpWorld2 = ctrlLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
+      kite.position.copy(predictedPosition);
+      const cpWorld2 = kite.localToWorld(ctrlLocal);
+      kite.position.copy(originalPos);
       const n2 = cpWorld2.clone().sub(handle).normalize();
       const r2 = cpWorld2.clone().sub(predictedPosition);
       const pointVel = state.velocity
@@ -128,8 +126,8 @@ export class ConstraintSolver {
       }
     };
 
-    // Deux passes pour mieux satisfaire les contraintes
-    for (let i = 0; i < 2; i++) {
+    // Plusieurs passes pour mieux satisfaire les contraintes
+    for (let i = 0; i < PhysicsConstants.CONSTRAINT_ITERATIONS; i++) {
       solveLine(ctrlLeft, handles.left);
       solveLine(ctrlRight, handles.right);
     }
@@ -184,18 +182,12 @@ export class ConstraintSolver {
         return;
       }
 
-      const q = kite.quaternion;
-
-      // Convertir points locaux en coordonnées monde
-      const startWorld = startLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
-
-      const endWorld = endLocal
-        .clone()
-        .applyQuaternion(q)
-        .add(predictedPosition);
+      // Convertir points locaux en coordonnées monde (avec position prédite)
+      const originalPos = kite.position.clone();
+      kite.position.copy(predictedPosition);
+      const startWorld = kite.localToWorld(startLocal);
+      const endWorld = kite.localToWorld(endLocal);
+      kite.position.copy(originalPos);
 
       // Calculer distance actuelle
       const diff = endWorld.clone().sub(startWorld);
@@ -254,15 +246,10 @@ export class ConstraintSolver {
       }
 
       // Correction de vitesse (dampening)
-      const q2 = kite.quaternion;
-      const startWorld2 = startLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
-      const endWorld2 = endLocal
-        .clone()
-        .applyQuaternion(q2)
-        .add(predictedPosition);
+      kite.position.copy(predictedPosition);
+      const startWorld2 = kite.localToWorld(startLocal);
+      const endWorld2 = kite.localToWorld(endLocal);
+      kite.position.copy(originalPos);
 
       const n2 = endWorld2.clone().sub(startWorld2).normalize();
       const rStart2 = startWorld2.clone().sub(predictedPosition);

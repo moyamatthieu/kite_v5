@@ -29,12 +29,13 @@ export class PhysicsConstants {
   static readonly CONTROL_DEADZONE = 0.01; // rad - Zone morte pour input barre de contrôle
   static readonly LINE_CONSTRAINT_TOLERANCE = 0.0005; // m - Tolérance contraintes lignes (0.5mm)
   static readonly LINE_TENSION_FACTOR = 0.99; // Sans unité - Facteur tension lignes (99% = légèrement tendues)
+  static readonly CONSTRAINT_ITERATIONS = 2; // Sans unité - Nombre d'itérations pour convergence PBD
 
   // Sol et friction
   static readonly GROUND_FRICTION = 0.95; // Sans unité - Facteur friction sol (5% perte vitesse)
 
   // Rendu caténaire
-  static readonly CATENARY_SEGMENTS = 5; // Sans unité - Nombre segments pour courbe caténaire
+  static readonly CATENARY_SEGMENTS = 10; // Sans unité - Nombre segments pour courbe caténaire
 
   // Limites de sécurité physique (éviter explosions numériques)
   static readonly MAX_FORCE = 1000; // N - Force maximale (équivalent ~100kg)

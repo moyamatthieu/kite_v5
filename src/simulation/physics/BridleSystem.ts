@@ -36,6 +36,7 @@ import { BridleFactory } from "@factories/BridleFactory";
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
 
 import { LinePhysics } from "./LinePhysics";
+import { VelocityCalculator } from "./VelocityCalculator";
 
 /**
  * Système de gestion des brides
@@ -54,11 +55,9 @@ export class BridleSystem {
   private rightInter: Line;
   private rightCentre: Line;
 
-  // Service de calcul physique (réutilisé)
+  // Services de calcul physique (réutilisés)
   private physics: LinePhysics;
-
-  // Positions précédentes pour calcul vélocité
-  private previousPositions: Map<string, THREE.Vector3> = new Map();
+  private velocityCalculator: VelocityCalculator;
 
   constructor(bridleLengths: BridleLengths) {
     // Valider les longueurs
@@ -73,8 +72,9 @@ export class BridleSystem {
     // Assigner brides droites
     [this.rightNez, this.rightInter, this.rightCentre] = right;
 
-    // Service de calcul physique
+    // Services de calcul physique
     this.physics = new LinePhysics();
+    this.velocityCalculator = new VelocityCalculator();
   }
 
   /**
@@ -90,67 +90,37 @@ export class BridleSystem {
   calculateBridleTensions(kite: Kite): BridleTensions {
     const deltaTime = 1 / 60; // Approximation pour calcul vélocité
 
-    // Calculer tension bride gauche NEZ
-    const leftNezTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftNez,
-      "NEZ",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
+    // Configuration des 6 brides avec leur métadonnées
+    const bridleConfigs = [
+      { line: this.leftNez, start: "NEZ", end: "CTRL_GAUCHE", key: "leftNez" },
+      { line: this.leftInter, start: "INTER_GAUCHE", end: "CTRL_GAUCHE", key: "leftInter" },
+      { line: this.leftCentre, start: "CENTRE", end: "CTRL_GAUCHE", key: "leftCentre" },
+      { line: this.rightNez, start: "NEZ", end: "CTRL_DROIT", key: "rightNez" },
+      { line: this.rightInter, start: "INTER_DROIT", end: "CTRL_DROIT", key: "rightInter" },
+      { line: this.rightCentre, start: "CENTRE", end: "CTRL_DROIT", key: "rightCentre" },
+    ] as const;
 
-    // Calculer tension bride gauche INTER
-    const leftInterTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftInter,
-      "INTER_GAUCHE",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
+    // Calculer toutes les tensions en une passe
+    const tensionsMap = new Map<string, number>();
+    for (const config of bridleConfigs) {
+      const tension = this.calculateSingleBridleTension(
+        kite,
+        config.line,
+        config.start,
+        config.end,
+        deltaTime
+      );
+      tensionsMap.set(config.key, tension);
+    }
 
-    // Calculer tension bride gauche CENTRE
-    const leftCentreTension = this.calculateSingleBridleTension(
-      kite,
-      this.leftCentre,
-      "CENTRE",
-      "CTRL_GAUCHE",
-      deltaTime
-    );
-
-    // Calculer tension bride droite NEZ
-    const rightNezTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightNez,
-      "NEZ",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
-    // Calculer tension bride droite INTER
-    const rightInterTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightInter,
-      "INTER_DROIT",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
-    // Calculer tension bride droite CENTRE
-    const rightCentreTension = this.calculateSingleBridleTension(
-      kite,
-      this.rightCentre,
-      "CENTRE",
-      "CTRL_DROIT",
-      deltaTime
-    );
-
+    // Construire le résultat
     return {
-      leftNez: leftNezTension,
-      leftInter: leftInterTension,
-      leftCentre: leftCentreTension,
-      rightNez: rightNezTension,
-      rightInter: rightInterTension,
-      rightCentre: rightCentreTension,
+      leftNez: tensionsMap.get("leftNez")!,
+      leftInter: tensionsMap.get("leftInter")!,
+      leftCentre: tensionsMap.get("leftCentre")!,
+      rightNez: tensionsMap.get("rightNez")!,
+      rightInter: tensionsMap.get("rightInter")!,
+      rightCentre: tensionsMap.get("rightCentre")!,
     };
   }
 
@@ -181,22 +151,16 @@ export class BridleSystem {
     }
 
     // Convertir en coordonnées monde
-    const startWorld = startLocal
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
+    const startWorld = kite.localToWorld(startLocal);
+    const endWorld = kite.localToWorld(endLocal);
 
-    const endWorld = endLocal
-      .clone()
-      .applyQuaternion(kite.quaternion)
-      .add(kite.position);
-
-    // Calculer vélocité relative
-    const velocity = this.calculateVelocity(
+    // Calculer vélocité relative avec VelocityCalculator
+    const key = `${startPointName}_${endPointName}`;
+    const velocity = this.velocityCalculator.calculateRelative(
+      `${key}_start`,
+      `${key}_end`,
       startWorld,
       endWorld,
-      startPointName,
-      endPointName,
       deltaTime
     );
 
@@ -212,45 +176,6 @@ export class BridleSystem {
     bridle.updateState(result.currentLength, result.tension, performance.now());
 
     return result.tension;
-  }
-
-  /**
-   * Calcule la vélocité relative entre deux points
-   *
-   * @param currentStart - Position actuelle point départ (monde)
-   * @param currentEnd - Position actuelle point arrivée (monde)
-   * @param startKey - Clé unique point départ
-   * @param endKey - Clé unique point arrivée
-   * @param deltaTime - Pas de temps
-   * @returns Vecteur vélocité relative
-   */
-  private calculateVelocity(
-    currentStart: THREE.Vector3,
-    currentEnd: THREE.Vector3,
-    startKey: string,
-    endKey: string,
-    deltaTime: number
-  ): THREE.Vector3 {
-    const key = `${startKey}_${endKey}`;
-    const prevStart = this.previousPositions.get(`${key}_start`);
-    const prevEnd = this.previousPositions.get(`${key}_end`);
-
-    let velocity = new THREE.Vector3();
-
-    if (prevStart && prevEnd) {
-      // Vélocité point départ
-      const velStart = currentStart.clone().sub(prevStart).divideScalar(deltaTime);
-      // Vélocité point arrivée
-      const velEnd = currentEnd.clone().sub(prevEnd).divideScalar(deltaTime);
-      // Vélocité relative
-      velocity = velStart.sub(velEnd);
-    }
-
-    // Mémoriser positions actuelles
-    this.previousPositions.set(`${key}_start`, currentStart.clone());
-    this.previousPositions.set(`${key}_end`, currentEnd.clone());
-
-    return velocity;
   }
 
   /**

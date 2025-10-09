@@ -48,17 +48,20 @@ export class Kite extends StructuredObject implements ICreatable {
   private bridleLengthFactor: number = 1.0; // Facteur de longueur virtuelle des brides principales
 
   // Longueurs physiques des brides (en mètres)
+  // LONGUEURS IDENTIQUES : L'équilibre vient de la géométrie, pas des brides
+  // Principe: Kite suspendu par CTRL_GAUCHE et CTRL_DROIT sera horizontal
+  // si le centre de masse se trouve entre ces deux points (axe X)
   private bridleLengths: BridleLengths = {
-    nez: 0.70,   // 70cm du NEZ au CTRL (ajusté pour meilleur comportement)
-    inter: 0.65,   // 65cm du INTER au CTRL (allongé pour équilibrer le pitch)
-    centre: 0.68,  // 68cm du CENTRE au CTRL (plus long pour remonter l'arrière)
+    nez: 0.65,     // 65cm - longueur standard
+    inter: 0.65,   // 65cm - longueur standard
+    centre: 0.65,  // 65cm - longueur standard
   };
 
   // Paramètres du cerf-volant
   private params = {
     width: 1.65, // Envergure
     height: 0.65, // Hauteur
-    depth: 0.10, // Profondeur whiskers
+    depth: 0.20, // Profondeur whiskers
     frameDiameter: 0.01,
     frameColor: "#2a2a2a",
     sailColor: "#ff3333",
@@ -417,6 +420,28 @@ export class Kite extends StructuredObject implements ICreatable {
    */
   public getBridleLengths(): BridleLengths {
     return { ...this.bridleLengths };
+  }
+
+  /**
+   * Transforme un point local en coordonnées monde
+   *
+   * Cette méthode utilitaire évite la duplication du pattern:
+   * `localPos.clone().applyQuaternion(kite.quaternion).add(kite.position)`
+   *
+   * @param localPos - Position dans le repère local du kite
+   * @returns Position dans le repère monde
+   *
+   * @example
+   * ```typescript
+   * const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
+   * const worldPos = kite.localToWorld(ctrlLeft);
+   * ```
+   */
+  public localToWorld(localPos: THREE.Vector3): THREE.Vector3 {
+    return localPos
+      .clone()
+      .applyQuaternion(this.quaternion)
+      .add(this.position);
   }
 
   /**
