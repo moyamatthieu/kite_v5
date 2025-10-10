@@ -88,72 +88,70 @@ export class ControlBarSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Calcule le quaternion de rotation de la barre basé sur l'axe des lignes
+   * Calcule le quaternion de rotation de la barre basé sur le vecteur vers le kite
+   * Logique issue de la branche main qui fonctionne correctement
    */
   private computeRotationQuaternion(): THREE.Quaternion | null {
-    if (!this.kite) return null;
+    if (!this.kite || !this.controlBarEntity) return null;
 
     const ctrlLeft = this.kite.getPoint('CTRL_GAUCHE');
     const ctrlRight = this.kite.getPoint('CTRL_DROIT');
 
     if (!ctrlLeft || !ctrlRight) return null;
 
+    // Convertir en coordonnées monde
     const kiteLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
     const kiteRightWorld = this.kite.toWorldCoordinates(ctrlRight);
 
-    // Axe naturel de la barre = axe entre les deux points de contrôle du kite
-    const kiteAxis = new THREE.Vector3()
-      .subVectors(kiteRightWorld, kiteLeftWorld)
+    // Calculer le centre du kite
+    const centerKite = new THREE.Vector3()
+      .addVectors(kiteLeftWorld, kiteRightWorld)
+      .multiplyScalar(0.5);
+
+    // Vecteur de la barre vers le kite
+    const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
+    if (!transform) return null;
+
+    const toKiteVector = new THREE.Vector3()
+      .subVectors(centerKite, transform.position)
       .normalize();
 
-    // Direction initiale de la barre (axe X local)
+    // Direction initiale de la barre (axe X)
     const barDirection = new THREE.Vector3(1, 0, 0);
 
-    // Calculer la rotation nécessaire pour aligner la barre avec l'axe du kite
-    const quaternion = new THREE.Quaternion().setFromUnitVectors(
-      barDirection,
-      kiteAxis
-    );
+    // Calculer l'axe de rotation via produit vectoriel
+    const rotationAxis = new THREE.Vector3()
+      .crossVectors(barDirection, toKiteVector)
+      .normalize();
 
-    // Appliquer la rotation de l'input utilisateur autour de l'axe vertical (Y)
-    const userRotation = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 1, 0),
-      this.rotation
-    );
+    // Si l'axe est trop petit (barre alignée avec le kite), utiliser Y par défaut
+    const DEADZONE = 0.001;
+    if (rotationAxis.length() < DEADZONE) {
+      rotationAxis.set(0, 1, 0);
+    }
 
-    // Combiner : rotation naturelle + rotation utilisateur
-    return quaternion.multiply(userRotation);
+    // Créer le quaternion avec l'axe calculé et la rotation utilisateur
+    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.rotation);
   }
 
   /**
    * Obtient les positions des poignées (pour le rendu des lignes)
    */
   getHandlePositions(): HandlePositions | null {
-    if (!this.controlBarEntity || !this.kite) return null;
+    if (!this.controlBarEntity) return null;
 
-    const ctrlLeft = this.kite.getPoint('CTRL_GAUCHE');
-    const ctrlRight = this.kite.getPoint('CTRL_DROIT');
+    const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
+    if (!transform) return null;
 
-    if (!ctrlLeft || !ctrlRight) {
-      // Fallback : orientation par défaut si points indisponibles
-      const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
-      if (!transform) return null;
-
+    const rotationQuaternion = this.computeRotationQuaternion();
+    if (!rotationQuaternion) {
+      // Fallback : orientation par défaut
       const halfWidth = CONFIG.controlBar.width / 2;
       return {
         left: transform.position.clone().add(new THREE.Vector3(-halfWidth, 0, 0)),
         right: transform.position.clone().add(new THREE.Vector3(halfWidth, 0, 0)),
       };
     }
-
-    const kiteLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
-    const kiteRightWorld = this.kite.toWorldCoordinates(ctrlRight);
-    const rotationQuaternion = this.computeRotationQuaternion();
-
-    if (!rotationQuaternion) return null;
-
-    const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
-    if (!transform) return null;
 
     const halfWidth = CONFIG.controlBar.width / 2;
     const handleLeftLocal = new THREE.Vector3(-halfWidth, 0, 0);

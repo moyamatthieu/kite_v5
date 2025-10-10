@@ -22,6 +22,7 @@ import {
   type RenderConfig
 } from './systems';
 import { ControlBarSystem } from './systems/ControlBarSystem';
+import { LinesRenderSystem } from './systems/LinesRenderSystem';
 
 import {
   UIManager,
@@ -32,6 +33,7 @@ import { DebugRenderer } from './rendering/DebugRenderer';
 import { CONFIG } from './config/SimulationConfig';
 import { Kite } from '../objects/Kite';
 import { ControlBarManager } from './controllers/ControlBarManager';
+import { EntityManager } from './entities/EntityManager';
 import { Entity } from './entities/Entity';
 import { TransformComponent, MeshComponent } from './components';
 
@@ -56,6 +58,9 @@ export class SimulationApp {
   private readonly logger: Logger;
   private config: SimulationConfig;
 
+  // === GESTIONNAIRE D'ENTITÉS ===
+  private entityManager!: EntityManager;
+
   // === SYSTÈMES ECS ===
   private physicsSystem!: PhysicsSystem;
   private windSystem!: WindSystem;
@@ -63,17 +68,13 @@ export class SimulationApp {
   private renderSystem?: RenderSystem;
   private kitePhysicsSystem?: KitePhysicsSystem;
   private controlBarSystem!: ControlBarSystem;
+  private linesRenderSystem!: LinesRenderSystem;
 
-  // === ENTITÉS ===
+  // === ENTITÉS PRINCIPALES ===
   private kite!: Kite;
-  private controlBarManager!: ControlBarManager;
   private controlBarEntity!: Entity;
-
-  // === COMPOSANTS LEGACY ===
-  private controlBar!: THREE.Group;
-  private pilot!: THREE.Mesh;
-  private leftLine?: THREE.Line;
-  private rightLine?: THREE.Line;
+  private leftLineEntity?: Entity;
+  private rightLineEntity?: Entity;
 
   // === INTERFACE ===
   private uiManager?: UIManager;
@@ -114,6 +115,9 @@ export class SimulationApp {
     try {
       this.logger.info('Initializing simulation...', 'SimulationApp');
 
+      // Créer le gestionnaire d'entités
+      this.entityManager = new EntityManager();
+
       // Créer les systèmes
       await this.createSystems();
 
@@ -146,6 +150,7 @@ export class SimulationApp {
     this.windSystem = new WindSystem(this.config.wind);
     this.inputSystem = new InputSystem(this.config.input);
     this.controlBarSystem = new ControlBarSystem();
+    this.linesRenderSystem = new LinesRenderSystem();
 
     if (this.config.enableRenderSystem) {
       this.renderSystem = new RenderSystem(this.config.render);
@@ -187,21 +192,14 @@ export class SimulationApp {
     const initialPos = this.calculateInitialKitePosition();
     this.kite.position.copy(initialPos);
 
-    // Créer le gestionnaire de barre de contrôle (legacy - sera supprimé)
-    this.controlBarManager = new ControlBarManager(CONFIG.controlBar.position.clone());
-
     // Configurer le système de physique du kite
     if (this.kitePhysicsSystem) {
       this.kitePhysicsSystem.setKite(this.kite);
     }
 
-    // Créer les composants legacy
-    if (this.config.enableLegacyComponents) {
-      this.createLegacyComponents();
-
-      // Créer l'entité ECS de la barre de contrôle
-      this.createControlBarEntity();
-    }
+    // Créer les entités ECS
+    this.createControlBarEntity();
+    this.createLineEntities();
   }
 
   /**
@@ -209,37 +207,11 @@ export class SimulationApp {
    */
   private createControlBarEntity(): void {
     // Créer l'entité
-    this.controlBarEntity = new Entity('controlBar');
+    this.controlBarEntity = this.entityManager.createEntity('controlBar');
 
-    // Ajouter le composant Transform
-    const transform = new TransformComponent({
-      position: CONFIG.controlBar.position.clone(),
-      rotation: 0,
-      quaternion: new THREE.Quaternion(),
-      scale: new THREE.Vector3(1, 1, 1)
-    });
-    this.controlBarEntity.addComponent(transform);
-
-    // Ajouter le composant Mesh (enveloppe le THREE.Group existant)
-    const mesh = new MeshComponent(this.controlBar, {
-      visible: true,
-      castShadow: true,
-      receiveShadow: false
-    });
-    this.controlBarEntity.addComponent(mesh);
-
-    // Configurer le système
-    this.controlBarSystem.setControlBarEntity(this.controlBarEntity);
-    this.controlBarSystem.setKite(this.kite);
-  }
-
-  /**
-   * Crée les composants legacy pour compatibilité
-   */
-  private createLegacyComponents(): void {
-    // Barre de contrôle
-    this.controlBar = new THREE.Group();
-    this.controlBar.name = 'ControlBar';
+    // Créer le THREE.Group pour la barre
+    const controlBarGroup = new THREE.Group();
+    controlBarGroup.name = 'ControlBar';
 
     const barGeometry = new THREE.CylinderGeometry(
       CONFIG.controlBar.barRadius,
@@ -255,7 +227,7 @@ export class SimulationApp {
     const bar = new THREE.Mesh(barGeometry, barMaterial);
     bar.rotation.z = CONFIG.controlBar.barRotation;
     bar.castShadow = true;
-    this.controlBar.add(bar);
+    controlBarGroup.add(bar);
 
     // Poignées
     const handleGeometry = new THREE.CylinderGeometry(
@@ -272,56 +244,56 @@ export class SimulationApp {
     const leftHandle = new THREE.Mesh(handleGeometry, handleMaterial);
     leftHandle.position.set(-halfWidth, 0, 0);
     leftHandle.castShadow = true;
-    this.controlBar.add(leftHandle);
+    controlBarGroup.add(leftHandle);
 
     const rightHandle = new THREE.Mesh(handleGeometry, handleMaterial);
     rightHandle.position.set(halfWidth, 0, 0);
     rightHandle.castShadow = true;
-    this.controlBar.add(rightHandle);
+    controlBarGroup.add(rightHandle);
 
-    this.controlBar.position.copy(CONFIG.controlBar.position);
+    controlBarGroup.position.copy(CONFIG.controlBar.position);
 
-    // Pilote
-    const pilotGeometry = new THREE.BoxGeometry(
-      CONFIG.pilot.width,
-      CONFIG.pilot.height,
-      CONFIG.pilot.depth
-    );
-    const pilotMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a4a4a,
-      roughness: 0.8
+    // Ajouter le composant Transform
+    const transform = new TransformComponent({
+      position: CONFIG.controlBar.position.clone(),
+      rotation: 0,
+      quaternion: new THREE.Quaternion(),
+      scale: new THREE.Vector3(1, 1, 1)
     });
+    this.controlBarEntity.addComponent(transform);
 
-    this.pilot = new THREE.Mesh(pilotGeometry, pilotMaterial);
-    this.pilot.position.set(0, CONFIG.pilot.offsetY, CONFIG.pilot.offsetZ);
-    this.pilot.castShadow = true;
-    this.pilot.name = 'Pilot';
+    // Ajouter le composant Mesh
+    const mesh = new MeshComponent(controlBarGroup, {
+      visible: true,
+      castShadow: true,
+      receiveShadow: false
+    });
+    this.controlBarEntity.addComponent(mesh);
 
-    // Lignes de contrôle
-    this.createControlLines();
+    // Configurer le système
+    this.controlBarSystem.setControlBarEntity(this.controlBarEntity);
+    this.controlBarSystem.setKite(this.kite);
   }
 
   /**
-   * Crée les lignes de contrôle visuelles
+   * Crée les entités ECS des lignes de contrôle
    */
-  private createControlLines(): void {
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x333333,
-      linewidth: CONFIG.visualization.lineWidth
-    });
+  private createLineEntities(): void {
+    if (!this.renderSystem) return;
 
-    const segments = 20;
-    const points = new Array(segments + 1).fill(0).map(() => new THREE.Vector3());
+    const scene = this.renderSystem.getScene();
+    if (!scene) return;
 
-    const leftLineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-    const rightLineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    // Configurer le système
+    this.linesRenderSystem.setKite(this.kite);
+    this.linesRenderSystem.setControlBarSystem(this.controlBarSystem);
 
-    this.leftLine = new THREE.Line(leftLineGeometry, lineMaterial);
-    this.leftLine.name = 'LeftControlLine';
-
-    this.rightLine = new THREE.Line(rightLineGeometry, lineMaterial);
-    this.rightLine.name = 'RightControlLine';
+    // Créer les entités de lignes
+    this.leftLineEntity = this.linesRenderSystem.createLineEntity('leftLine', 'left', scene);
+    this.rightLineEntity = this.linesRenderSystem.createLineEntity('rightLine', 'right', scene);
   }
+
+
 
   /**
    * Initialise tous les systèmes
@@ -331,7 +303,8 @@ export class SimulationApp {
       this.physicsSystem.initialize(),
       this.windSystem.initialize(),
       this.inputSystem.initialize(),
-      this.controlBarSystem.initialize()
+      this.controlBarSystem.initialize(),
+      this.linesRenderSystem.initialize()
     ];
 
     if (this.renderSystem) {
@@ -379,12 +352,16 @@ export class SimulationApp {
 
     const scene = this.renderSystem.getScene();
     if (scene) {
-      // Ajouter les entités à la scène
+      // Ajouter le kite à la scène
       scene.add(this.kite);
-      scene.add(this.controlBar);
-      scene.add(this.pilot);
-      if (this.leftLine) scene.add(this.leftLine);
-      if (this.rightLine) scene.add(this.rightLine);
+
+      // Ajouter les entités ECS à la scène via leurs composants Mesh
+      const controlBarMesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
+      if (controlBarMesh) {
+        scene.add(controlBarMesh.object3D);
+      }
+
+      // Les lignes sont gérées par LinesRenderSystem
     }
 
     // Démarrer le rendu
@@ -569,13 +546,11 @@ export class SimulationApp {
       this.controlBarSystem.setRotation(inputState.barPosition);
       this.controlBarSystem.update(context);
 
+      // Mise à jour du système de rendu des lignes
+      this.linesRenderSystem.update(context);
+
       if (this.renderSystem) {
         this.renderSystem.update(context);
-      }
-
-      // Synchronisation legacy
-      if (this.config.enableLegacyComponents) {
-        this.syncLegacyComponents(context);
       }
 
       // Mise à jour UI
@@ -593,67 +568,11 @@ export class SimulationApp {
     requestAnimationFrame(this.updateLoop);
   };
 
-  /**
-   * Synchronise les composants legacy
-   */
-  private syncLegacyComponents(_context: any): void {
-    if (!this.kitePhysicsSystem) return;
 
-    // La barre de contrôle est maintenant gérée par ControlBarSystem (ECS)
-    // Ce code legacy ne sera plus nécessaire une fois la migration terminée
 
-    // Mettre à jour les lignes de contrôle
-    this.updateControlLines();
-  }
 
-  /**
-   * Met à jour les lignes de contrôle
-   */
-  private updateControlLines(): void {
-    if (!this.leftLine || !this.rightLine || !this.kitePhysicsSystem) return;
 
-    const handles = this.controlBarSystem.getHandlePositions();
-    if (!handles) return;
 
-    // Récupérer les points de contrôle du kite (où les lignes s'attachent)
-    const ctrlLeft = this.kite.getPoint("CTRL_GAUCHE");
-    const ctrlRight = this.kite.getPoint("CTRL_DROIT");
-
-    if (!ctrlLeft || !ctrlRight) {
-      console.warn("⚠️ Points de contrôle CTRL_GAUCHE ou CTRL_DROIT introuvables");
-      return;
-    }
-
-    // Convertir les points locaux en coordonnées monde
-    const ctrlLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
-    const ctrlRightWorld = this.kite.toWorldCoordinates(ctrlRight);
-
-    // Mettre à jour les lignes avec les vrais points de connexion
-    this.updateLineGeometry(this.leftLine, ctrlLeftWorld, handles.left);
-    this.updateLineGeometry(this.rightLine, ctrlRightWorld, handles.right);
-  }
-
-  /**
-   * Met à jour la géométrie d'une ligne
-   */
-  private updateLineGeometry(line: THREE.Line, start: THREE.Vector3, end: THREE.Vector3): void {
-    const geometry = line.geometry as THREE.BufferGeometry;
-    const positions = geometry.attributes.position;
-
-    if (!positions) return;
-
-    const segments = 20;
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const x = start.x + (end.x - start.x) * t;
-      const y = start.y + (end.y - start.y) * t;
-      const z = start.z + (end.z - start.z) * t;
-
-      positions.setXYZ(i, x, y, z);
-    }
-
-    positions.needsUpdate = true;
-  }
 
   /**
    * Nettoie les ressources
