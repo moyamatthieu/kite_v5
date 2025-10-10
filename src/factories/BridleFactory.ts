@@ -22,9 +22,10 @@
  *   - src/simulation/types/BridleTypes.ts
  */
 
+import { BridleLengths, BridleAttachment, BridleSide, BridlePosition } from "../simulation/types/BridleTypes";
+
 import { Line, LineConfig, LineAttachments } from "@/objects/Line";
 
-import { BridleLengths, BridleAttachment, BridleSide, BridlePosition } from "../simulation/types/BridleTypes";
 
 /**
  * Factory pour créer les brides du cerf-volant

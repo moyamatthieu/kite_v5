@@ -34,9 +34,10 @@
 
 import { Vector3 } from 'three';
 
+import { PhysicsConstants } from '../config/PhysicsConstants';
+
 import { Line } from '@/objects/Line';
 
-import { PhysicsConstants } from '../config/PhysicsConstants';
 
 /**
  * Résultat d'un calcul de force de tension

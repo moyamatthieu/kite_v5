@@ -3,6 +3,7 @@
  */
 
 import * as THREE from 'three';
+
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
 import { Logger } from '../../utils/Logging';
 import { MathUtils } from '../../utils/MathUtils';

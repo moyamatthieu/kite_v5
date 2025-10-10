@@ -3,6 +3,7 @@
  */
 
 import * as THREE from 'three';
+
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
 import { Logger } from '../../utils/Logging';
 
@@ -45,7 +46,7 @@ export class InputSystem extends BaseSimulationSystem {
     this.logger = Logger.getInstance();
     this.config = {
       barSmoothingEnabled: true,
-      barSmoothingFactor: 0.8,
+      barSmoothingFactor: 0.92, // Plus élevé = plus smooth (0-1)
       deadzone: 0.05,
       maxBarSpeed: 2.0, // unités par seconde
       keyboardEnabled: true,

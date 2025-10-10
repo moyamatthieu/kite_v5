@@ -12,16 +12,17 @@
  *   - Le ConstraintSolver.enforceLineConstraints() gère la contrainte géométrique
  */
 import * as THREE from "three";
-
 import { LineFactory } from "@factories/LineFactory";
-import { Line } from "@/objects/Line";
-import { Kite } from "@/objects/Kite";
+
 
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { HandlePositions } from "../types";
 
 import { LinePhysics } from "./LinePhysics";
 import { VelocityCalculator } from "./VelocityCalculator";
+
+import { Kite } from "@/objects/Kite";
+import { Line } from "@/objects/Line";
 
 export class LineSystem {
   private leftLine: Line;

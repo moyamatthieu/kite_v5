@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 import { Logger } from '../utils/Logging';
 import { MathUtils } from '../utils/MathUtils';
+import { Kite } from '../objects/Kite';
 
 import {
   PhysicsSystem,
@@ -23,16 +24,12 @@ import {
 } from './systems';
 import { ControlBarSystem } from './systems/ControlBarSystem';
 import { LinesRenderSystem } from './systems/LinesRenderSystem';
-
 import {
   UIManager,
   type SimulationControls
 } from './ui/UIManager';
-
 import { DebugRenderer } from './rendering/DebugRenderer';
 import { CONFIG } from './config/SimulationConfig';
-import { Kite } from '../objects/Kite';
-import { ControlBarManager } from './controllers/ControlBarManager';
 import { EntityManager } from './entities/EntityManager';
 import { Entity } from './entities/Entity';
 import { TransformComponent, MeshComponent } from './components';

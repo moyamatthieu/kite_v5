@@ -29,14 +29,15 @@
  */
 
 import * as THREE from "three";
-import { Kite } from "@/objects/Kite";
-import { Line } from "@/objects/Line";
 import { BridleFactory } from "@factories/BridleFactory";
 
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
 
 import { LinePhysics } from "./LinePhysics";
 import { VelocityCalculator } from "./VelocityCalculator";
+
+import { Line } from "@/objects/Line";
+import { Kite } from "@/objects/Kite";
 
 /**
  * Système de gestion des brides

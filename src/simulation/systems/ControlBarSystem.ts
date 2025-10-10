@@ -13,6 +13,7 @@
  */
 
 import * as THREE from 'three';
+
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
 import { Entity } from '../entities/Entity';
 import { TransformComponent } from '../components/TransformComponent';

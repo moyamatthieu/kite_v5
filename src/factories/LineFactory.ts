@@ -32,7 +32,6 @@
  */
 
 import { Line, LineConfig, LineAttachments } from '@/objects/Line';
-
 import { CONFIG } from '@/simulation/config/SimulationConfig';
 
 /**

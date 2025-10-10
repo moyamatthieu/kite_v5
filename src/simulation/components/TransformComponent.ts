@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+
 import { Component } from '../entities/Entity';
 
 export interface TransformComponentData {

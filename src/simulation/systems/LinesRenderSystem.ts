@@ -13,13 +13,15 @@
  */
 
 import * as THREE from 'three';
+
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
 import { Entity } from '../entities/Entity';
 import { MeshComponent } from '../components/MeshComponent';
 import { Kite } from '../../objects/Kite';
-import { ControlBarSystem } from './ControlBarSystem';
 import { CONFIG } from '../config/SimulationConfig';
 import { Logger } from '../../utils/Logging';
+
+import { ControlBarSystem } from './ControlBarSystem';
 
 /**
  * Composant spécifique aux lignes pour stocker leurs paramètres
