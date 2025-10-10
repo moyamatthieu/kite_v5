@@ -39,8 +39,8 @@ export const CONFIG = {
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
     controlDeadzone: 0.1, // m - Petite zone de tolérance pour la tension des lignes
     // Amortissement réaliste pour un cerf-volant
-    linearDampingCoeff: 1.3, // Amortissement linéaire modéré pour stabilité
-    angularDragFactor: 1.8, // Amortissement angulaire pour éviter les oscillations
+    linearDampingCoeff: 1.5, // Amortissement linéaire modéré pour stabilité
+    angularDragFactor: 1.5, // Amortissement angulaire pour éviter les oscillations
   },
   aero: {
     // Forces aérodynamiques réalistes pour un cerf-volant delta

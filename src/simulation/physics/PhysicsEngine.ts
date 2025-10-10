@@ -100,7 +100,7 @@ export class PhysicsEngine {
 
     // Récupérer l'état actuel du système
     const kite = this.kiteController.getKite();
-    const handles = this.controlBarManager.getHandlePositions(kite.position);
+    const handles = this.controlBarManager.getHandlePositions(kite);
 
     // Vent apparent = vent réel - vitesse du kite (principe de relativité)
     const kiteState = this.kiteController.getState();

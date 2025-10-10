@@ -558,6 +558,10 @@ export class SimulationApp {
     const inputState = this.inputSystem.getInputState();
     this.controlBarManager.setRotation(inputState.barPosition);
 
+    // ⚡ CRITIQUE : Mettre à jour la barre visuelle (THREE.Group)
+    // Sans cet appel, la barre reste figée car le manager calcule mais ne rend pas
+    this.controlBarManager.updateVisual(this.controlBar, this.kite);
+
     // Mettre à jour les lignes de contrôle
     this.updateControlLines();
   }
@@ -568,7 +572,7 @@ export class SimulationApp {
   private updateControlLines(): void {
     if (!this.leftLine || !this.rightLine || !this.kitePhysicsSystem) return;
 
-    const handles = this.controlBarManager.getHandlePositions(this.kite.position);
+    const handles = this.controlBarManager.getHandlePositions(this.kite);
 
     // Récupérer les points de contrôle du kite (où les lignes s'attachent)
     const ctrlLeft = this.kite.getPoint("CTRL_GAUCHE");

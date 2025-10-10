@@ -30,6 +30,8 @@ import { CONFIG } from "../config/SimulationConfig";
  */
 export class InputHandler {
   private currentRotation: number = 0;
+  private targetRotation: number = 0;  // Rotation cible (instantanée)
+  private smoothingFactor: number = 0.15;  // Facteur de lissage (0=pas de smooth, 1=instantané)
   private keysPressed = new Set<string>();
   private rotationSpeed: number = CONFIG.input.rotationSpeed;
   private returnSpeed: number = CONFIG.input.returnSpeed;
@@ -80,24 +82,52 @@ export class InputHandler {
       this.keysPressed.has("ArrowRight") || this.keysPressed.has("d");
     const dir = (left ? 1 : 0) + (right ? -1 : 0);
 
+    // Mettre à jour la rotation cible (instantanée)
     if (dir !== 0) {
-      this.currentRotation += dir * this.rotationSpeed * deltaTime;
+      this.targetRotation += dir * this.rotationSpeed * deltaTime;
     } else {
-      if (Math.abs(this.currentRotation) > PhysicsConstants.EPSILON) {
-        const sign = Math.sign(this.currentRotation);
-        this.currentRotation -= sign * this.returnSpeed * deltaTime;
-        if (Math.sign(this.currentRotation) !== sign) {
-          this.currentRotation = 0;
+      // Retour au centre progressif
+      if (Math.abs(this.targetRotation) > PhysicsConstants.EPSILON) {
+        const sign = Math.sign(this.targetRotation);
+        this.targetRotation -= sign * this.returnSpeed * deltaTime;
+        if (Math.sign(this.targetRotation) !== sign) {
+          this.targetRotation = 0;
         }
       } else {
-        this.currentRotation = 0;
+        this.targetRotation = 0;
       }
     }
 
-    this.currentRotation = Math.max(
+    // Limiter la rotation cible
+    this.targetRotation = Math.max(
       -this.maxRotation,
-      Math.min(this.maxRotation, this.currentRotation)
+      Math.min(this.maxRotation, this.targetRotation)
     );
+
+    // Appliquer le smoothing (lerp) : rotation actuelle → rotation cible
+    // Plus le smoothingFactor est grand, plus le mouvement est réactif
+    // smoothingFactor=1 → instantané, smoothingFactor=0.1 → très smooth
+    this.currentRotation = this.lerp(
+      this.currentRotation,
+      this.targetRotation,
+      this.smoothingFactor
+    );
+
+    // Si proche de zéro, snap à zéro pour éviter les oscillations
+    if (Math.abs(this.currentRotation) < PhysicsConstants.EPSILON) {
+      this.currentRotation = 0;
+    }
+  }
+
+  /**
+   * Interpolation linéaire (lerp) pour smoothing
+   * @param current - Valeur actuelle
+   * @param target - Valeur cible
+   * @param factor - Facteur d'interpolation (0-1)
+   * @returns Valeur interpolée
+   */
+  private lerp(current: number, target: number, factor: number): number {
+    return current + (target - current) * factor;
   }
 
   getTargetBarRotation(): number {

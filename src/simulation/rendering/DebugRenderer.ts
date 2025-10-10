@@ -399,11 +399,10 @@ export class DebugRenderer {
 
     // Calcul des tensions des lignes
     const lineLength = physicsSource.getLineSystem().lineLength;
+    const kite = physicsSource.getKiteController().getKite();
     const handles = physicsSource
       .getControlBarManager()
-      .getHandlePositions(kitePosition);
-
-    const kite = physicsSource.getKiteController().getKite();
+      .getHandlePositions(kite);
     const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
     const ctrlRight = kite.getPoint("CTRL_DROIT");
 

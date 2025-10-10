@@ -46,29 +46,56 @@ export class ControlBarManager {
   }
 
   /**
-   * Calcule le quaternion de rotation de la barre
+   * Calcule le quaternion de rotation de la barre basé sur l'axe des lignes
+   * La barre s'oriente naturellement selon l'axe entre les deux points de contrôle du kite
    */
   private computeRotationQuaternion(
-    toKiteVector: THREE.Vector3
+    kiteLeftWorld: THREE.Vector3,
+    kiteRightWorld: THREE.Vector3
   ): THREE.Quaternion {
-    const barDirection = new THREE.Vector3(1, 0, 0);
-    const rotationAxis = new THREE.Vector3()
-      .crossVectors(barDirection, toKiteVector)
+    // Axe naturel de la barre = axe entre les deux points de contrôle du kite
+    const kiteAxis = new THREE.Vector3()
+      .subVectors(kiteRightWorld, kiteLeftWorld)
       .normalize();
 
-    if (rotationAxis.length() < PhysicsConstants.CONTROL_DEADZONE) {
-      rotationAxis.set(0, 1, 0);
-    }
+    // Direction initiale de la barre (axe X local)
+    const barDirection = new THREE.Vector3(1, 0, 0);
 
-    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.rotation);
+    // Calculer la rotation nécessaire pour aligner la barre avec l'axe du kite
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(
+      barDirection,
+      kiteAxis
+    );
+
+    // Appliquer la rotation de l'input utilisateur autour de l'axe vertical (Y)
+    const userRotation = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      this.rotation
+    );
+
+    // Combiner : rotation naturelle + rotation utilisateur
+    return quaternion.multiply(userRotation);
   }
 
   /**
    * Obtient les positions des poignées (méthode unique centralisée)
    */
-  getHandlePositions(kitePosition: THREE.Vector3): HandlePositions {
-    const toKiteVector = kitePosition.clone().sub(this.position).normalize();
-    const rotationQuaternion = this.computeRotationQuaternion(toKiteVector);
+  getHandlePositions(kite: Kite): HandlePositions {
+    const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
+    const ctrlRight = kite.getPoint("CTRL_DROIT");
+
+    if (!ctrlLeft || !ctrlRight) {
+      // Fallback : orientation par défaut si points indisponibles
+      const halfWidth = CONFIG.controlBar.width / 2;
+      return {
+        left: this.position.clone().add(new THREE.Vector3(-halfWidth, 0, 0)),
+        right: this.position.clone().add(new THREE.Vector3(halfWidth, 0, 0)),
+      };
+    }
+
+    const kiteLeftWorld = kite.toWorldCoordinates(ctrlLeft);
+    const kiteRightWorld = kite.toWorldCoordinates(ctrlRight);
+    const rotationQuaternion = this.computeRotationQuaternion(kiteLeftWorld, kiteRightWorld);
 
     const halfWidth = CONFIG.controlBar.width / 2;
     const handleLeftLocal = new THREE.Vector3(-halfWidth, 0, 0);
@@ -111,13 +138,7 @@ export class ControlBarManager {
       const kiteLeftWorld = kite.toWorldCoordinates(ctrlLeft);
       const kiteRightWorld = kite.toWorldCoordinates(ctrlRight);
 
-      const centerKite = kiteLeftWorld
-        .clone()
-        .add(kiteRightWorld)
-        .multiplyScalar(0.5);
-      const toKiteVector = centerKite.clone().sub(this.position).normalize();
-
-      bar.quaternion.copy(this.computeRotationQuaternion(toKiteVector));
+      bar.quaternion.copy(this.computeRotationQuaternion(kiteLeftWorld, kiteRightWorld));
     }
   }
 }

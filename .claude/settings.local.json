@@ -23,7 +23,8 @@
       "Bash(npm install)",
       "mcp__ide__getDiagnostics",
       "Bash(timeout 10 npm run dev)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

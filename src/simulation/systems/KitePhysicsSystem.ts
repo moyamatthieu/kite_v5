@@ -159,7 +159,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
 
     // 2. Obtenir l'état actuel du kite
     const kiteState = this.kiteController.getState();
-    const handles = this.controlBarManager.getHandlePositions(this.kite.position);
+    const handles = this.controlBarManager.getHandlePositions(this.kite);
 
     // 3. Calculer le vent apparent (vent réel - vitesse du kite)
     const apparentWind = this.windSimulator.getApparentWind(
