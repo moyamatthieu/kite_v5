@@ -27,7 +27,9 @@ export class ControlBarSystem extends BaseSimulationSystem {
   private logger: Logger;
   private controlBarEntity: Entity | null = null;
   private kite: Kite | null = null; // Référence temporaire jusqu'à migration complète du Kite en entité
-  private rotation: number = 0;
+  private targetRotation: number = 0; // Rotation cible (input utilisateur)
+  private currentRotation: number = 0; // Rotation actuelle (smoothed)
+  private smoothingFactor: number = 0.15; // Facteur de lissage (0-1, plus petit = plus smooth)
 
   constructor() {
     super('ControlBarSystem', 5); // Priorité moyenne (après Input, avant Render)
@@ -56,14 +58,14 @@ export class ControlBarSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Met à jour la rotation de la barre (appelé par l'input)
+   * Met à jour la rotation cible de la barre (appelé par l'input)
    */
   setRotation(rotation: number): void {
-    this.rotation = rotation;
+    this.targetRotation = rotation;
   }
 
   getRotation(): number {
-    return this.rotation;
+    return this.currentRotation;
   }
 
   update(context: SimulationContext): void {
@@ -73,6 +75,13 @@ export class ControlBarSystem extends BaseSimulationSystem {
     const mesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
 
     if (!transform || !mesh) return;
+
+    // Appliquer le smoothing sur la rotation (lerp)
+    this.currentRotation = THREE.MathUtils.lerp(
+      this.currentRotation,
+      this.targetRotation,
+      this.smoothingFactor
+    );
 
     // Calculer le quaternion de rotation basé sur l'axe du kite
     const quaternion = this.computeRotationQuaternion();
@@ -131,8 +140,8 @@ export class ControlBarSystem extends BaseSimulationSystem {
       rotationAxis.set(0, 1, 0);
     }
 
-    // Créer le quaternion avec l'axe calculé et la rotation utilisateur
-    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.rotation);
+    // Créer le quaternion avec l'axe calculé et la rotation lissée
+    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.currentRotation);
   }
 
   /**
@@ -168,7 +177,8 @@ export class ControlBarSystem extends BaseSimulationSystem {
   }
 
   reset(): void {
-    this.rotation = 0;
+    this.targetRotation = 0;
+    this.currentRotation = 0;
 
     if (this.controlBarEntity) {
       const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');

@@ -147,20 +147,23 @@ export class InputSystem extends BaseSimulationSystem {
    */
   private updateKeyboardInput(): void {
     // Contrôle de la barre avec les flèches gauche/droite
-    let targetBarPosition = 0;
+    // Input brut de l'utilisateur (instantané)
+    let rawInput = 0;
 
     if (this.keyStates.get('ArrowLeft')) {
-      targetBarPosition = -1; // Barre tirée à gauche
+      rawInput = -1; // Barre tirée à gauche
     } else if (this.keyStates.get('ArrowRight')) {
-      targetBarPosition = 1; // Barre tirée à droite
+      rawInput = 1; // Barre tirée à droite
     }
 
     // Appliquer la zone morte
-    if (Math.abs(targetBarPosition) < this.config.deadzone) {
-      targetBarPosition = 0;
+    if (Math.abs(rawInput) < this.config.deadzone) {
+      rawInput = 0;
     }
 
-    this.inputState.barPosition = targetBarPosition;
+    // Stocker l'input brut (sans smoothing)
+    // Le smoothing sera fait dans ControlBarSystem
+    this.inputState.barPosition = rawInput;
 
     // Boutons pulse
     this.inputState.resetPressed = this.keyStates.get('KeyR') || false;
@@ -176,27 +179,15 @@ export class InputSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Met à jour la position de la barre avec lissage
+   * Met à jour la position de la barre (pas de smoothing ici, fait dans ControlBarSystem)
    */
   private updateBarPosition(deltaTime: number): void {
-    const targetPosition = this.inputState.barPosition;
-
-    if (this.config.barSmoothingEnabled) {
-      // Lissage exponentiel
-      const smoothedPosition = THREE.MathUtils.lerp(
-        this.inputState.lastBarPosition,
-        targetPosition,
-        1.0 - Math.pow(1.0 - this.inputState.smoothingFactor, deltaTime * 60)
-      );
-
-      this.inputState.lastBarPosition = smoothedPosition;
-      this.inputState.barPosition = smoothedPosition;
-    } else {
-      this.inputState.lastBarPosition = targetPosition;
-    }
+    // L'input est déjà dans barPosition (brut)
+    // Le smoothing sera appliqué dans ControlBarSystem sur la rotation physique
 
     // Calculer la vitesse de changement
     this.inputState.barVelocity = (this.inputState.barPosition - this.inputState.lastBarPosition) / deltaTime;
+    this.inputState.lastBarPosition = this.inputState.barPosition;
 
     // Limiter la vitesse maximale
     if (Math.abs(this.inputState.barVelocity) > this.config.maxBarSpeed) {
