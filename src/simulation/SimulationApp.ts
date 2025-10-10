@@ -21,6 +21,7 @@ import {
   type InputConfig,
   type RenderConfig
 } from './systems';
+import { ControlBarSystem } from './systems/ControlBarSystem';
 
 import {
   UIManager,
@@ -31,6 +32,8 @@ import { DebugRenderer } from './rendering/DebugRenderer';
 import { CONFIG } from './config/SimulationConfig';
 import { Kite } from '../objects/Kite';
 import { ControlBarManager } from './controllers/ControlBarManager';
+import { Entity } from './entities/Entity';
+import { TransformComponent, MeshComponent } from './components';
 
 export interface SimulationConfig {
   targetFPS: number;
@@ -59,10 +62,12 @@ export class SimulationApp {
   private inputSystem!: InputSystem;
   private renderSystem?: RenderSystem;
   private kitePhysicsSystem?: KitePhysicsSystem;
+  private controlBarSystem!: ControlBarSystem;
 
   // === ENTITÉS ===
   private kite!: Kite;
   private controlBarManager!: ControlBarManager;
+  private controlBarEntity!: Entity;
 
   // === COMPOSANTS LEGACY ===
   private controlBar!: THREE.Group;
@@ -140,6 +145,7 @@ export class SimulationApp {
     this.physicsSystem = new PhysicsSystem(this.config.physics);
     this.windSystem = new WindSystem(this.config.wind);
     this.inputSystem = new InputSystem(this.config.input);
+    this.controlBarSystem = new ControlBarSystem();
 
     if (this.config.enableRenderSystem) {
       this.renderSystem = new RenderSystem(this.config.render);
@@ -181,7 +187,7 @@ export class SimulationApp {
     const initialPos = this.calculateInitialKitePosition();
     this.kite.position.copy(initialPos);
 
-    // Créer le gestionnaire de barre de contrôle
+    // Créer le gestionnaire de barre de contrôle (legacy - sera supprimé)
     this.controlBarManager = new ControlBarManager(CONFIG.controlBar.position.clone());
 
     // Configurer le système de physique du kite
@@ -192,7 +198,39 @@ export class SimulationApp {
     // Créer les composants legacy
     if (this.config.enableLegacyComponents) {
       this.createLegacyComponents();
+
+      // Créer l'entité ECS de la barre de contrôle
+      this.createControlBarEntity();
     }
+  }
+
+  /**
+   * Crée l'entité ECS de la barre de contrôle
+   */
+  private createControlBarEntity(): void {
+    // Créer l'entité
+    this.controlBarEntity = new Entity('controlBar');
+
+    // Ajouter le composant Transform
+    const transform = new TransformComponent({
+      position: CONFIG.controlBar.position.clone(),
+      rotation: 0,
+      quaternion: new THREE.Quaternion(),
+      scale: new THREE.Vector3(1, 1, 1)
+    });
+    this.controlBarEntity.addComponent(transform);
+
+    // Ajouter le composant Mesh (enveloppe le THREE.Group existant)
+    const mesh = new MeshComponent(this.controlBar, {
+      visible: true,
+      castShadow: true,
+      receiveShadow: false
+    });
+    this.controlBarEntity.addComponent(mesh);
+
+    // Configurer le système
+    this.controlBarSystem.setControlBarEntity(this.controlBarEntity);
+    this.controlBarSystem.setKite(this.kite);
   }
 
   /**
@@ -292,7 +330,8 @@ export class SimulationApp {
     const initPromises: Promise<void>[] = [
       this.physicsSystem.initialize(),
       this.windSystem.initialize(),
-      this.inputSystem.initialize()
+      this.inputSystem.initialize(),
+      this.controlBarSystem.initialize()
     ];
 
     if (this.renderSystem) {
@@ -471,6 +510,7 @@ export class SimulationApp {
     this.physicsSystem.reset();
     this.windSystem.reset();
     this.inputSystem.reset();
+    this.controlBarSystem.reset();
     this.kitePhysicsSystem?.reset();
 
     // Reset kite position avec calcul automatique de la position initiale
@@ -524,6 +564,11 @@ export class SimulationApp {
         this.kitePhysicsSystem.update(context);
       }
 
+      // Mise à jour du système de barre de contrôle ECS
+      const inputState = this.inputSystem.getInputState();
+      this.controlBarSystem.setRotation(inputState.barPosition);
+      this.controlBarSystem.update(context);
+
       if (this.renderSystem) {
         this.renderSystem.update(context);
       }
@@ -554,13 +599,8 @@ export class SimulationApp {
   private syncLegacyComponents(_context: any): void {
     if (!this.kitePhysicsSystem) return;
 
-    // Mettre à jour la barre de contrôle
-    const inputState = this.inputSystem.getInputState();
-    this.controlBarManager.setRotation(inputState.barPosition);
-
-    // ⚡ CRITIQUE : Mettre à jour la barre visuelle (THREE.Group)
-    // Sans cet appel, la barre reste figée car le manager calcule mais ne rend pas
-    this.controlBarManager.updateVisual(this.controlBar, this.kite);
+    // La barre de contrôle est maintenant gérée par ControlBarSystem (ECS)
+    // Ce code legacy ne sera plus nécessaire une fois la migration terminée
 
     // Mettre à jour les lignes de contrôle
     this.updateControlLines();
@@ -572,7 +612,8 @@ export class SimulationApp {
   private updateControlLines(): void {
     if (!this.leftLine || !this.rightLine || !this.kitePhysicsSystem) return;
 
-    const handles = this.controlBarManager.getHandlePositions(this.kite);
+    const handles = this.controlBarSystem.getHandlePositions();
+    if (!handles) return;
 
     // Récupérer les points de contrôle du kite (où les lignes s'attachent)
     const ctrlLeft = this.kite.getPoint("CTRL_GAUCHE");
@@ -626,6 +667,7 @@ export class SimulationApp {
     this.physicsSystem.dispose();
     this.windSystem.dispose();
     this.inputSystem.dispose();
+    this.controlBarSystem.dispose();
     this.renderSystem?.dispose();
     this.kitePhysicsSystem?.dispose();
 
@@ -639,6 +681,7 @@ export class SimulationApp {
       physics: this.physicsSystem,
       wind: this.windSystem,
       input: this.inputSystem,
+      controlBar: this.controlBarSystem,
       render: this.renderSystem,
       kitePhysics: this.kitePhysicsSystem
     };
