@@ -2,21 +2,13 @@
 /**
  * Kite.ts - Modèle 3D du cerf-volant delta pour la simulation Kite
  *
- * Rôle :
- *   - Définit la structure, les points anatomiques et les surfaces du cerf-volant
- *   - Utilise les factories pour générer la géométrie, la structure et la toile
- *   - Sert de base à tous les calculs physiques et au rendu
- *
- * Dépendances principales :
- *   - StructuredObject.ts : Classe de base pour tous les objets 3D structurés
- *   - FrameFactory.ts, SurfaceFactory.ts, PointFactory.ts : Factories pour la création des éléments du kite
- *   - Primitive.ts : Utilitaires pour les formes de base
- *   - Types : ICreatable pour l'interface de création
- *   - Three.js : Pour la géométrie et le rendu
- *
- * Relation avec les fichiers adjacents :
- *   - Les factories (FrameFactory, SurfaceFactory, PointFactory) sont utilisées pour générer la structure et la toile
- *   - StructuredObject.ts (dossier core) est la classe mère
+ * Modèle physique (voir PHYSICS_MODEL.md) :
+ *   - Structure tridimensionnelle rigide (frames carbone + surfaces toile)
+ *   - Masse distribuée sur chaque surface proportionnellement à son aire
+ *   - Inertie calculée automatiquement depuis la géométrie (I ≈ m·r²)
+ *   - Forces et couples émergent naturellement de la distribution spatiale des forces
+ *   - Les brides et lignes sont des contraintes géométriques, pas des forces directes
+ *   - L’équilibre du kite provient de la géométrie et de la répartition des masses
  *
  * Utilisation typique :
  *   - Instancié par le moteur physique et le rendu pour manipuler le kite
@@ -40,20 +32,21 @@ import { PointFactory, BridleLengths } from "../factories/PointFactory";
 import { CONFIG } from "../simulation/config/SimulationConfig";
 
 export class Kite extends StructuredObject implements ICreatable {
+  // Modèle physique : Structure 3D rigide
+  // - Structure tridimensionnelle rigide (frames carbone + surfaces toile)
+  // - Masse distribuée sur chaque surface proportionnellement à son aire
+  // - Inertie calculée automatiquement depuis la géométrie (I ≈ m·r²)
+  // - Forces et couples émergent naturellement de la distribution spatiale des forces
+  // - Les brides et lignes sont des contraintes géométriques, pas des forces directes
+  // - L’équilibre du kite provient de la géométrie et de la répartition des masses
+
   private frameFactory: FrameFactory;
   private surfaceFactory: SurfaceFactory;
   // Map centrale des points - Single Source of Truth
   private pointsMap: Map<string, [number, number, number]> = new Map();
   private bridleLines: THREE.Group | null = null;
   private bridleLengthFactor: number = 1.0; // Facteur de longueur virtuelle des brides principales
-
-  // Longueurs physiques des brides (en mètres)
-  // LONGUEURS IDENTIQUES : L'équilibre vient de la géométrie, pas des brides
-  // Principe: Kite suspendu par CTRL_GAUCHE et CTRL_DROIT sera horizontal
-  // si le centre de masse se trouve entre ces deux points (axe X)
   private bridleLengths: BridleLengths = { ...CONFIG.bridle.defaultLengths };
-
-  // Paramètres du cerf-volant
   private params = {
     width: 1.65, // Envergure
     height: 0.65, // Hauteur

@@ -28,7 +28,6 @@
  *   - src/simulation/physics/ConstraintSolver.ts
  */
 
-import * as THREE from "three";
 import { BridleFactory } from "@factories/BridleFactory";
 
 import { BridleLengths, BridleTensions } from "../types/BridleTypes";
@@ -147,7 +146,7 @@ export class BridleSystem {
     const endLocal = kite.getPoint(endPointName);
 
     if (!startLocal || !endLocal) {
-      console.warn(`⚠️ Points bride introuvables: ${startPointName} ou ${endPointName}`);
+      // Points bride introuvables - gestion silencieuse
       return 0;
     }
 
@@ -185,12 +184,11 @@ export class BridleSystem {
    * @param newLengths - Nouvelles longueurs (partial update)
    * @deprecated Utilisez PhysicsEngine.setBridleLength() à la place
    */
-  setBridleLengths(newLengths: Partial<BridleLengths>): void {
+  setBridleLengths(_newLengths: Partial<BridleLengths>): void {
     // Note: Les instances Line sont immuables. Pour changer les longueurs,
     // il faut recréer BridleSystem avec les nouvelles longueurs.
     // Cette méthode est dépréciée - utilisez PhysicsEngine.setBridleLength()
-    console.warn("⚠️ BridleSystem.setBridleLengths() est déprécié. Utilisez PhysicsEngine.setBridleLength() à la place");
-    console.log("   Nouvelles longueurs demandées:", newLengths);
+    // Gestion silencieuse - méthode dépréciée
   }
 
   /**

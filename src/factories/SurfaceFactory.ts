@@ -53,6 +53,12 @@ export class SurfaceFactory extends BaseFactory<StructuredObject & ICreatable> {
     };
   }
 
+  /**
+   * Modèle physique :
+   * - La masse du kite est distribuée sur chaque surface proportionnellement à son aire (voir PHYSICS_MODEL.md §1.2).
+   * - Cette logique doit être appliquée lors de la création des surfaces (buildSurfaces).
+   * - Permet l'émergence naturelle des couples gravitationnels et aérodynamiques.
+   */
   createObject(params?: SurfaceParams): StructuredObject & ICreatable {
     const mergedParams = this.mergeParams(params) as SurfaceParams;
 

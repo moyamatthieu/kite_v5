@@ -80,8 +80,8 @@ export class AerodynamicsCalculator {
     apparentWind: THREE.Vector3,
     kiteOrientation: THREE.Quaternion,
     kitePosition?: THREE.Vector3,
-    kiteVelocity?: THREE.Vector3,
-    angularVelocity?: THREE.Vector3
+    _kiteVelocity?: THREE.Vector3,
+    _angularVelocity?: THREE.Vector3
   ): {
     lift: THREE.Vector3;
     drag: THREE.Vector3;
@@ -102,8 +102,8 @@ export class AerodynamicsCalculator {
       };
     }
 
-    const windDir = apparentWind.clone().normalize();
-    const dynamicPressure = AerodynamicsCalculator.HALF_AIR_DENSITY * windSpeed * windSpeed;
+    apparentWind.clone().normalize();
+    AerodynamicsCalculator.HALF_AIR_DENSITY * windSpeed * windSpeed;
 
     // Forces séparées pour gauche et droite
     const leftForce = new THREE.Vector3();
@@ -123,8 +123,14 @@ export class AerodynamicsCalculator {
     // Collection des forces par surface pour le debug
     const surfaceForces: SurfaceForce[] = [];
 
-    // On examine chaque triangle du cerf-volant un par un
-    // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
+  // Modèle physique :
+  // - Les forces aérodynamiques (portance, traînée) sont calculées et appliquées pour chaque surface triangulaire
+  // - La masse de chaque surface est proportionnelle à son aire
+  // - Les forces sont appliquées au centre géométrique du triangle (barycentre)
+  // - Les couples émergent naturellement de la distribution spatiale des forces
+  // - Voir PHYSICS_MODEL.md §4.2 pour les équations et principes
+  // On examine chaque triangle du cerf-volant un par un
+  // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
     KiteGeometry.SUBDIVIDED_SURFACES.forEach((surface, surfaceIndex) => {
       // 🔴 MAILLAGE FIN : Distribuer la masse proportionnellement à l'aire
       // Trouver quelle surface originale contient ce sous-triangle

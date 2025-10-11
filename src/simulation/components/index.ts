@@ -9,3 +9,5 @@ export { MeshComponent } from './MeshComponent';
 
 export { PhysicsComponent } from './PhysicsComponent';
 export type { PhysicsComponentData } from './PhysicsComponent';
+
+export { KiteComponent } from './KiteComponent';

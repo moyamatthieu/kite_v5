@@ -225,7 +225,7 @@ export class LinePhysics {
 
     // Paramètre de la caténaire : a = T / (ρ × g)
     const rho = line.config.linearMassDensity;
-    const a = tension / (rho * LinePhysics.GRAVITY);
+    tension / (rho * LinePhysics.GRAVITY);
 
     // Calcul sag maximal
     const sag = this.calculateCatenarySag(line, tension);

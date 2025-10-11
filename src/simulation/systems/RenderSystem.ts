@@ -74,18 +74,27 @@ export class RenderSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Initialise le renderer Three.js
+   * Vérifie si l'environnement DOM est disponible
    */
-  private async initializeRenderer(): Promise<void> {
+  private checkDOMEnvironment(): void {
     if (typeof document === 'undefined') {
       throw new Error('RenderSystem requires a DOM environment');
     }
+  }
 
-    // Créer le canvas
+  /**
+   * Crée et configure le canvas
+   */
+  private createCanvas(): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
     canvas.id = 'kite-simulator-canvas';
+    return canvas;
+  }
 
-    // Créer le renderer
+  /**
+   * Crée et configure le renderer WebGL
+   */
+  private createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
     const renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: this.config.antialias,
@@ -93,28 +102,42 @@ export class RenderSystem extends BaseSimulationSystem {
       powerPreference: this.config.powerPreference
     });
 
-    // Configurer le renderer
+    // Configuration de base
     renderer.setPixelRatio(this.config.pixelRatio);
     renderer.setClearColor(this.config.clearColor, this.config.clearAlpha);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Configurer les ombres
+    // Configuration des ombres
     if (this.config.shadowMapEnabled) {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = this.config.shadowMapType;
     }
 
-    // Créer la scène
+    return renderer;
+  }
+
+  /**
+   * Crée et configure la scène avec brouillard
+   */
+  private createScene(): THREE.Scene {
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(this.config.clearColor, 50, 200);
+    return scene;
+  }
 
-    // Ajouter des lumières
+  /**
+   * Configure l'éclairage de la scène
+   */
+  private setupLighting(scene: THREE.Scene): void {
+    // Lumière ambiante
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
+    // Lumière directionnelle
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 20, 10);
     directionalLight.castShadow = this.config.shadowMapEnabled;
+
     if (this.config.shadowMapEnabled) {
       directionalLight.shadow.mapSize.width = 2048;
       directionalLight.shadow.mapSize.height = 2048;
@@ -124,45 +147,94 @@ export class RenderSystem extends BaseSimulationSystem {
     scene.add(directionalLight);
 
     this.logger.info('Scene lights created', 'RenderSystem');
+  }
 
-    // Ajouter un sol (ground plane)
+  /**
+   * Ajoute le sol et la grille à la scène
+   */
+  private setupGroundAndGrid(scene: THREE.Scene): void {
+    // Sol
     const groundGeometry = new THREE.PlaneGeometry(100, 100);
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x3a7d44, // Vert herbe
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3a7d44,
       roughness: 0.8,
       metalness: 0.2
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2; // Rotation pour être horizontal
+    ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.receiveShadow = this.config.shadowMapEnabled;
     scene.add(ground);
 
-    // Ajouter une grille pour référence visuelle
+    // Grille
     const gridHelper = new THREE.GridHelper(100, 50, 0x888888, 0x444444);
-    gridHelper.position.y = 0.01; // Légèrement au-dessus du sol pour éviter le z-fighting
+    gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
     this.logger.info('Ground plane and grid created', 'RenderSystem');
+  }
 
-    // Créer la caméra (sera configurée par le système de caméra séparé)
+  /**
+   * Crée et configure la caméra
+   */
+  private createCamera(): THREE.PerspectiveCamera {
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 5, 15); // Position de la caméra derrière et légèrement au-dessus
-    camera.lookAt(0, 5, 0); // Regarder vers le centre où se trouve le kite
+    camera.position.set(0, 3, 5);
+    camera.lookAt(0, 5, -15);
+    return camera;
+  }
 
-    // Créer les contrôles OrbitControls pour la navigation de caméra
+  /**
+   * Crée et configure les contrôles de caméra
+   */
+  private createCameraControls(camera: THREE.PerspectiveCamera, canvas: HTMLCanvasElement): OrbitControls {
     const controls = new OrbitControls(camera, canvas);
-    controls.enableDamping = true; // Lissage du mouvement
+    controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 5;
+    controls.minDistance = 2;
     controls.maxDistance = 100;
-    controls.maxPolarAngle = Math.PI / 2; // Empêcher de passer sous le sol
-    controls.target.set(0, 5, 0); // Regarder le kite
+    controls.maxPolarAngle = Math.PI / 2;
+    controls.target.set(0, 5, -10);
     controls.update();
 
     this.logger.info('OrbitControls created', 'RenderSystem');
+    return controls;
+  }
 
-    // Initialiser l'état de rendu
+  /**
+   * Ajoute le canvas au DOM et configure les écouteurs
+   */
+  private setupCanvasInDOM(canvas: HTMLCanvasElement): void {
+    const container = document.getElementById('app') || document.body;
+    container.appendChild(canvas);
+
+    this.logger.info(`Canvas created and added to container: ${container.id || 'body'}`, 'RenderSystem');
+    this.logger.info(`Canvas dimensions: ${canvas.width}x${canvas.height}`, 'RenderSystem');
+
+    // Écouteur de redimensionnement
+    window.addEventListener('resize', this.onResize.bind(this));
+  }
+
+  /**
+   * Initialise le renderer Three.js
+   */
+  private async initializeRenderer(): Promise<void> {
+    this.checkDOMEnvironment();
+
+    // Création des composants
+    const canvas = this.createCanvas();
+    const renderer = this.createRenderer(canvas);
+    const scene = this.createScene();
+
+    // Configuration de la scène
+    this.setupLighting(scene);
+    this.setupGroundAndGrid(scene);
+
+    // Création de la caméra et contrôles
+    const camera = this.createCamera();
+    const controls = this.createCameraControls(camera, canvas);
+
+    // Initialisation de l'état
     this.renderState = {
       scene,
       camera,
@@ -175,27 +247,13 @@ export class RenderSystem extends BaseSimulationSystem {
       lastFrameTime: performance.now()
     };
 
-    // Configurer la taille initiale
+    // Configuration finale
     this.onResize();
-
-    // Ajouter le canvas au DOM
-    const container = document.getElementById('app') || document.body;
-    container.appendChild(canvas);
-    
-    this.logger.info(`Canvas created and added to container: ${container.id || 'body'}`, 'RenderSystem');
-    this.logger.info(`Canvas dimensions: ${canvas.width}x${canvas.height}`, 'RenderSystem');
-
-    // Écouteur de redimensionnement
-    window.addEventListener('resize', this.onResize.bind(this));
+    this.setupCanvasInDOM(canvas);
   }
 
-  update(context: SimulationContext): void {
+  update(_context: SimulationContext): void {
     if (!this.renderState || !this.renderState.isRendering) {
-      if (!this.renderState) {
-        console.warn('RenderSystem: renderState is null');
-      } else if (!this.renderState.isRendering) {
-        console.warn('RenderSystem: isRendering is false');
-      }
       return;
     }
 
@@ -252,16 +310,11 @@ export class RenderSystem extends BaseSimulationSystem {
   startRendering(): void {
     if (this.renderState) {
       this.renderState.isRendering = true;
-      console.log('🎬 RenderSystem: Rendering started');
-      console.log(`📺 Canvas element: ${this.renderState.canvas.id}`);
-      console.log(`🎭 Scene children count: ${this.renderState.scene.children.length}`);
-      console.log(`📐 Canvas size: ${this.renderState.canvas.width}x${this.renderState.canvas.height}`);
-      console.log(`📷 Camera position:`, this.renderState.camera.position);
       this.logger.info('Rendering started', 'RenderSystem');
       this.logger.info(`Canvas element: ${this.renderState.canvas.id}`, 'RenderSystem');
       this.logger.info(`Scene children count: ${this.renderState.scene.children.length}`, 'RenderSystem');
     } else {
-      console.error('❌ RenderSystem: Cannot start rendering - renderState is null');
+      this.logger.error('Cannot start rendering - renderState is null', 'RenderSystem');
     }
   }
 

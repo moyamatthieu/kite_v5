@@ -32,13 +32,9 @@ import * as THREE from "three";
 import { Primitive } from "@core/Primitive";
 
 import { Kite } from "../../objects/Kite";
-import { KiteState, SurfaceForce } from "../types";
-import type { KiteController } from "../controllers/KiteController";
-import type { ControlBarManager } from "../controllers/ControlBarManager";
+import { SurfaceForce } from "../types";
 import type { LineSystem } from "../physics/LineSystem";
 import type { WindSimulator } from "../physics/WindSimulator";
-import { AerodynamicsCalculator } from "../physics/AerodynamicsCalculator";
-import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
 import { KiteGeometry } from "../config/KiteGeometry";
 
@@ -142,9 +138,11 @@ export class DebugRenderer {
     surfaceMass: false,  // Désactivé par défaut (peut surcharger l'affichage)
     torque: true, // Activé par défaut
   };
+  private physicsSystem: any;
 
-  constructor(renderTarget: DebugRenderTarget) {
+  constructor(renderTarget: DebugRenderTarget, physicsSystem: any) {
     this.renderTarget = renderTarget;
+    this.physicsSystem = physicsSystem;
     this.debugMode = CONFIG.debugVectors === true;
     this.setupDebugControls();
   }
@@ -264,208 +262,78 @@ export class DebugRenderer {
     this.debugArrows = [];
   }
 
-  updateDebugArrows(kite: Kite, physicsSource: DebugPhysicsSource): void {
-    if (!this.debugMode) return;
+  // TODO: Réimplémenter avec ECS
+  private updateDebugArrows(): void {
+    const physicsInfo = this.physicsSystem.getDebugInfo();
+    if (!physicsInfo || !physicsInfo.kiteState) return;
 
     this.clearDebugArrows();
 
-    const kiteState = physicsSource.getKiteController().getState();
-    const kitePosition = kite.position.clone();
+    const kitePosition = physicsInfo.kiteState.position;
+    const velocity = physicsInfo.kiteState.velocity;
 
-    // Calculer le centre géométrique entre NEZ et SPINE_BAS
-    const centerLocal = new THREE.Vector3(0, 0.325, 0);
-    const centerWorld = kite.toWorldCoordinates(centerLocal);
-
-    // Vecteur de vitesse du kite (vert vif)
-    if (this.vectorVisibility.velocity && kiteState.velocity.length() > CONFIG.debug.minVelocityDisplay) {
-      const velocityArrow = Primitive.arrow(
-        kiteState.velocity.clone().normalize(),
-        centerWorld,
-        kiteState.velocity.length() * VECTOR_SCALES.velocity,
-        DEBUG_COLORS.velocity,
-        ARROW_HEAD_CONFIG.large.headLength,
-        ARROW_HEAD_CONFIG.large.headWidth
-      );
-        this.renderTarget.addObject(velocityArrow);
-      this.debugArrows.push(velocityArrow);
+    // Flèche de vitesse (utiliser THREE.ArrowHelper directement si RenderSystem non disponible)
+    if (this.vectorVisibility.velocity && velocity.length() > 0.1) {
+      const dir = velocity.clone().normalize();
+      const origin = kitePosition;
+      const length = velocity.length() * VECTOR_SCALES.velocity;
+      const arrow = new THREE.ArrowHelper(dir, origin, length, DEBUG_COLORS.velocity);
+      this.debugArrows.push(arrow);
+      this.renderTarget.addObject(arrow);
     }
 
-    const windSim = physicsSource.getWindSimulator();
-    const wind = windSim.getWindAt(kitePosition);
-    const relativeWind = wind.clone().sub(kiteState.velocity);
-
-    // Vecteur de vent apparent (cyan)
-    if (this.vectorVisibility.apparentWind && relativeWind.length() > CONFIG.debug.minVelocityDisplay) {
-      const apparentWindArrow = Primitive.arrow(
-        relativeWind.clone().normalize(),
-        centerWorld,
-        relativeWind.length() * VECTOR_SCALES.apparentWind,
-        DEBUG_COLORS.apparentWind,
-        ARROW_HEAD_CONFIG.large.headLength,
-        ARROW_HEAD_CONFIG.large.headWidth
-      );
-        this.renderTarget.addObject(apparentWindArrow);
-      this.debugArrows.push(apparentWindArrow);
-    }
-
-    if (relativeWind.length() > CONFIG.debug.minVelocityDisplay) {
-      const { lift, drag, surfaceForces } = AerodynamicsCalculator.calculateForces(
-        relativeWind,
-        kite.quaternion,
-        kite.position,
-        kiteState.velocity,
-        kiteState.angularVelocity
-      );
-
-      // Forces globales (si activé)
-      if (this.vectorVisibility.globalForces) {
-        // Portance globale (bleu royal)
-        if (lift.length() > CONFIG.debug.minVectorLength) {
-          const liftArrow = Primitive.arrow(
-            lift.clone().normalize(),
-            centerWorld,
-            Math.sqrt(lift.length()) * VECTOR_SCALES.globalLift,
-            DEBUG_COLORS.globalLift,
-            ARROW_HEAD_CONFIG.medium.headLength,
-            ARROW_HEAD_CONFIG.medium.headWidth
-          );
-            this.renderTarget.addObject(liftArrow);
-          this.debugArrows.push(liftArrow);
-        }
-
-        // Résultante globale (blanc) - somme de toutes les surfaces
-        const globalResultant = surfaceForces.reduce((sum, sf) => sum.add(sf.resultant.clone()), new THREE.Vector3());
-        if (globalResultant.length() > CONFIG.debug.minVectorLength) {
-          const resultantArrow = Primitive.arrow(
-            globalResultant.clone().normalize(),
-            centerWorld,
-            Math.sqrt(globalResultant.length()) * VECTOR_SCALES.globalResultant,
-            DEBUG_COLORS.globalResultant,
-            ARROW_HEAD_CONFIG.large.headLength,
-            ARROW_HEAD_CONFIG.large.headWidth
-          );
-            this.renderTarget.addObject(resultantArrow);
-          this.debugArrows.push(resultantArrow);
-        }
-      }
-
-      // Afficher les forces par surface (si activé)
-      if (this.vectorVisibility.surfaceForces) {
-        this.displaySurfaceForces(surfaceForces);
-      }
-
-      // Afficher les vecteurs de masse distribuée (si activé)
-      if (this.vectorVisibility.surfaceMass) {
-        this.displaySurfaceMass(kite);
-      }
-
-      // Afficher le couple aérodynamique (si activé)
-      if (this.vectorVisibility.torque) {
-        const { torque } = AerodynamicsCalculator.calculateForces(
-          relativeWind,
-          kite.quaternion,
-          kite.position,
-          kiteState.velocity,
-          kiteState.angularVelocity
-        );
-        if (torque.length() > CONFIG.debug.minVectorLength) {
-          const torqueArrow = Primitive.arrow(
-            torque.clone().normalize(),
-            centerWorld,
-            Math.sqrt(torque.length()) * VECTOR_SCALES.torque,
-            DEBUG_COLORS.torque,
-            ARROW_HEAD_CONFIG.medium.headLength,
-            ARROW_HEAD_CONFIG.medium.headWidth
-          );
-            this.renderTarget.addObject(torqueArrow);
-          this.debugArrows.push(torqueArrow);
-        }
-      }
-
-      this.updateDebugDisplay(kiteState, kitePosition, { lift, drag }, physicsSource);
-    }
+    // TODO: Ajouter autres flèches avec ECS
   }
 
-  private updateDebugDisplay(
-    kiteState: KiteState,
-    kitePosition: THREE.Vector3,
-    forces: { lift: THREE.Vector3; drag: THREE.Vector3 },
-    physicsSource: DebugPhysicsSource
-  ): void {
-    const debugInfo = document.getElementById("debug-info");
-    if (!debugInfo || !this.debugMode) return;
+  // TODO: Réimplémenter avec ECS
+  private updateDebugDisplay(): void {
+    const physicsInfo = this.physicsSystem.getDebugInfo();
+    if (!physicsInfo) return;
 
-    const { lift, drag } = forces;
+    const kiteState = physicsInfo.kiteState;
+    const windState = physicsInfo.windState;
+    const lineTensions = physicsInfo.lineTensions || { left: 0, right: 0 };
 
-    // Calcul des tensions des lignes
-    const lineLength = physicsSource.getLineSystem().lineLength;
-    const kite = physicsSource.getKiteController().getKite();
-    const handles = physicsSource
-      .getControlBarManager()
-      .getHandlePositions(kite);
-    const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
-    const ctrlRight = kite.getPoint("CTRL_DROIT");
+    const kitePosition = kiteState.position;
+    const velocityLength = kiteState.velocity.length();
 
+    // Calcul tensions lignes basique
     let tensionInfo = "N/A";
-    if (ctrlLeft && ctrlRight) {
-      const kiteLeftWorld = kite.toWorldCoordinates(ctrlLeft);
-      const kiteRightWorld = kite.toWorldCoordinates(ctrlRight);
-
-      const distL = kiteLeftWorld.distanceTo(handles.left);
-      const distR = kiteRightWorld.distanceTo(handles.right);
-      const tautL = distL >= lineLength - PhysicsConstants.LINE_CONSTRAINT_TOLERANCE;
-      const tautR = distR >= lineLength - PhysicsConstants.LINE_CONSTRAINT_TOLERANCE;
-
-      tensionInfo = `L:${tautL ? "TENDU" : "RELÂCHÉ"}(${distL.toFixed(2)}m) R:${
-        tautR ? "TENDU" : "RELÂCHÉ"
-      }(${distR.toFixed(2)}m)`;
+    if (lineTensions.left > 0 || lineTensions.right > 0) {
+      tensionInfo = `L:${lineTensions.left.toFixed(2)}N R:${lineTensions.right.toFixed(2)}N`;
     }
 
-    const windState = physicsSource.getWindSimulator().getParams();
+    const debugInfo = document.getElementById("debug-info") as HTMLElement;
+    if (debugInfo) {
+      debugInfo.innerHTML = `
+        <strong>🪁 Position Cerf-volant:</strong><br>
+        X: ${kitePosition.x.toFixed(2)}m, Y: ${kitePosition.y.toFixed(2)}m, Z: ${kitePosition.z.toFixed(2)}m<br><br>
 
-    // Assemblage des informations de debug
-    const totalForce = Math.sqrt(lift.lengthSq() + drag.lengthSq());
+        <strong>💨 Vent:</strong><br>
+        Vitesse: ${windState.speed.toFixed(1)} km/h<br>
+        Direction: ${windState.direction.toFixed(0)}°<br>
+        Turbulence: ${windState.turbulence.toFixed(1)}%<br><br>
 
-    debugInfo.innerHTML = `
-            <strong>🪁 Position Cerf-volant:</strong><br>
-            X: ${kitePosition.x.toFixed(2)}m, Y: ${kitePosition.y.toFixed(
-      2
-    )}m, Z: ${kitePosition.z.toFixed(2)}m<br><br>
+        <strong>🏃 Vitesse Cerf-volant:</strong><br>
+        ${velocityLength.toFixed(2)} m/s<br><br>
 
-            <strong>💨 Vent:</strong><br>
-            Vitesse: ${windState.speed.toFixed(1)} km/h<br>
-            Direction: ${windState.direction.toFixed(0)}°<br>
-            Turbulence: ${windState.turbulence.toFixed(1)}%<br><br>
+        <strong>🔗 Tensions Lignes:</strong><br>
+        ${tensionInfo}<br><br>
 
-            <strong>⚡ Forces Aérodynamiques:</strong><br>
-            Portance: ${lift.length().toFixed(3)} N<br>
-            Traînée: ${drag.length().toFixed(3)} N<br>
-            Force Totale: ${totalForce.toFixed(3)} N<br><br>
+        <strong>⚙️ Performance:</strong><br>
+        Statut: <span style="color: #00ff88;">SIMULATION ACTIVE</span>
+      `;
+    }
 
-            <strong>🔗 Tensions Lignes:</strong><br>
-            ${tensionInfo}<br><br>
-
-            <strong>🏃 Vitesse Cerf-volant:</strong><br>
-            ${kiteState.velocity.length().toFixed(2)} m/s<br><br>
-
-            <strong>⚙️ Performance:</strong><br>
-            Statut: <span style="color: #00ff88;">STABLE</span>
-        `;
+    // TODO: Ajouter forces une fois calculées dans ECS
   }
 
   /**
    * Affiche une flèche de force pour chaque surface du kite
    */
   private displaySurfaceForces(surfaceForces: SurfaceForce[]): void {
-    const colorPalette = [
-      0xff6b6b, // Rouge - Surface 0 (haute gauche)
-      0x51cf66, // Vert - Surface 1 (basse gauche) 
-      0x667eea, // Bleu - Surface 2 (haute droite)
-      0xff9f43, // Orange - Surface 3 (basse droite)
-    ];
-
     surfaceForces.forEach((surfaceForce) => {
-      const { lift, drag, friction, resultant, center, surfaceIndex: _surfaceIndex } = surfaceForce;
+      const { lift, drag, friction, resultant, center } = surfaceForce;
   const centerWorld = center.clone();
 
       // Portance locale (bleu ciel profond)
@@ -530,9 +398,42 @@ export class DebugRenderer {
    * Affiche les vecteurs de force gravitationnelle pour chaque surface
    * Visualise la masse distribuée (physique émergente)
    */
-  private displaySurfaceMass(kite: Kite): void {
+  /**
+   * Affiche la sphère de vol du kite (concept physique fondamental)
+   * Visualise la sphère définie par R = longueur_lignes + longueur_bridles
+   */
+  private displayFlightSphere(flightSphere: any, _kite: Kite): void {
+    if (!flightSphere) return;
+
+    // Créer la géométrie de la sphère (fil de fer pour ne pas obstruer la vue)
+    const sphereGeometry = new THREE.SphereGeometry(flightSphere.radius, 16, 12);
+    const sphereMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.1,
+      wireframe: true
+    });
+
+    const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphereMesh.position.copy(flightSphere.center);
+
+    // Ajouter temporairement à la scène pour visualisation
+    this.renderTarget.addObject(sphereMesh);
+    this.debugArrows.push(sphereMesh as any);
+
+    // Ajouter le centre de la sphère
+    const centerGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+    const centerMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+    const centerMesh = new THREE.Mesh(centerGeometry, centerMaterial);
+    centerMesh.position.copy(flightSphere.center);
+
+    this.renderTarget.addObject(centerMesh);
+    this.debugArrows.push(centerMesh as any);
+  }
+
+  private displaySurfaceMass(_kite: Kite): void {
     // Pour chaque surface avec sa masse
-    KiteGeometry.SURFACES_WITH_MASS.forEach((surface: any, surfaceIndex: number) => {
+    KiteGeometry.SURFACES_WITH_MASS.forEach((surface: any, _surfaceIndex: number) => {
       // Centre géométrique de la surface (coordonnées locales)
       const centre = KiteGeometry.calculateTriangleCentroid(
         surface.vertices[0],
@@ -541,7 +442,7 @@ export class DebugRenderer {
       );
 
       // Transformer en coordonnées monde
-      const centerWorld = kite.toWorldCoordinates(centre);
+      const centerWorld = _kite.toWorldCoordinates(centre);
 
       // Force gravitationnelle = m × g (vers le bas)
       const gravityForce = new THREE.Vector3(0, -surface.mass * CONFIG.physics.gravity, 0);
@@ -586,9 +487,7 @@ export class DebugRenderer {
  * Fournit les méthodes nécessaires pour accéder aux contrôleurs et simulateurs
  */
 export interface DebugPhysicsSource {
-  getKiteController(): KiteController;
   getWindSimulator(): WindSimulator;
   getLineSystem(): LineSystem;
-  getControlBarManager(): ControlBarManager;
 }
 

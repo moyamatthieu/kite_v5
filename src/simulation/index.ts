@@ -15,11 +15,6 @@ export * from './types';
 export * from './physics/WindSimulator';
 export * from './physics/AerodynamicsCalculator';
 export * from './physics/LineSystem';
-export * from './physics/PhysicsEngine';
-
-export * from './controllers/ControlBarManager';
-export * from './controllers/KiteController';
-export * from './controllers/InputHandler';
 
 export * from './rendering/RenderManager';
 export * from './rendering/DebugRenderer';

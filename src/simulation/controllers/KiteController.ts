@@ -1,48 +1,24 @@
 /**
- * KiteController.ts - Contrôleur du cerf-volant pour la simulation Kite
+ * KiteController.ts - Contrôleur physique du cerf-volant
  *
- * Rôle :
- *   - Gère l'état physique et le mouvement du cerf-volant
- *   - Applique les forces, met à jour la position, la vitesse et l'orientation
- *   - Détecte les situations extrêmes (accélération, vitesse, rotation)
- *
- * Dépendances principales :
- *   - Kite.ts : Modèle 3D du cerf-volant
- *   - PhysicsConstants.ts, SimulationConfig.ts : Paramètres et limites physiques
- *   - ConstraintSolver.ts : Applique les contraintes de ligne
- *   - Types : KiteState, HandlePositions pour typer l'état
- *   - Three.js : Pour la géométrie et le calcul
- *
- * Relation avec les fichiers adjacents :
- *   - Utilisé par PhysicsEngine pour manipuler le kite
- *   - Interagit avec ControlBarManager pour la gestion des lignes
- *
- * Utilisation typique :
- *   - Instancié par PhysicsEngine, appelé à chaque frame pour mettre à jour l'état du kite
- *   - Sert à la visualisation et au contrôle du kite
- *
- * Voir aussi :
- *   - src/objects/organic/Kite.ts
- *   - src/simulation/physics/PhysicsEngine.ts
- *   - src/simulation/controllers/ControlBarManager.ts
+ * Gère l'état physique du kite, l'intégration des forces et l'application
+ * des contraintes géométriques (lignes et brides).
  */
-import * as THREE from "three";
 
-import { Kite } from "../../objects/Kite";
-import { KiteState, HandlePositions } from "../types";
-import { PhysicsConstants } from "../config/PhysicsConstants";
-import { CONFIG } from "../config/SimulationConfig";
-import { ConstraintSolver } from "../physics/ConstraintSolver";
+import * as THREE from 'three';
 
-/**
- * Contrôleur du cerf-volant
- *
- * Gère l'état physique et le mouvement du cerf-volant
- */
+import { Kite } from '../../objects/Kite';
+import { CONFIG } from '../config/SimulationConfig';
+import { PhysicsConstants } from '../config/PhysicsConstants';
+import { KiteState } from '../types';
+import { HandlePositions } from '../types';
+import { ConstraintSolver } from '../physics/ConstraintSolver';
+
 export class KiteController {
   private kite: Kite;
   private state: KiteState;
   private previousPosition: THREE.Vector3;
+
   // États pour les warnings
   private hasExcessiveAccel: boolean = false;
   private hasExcessiveVelocity: boolean = false;
@@ -53,11 +29,7 @@ export class KiteController {
   // Lissage temporel des forces
   private smoothedForce: THREE.Vector3;
   private smoothedTorque: THREE.Vector3;
-  private forceSmoothingRate: number = KiteController.DEFAULT_FORCE_SMOOTHING_RATE; // 🔧 PHASE 1: Quasi-désactivé pour restaurer réactivité
-
-  // Instantanés pour l'UI/debug
-  private lastLiftForce: THREE.Vector3 | null = null;
-  private lastDragForce: THREE.Vector3 | null = null;
+  private forceSmoothingRate: number = KiteController.DEFAULT_FORCE_SMOOTHING_RATE;
 
   // Constantes pour éviter les facteurs magiques
   private static readonly DEFAULT_FORCE_SMOOTHING_RATE = 0.1;
@@ -71,9 +43,6 @@ export class KiteController {
       velocity: new THREE.Vector3(),
       angularVelocity: new THREE.Vector3(),
       orientation: kite.quaternion.clone(),
-      acceleration: new THREE.Vector3(),
-      angularAcceleration: new THREE.Vector3(),
-      mass: CONFIG.kite.mass,
     };
     this.previousPosition = kite.position.clone();
     this.kite.userData.lineLength = CONFIG.lines.defaultLength;
@@ -98,7 +67,6 @@ export class KiteController {
     const validTorque = this.validateTorque(torque);
 
     // Lissage exponentiel des forces (indépendant du framerate)
-    // smoothingFactor = 1 - e^(-rate × dt)
     const smoothingFactor = 1 - Math.exp(-this.forceSmoothingRate * deltaTime);
     this.smoothedForce.lerp(validForces, smoothingFactor);
     this.smoothedTorque.lerp(validTorque, smoothingFactor);
@@ -107,12 +75,8 @@ export class KiteController {
     const newPosition = this.integratePhysics(this.smoothedForce, deltaTime);
 
     // Résolution itérative des contraintes PBD pour convergence stable
-    // Les contraintes lignes ↔ brides s'influencent mutuellement
-    // Une seule passe n'est pas suffisante - il faut itérer jusqu'à convergence
-
     for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
       // Appliquer les contraintes de lignes (Position-Based Dynamics)
-      // Le solveur peut modifier newPosition ainsi que state.velocity / state.angularVelocity
       try {
         ConstraintSolver.enforceLineConstraints(
           this.kite,
@@ -121,12 +85,10 @@ export class KiteController {
           handles
         );
       } catch (err) {
-        // Ne pas laisser une exception du solveur casser la boucle principale
         console.error(`⚠️ Erreur dans ConstraintSolver.enforceLineConstraints (iter ${iter}):`, err);
       }
 
       // Appliquer les contraintes des brides (Position-Based Dynamics)
-      // Les brides sont des contraintes INTERNES qui lient les points du kite entre eux
       try {
         ConstraintSolver.enforceBridleConstraints(
           this.kite,
@@ -139,7 +101,7 @@ export class KiteController {
       }
     }
 
-    // Gérer la collision avec le sol - corrige newPosition et vitesse si nécessaire
+    // Gérer la collision avec le sol
     try {
       ConstraintSolver.handleGroundCollision(this.kite, newPosition, this.state.velocity);
     } catch (err) {
@@ -151,11 +113,10 @@ export class KiteController {
 
     // Appliquer la position et l'orientation
     this.kite.position.copy(newPosition);
-    this.updateOrientation(this.smoothedTorque, deltaTime); // Utiliser le torque lissé
+    this.updateOrientation(this.smoothedTorque, deltaTime);
     this.previousPosition.copy(newPosition);
-  this.state.position.copy(this.kite.position);
-  this.state.orientation = this.kite.quaternion.clone();
   }
+
   /**
    * Valide les forces appliquées au cerf-volant
    */
@@ -188,17 +149,14 @@ export class KiteController {
 
   /**
    * Intègre les forces pour calculer la nouvelle position (méthode d'Euler)
-   * Implémente la 2ème loi de Newton : F = ma → a = F/m
    */
   private integratePhysics(
     forces: THREE.Vector3,
     deltaTime: number
   ): THREE.Vector3 {
     // Newton : accélération = Force / masse
-    // IMPORTANT: clone() pour ne pas modifier le vecteur forces en place!
     const acceleration = forces.clone().divideScalar(CONFIG.kite.mass);
     this.lastAccelMagnitude = acceleration.length();
-  this.state.acceleration?.copy(acceleration);
 
     // Sécurité : limiter pour éviter l'explosion numérique
     this.hasExcessiveAccel = acceleration.length() > PhysicsConstants.MAX_ACCELERATION;
@@ -209,16 +167,14 @@ export class KiteController {
     }
 
     // Intégration d'Euler : v(t+dt) = v(t) + a·dt
-    // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier acceleration!
     this.state.velocity.add(acceleration.clone().multiplyScalar(deltaTime));
 
-    // Amortissement exponentiel : v(t) = v₀ × e^(-c×dt)
-    // Formule physiquement correcte, indépendante du framerate
+    // Amortissement exponentiel
     const linearDampingFactor = Math.exp(-CONFIG.physics.linearDampingCoeff * deltaTime);
     this.state.velocity.multiplyScalar(linearDampingFactor);
     this.lastVelocityMagnitude = this.state.velocity.length();
 
-    // Garde-fou vitesse max (réalisme physique)
+    // Garde-fou vitesse max
     this.hasExcessiveVelocity = this.state.velocity.length() > PhysicsConstants.MAX_VELOCITY;
     if (this.hasExcessiveVelocity) {
       this.state.velocity
@@ -227,11 +183,9 @@ export class KiteController {
     }
 
     // Position : x(t+dt) = x(t) + v·dt
-    const nextPosition = this.kite.position
+    return this.kite.position
       .clone()
       .add(this.state.velocity.clone().multiplyScalar(deltaTime));
-
-    return nextPosition;
   }
 
   /**
@@ -249,15 +203,13 @@ export class KiteController {
    * Met à jour l'orientation du cerf-volant - Dynamique du corps rigide
    */
   private updateOrientation(torque: THREE.Vector3, deltaTime: number): void {
-    // Couple d'amortissement (résistance aérodynamique à la rotation)
-    // τ_drag = -I × k_drag × ω  (unités correctes: kg·m² × 1/s × rad/s = N·m)
+    // Couple d'amortissement
     const dampTorque = this.state.angularVelocity
       .clone()
       .multiplyScalar(-CONFIG.kite.inertia * CONFIG.physics.angularDragFactor);
     const effectiveTorque = torque.clone().add(dampTorque);
 
     // Dynamique rotationnelle : α = T / I
-    // IMPORTANT: clone() pour ne pas modifier effectiveTorque en place!
     const angularAcceleration = effectiveTorque.clone().divideScalar(
       CONFIG.kite.inertia
     );
@@ -271,25 +223,11 @@ export class KiteController {
         .multiplyScalar(PhysicsConstants.MAX_ANGULAR_ACCELERATION);
     }
 
-  this.state.angularAcceleration?.copy(angularAcceleration);
-
     // Mise à jour de la vitesse angulaire
-    // IMPORTANT: clone() avant multiplyScalar pour ne pas modifier angularAcceleration!
     this.state.angularVelocity.add(
       angularAcceleration.clone().multiplyScalar(deltaTime)
     );
 
-    // Note: Amortissement déjà appliqué via dampTorque ci-dessus
-    // Pas de damping exponentiel supplémentaire pour éviter sur-amortissement
-
-    // 🔧 DÉSACTIVATION TEMPORAIRE : Limiter la vitesse angulaire
-    // Cause des positions impossibles car empêche la convergence naturelle
-    // this.hasExcessiveAngular = this.state.angularVelocity.length() > PhysicsConstants.MAX_ANGULAR_VELOCITY;
-    // if (this.hasExcessiveAngular) {
-    //   this.state.angularVelocity
-    //     .normalize()
-    //     .multiplyScalar(PhysicsConstants.MAX_ANGULAR_VELOCITY);
-    // }
     this.hasExcessiveAngular = false; // Toujours faux pour l'instant
 
     // Appliquer la rotation
@@ -305,17 +243,7 @@ export class KiteController {
   }
 
   getState(): KiteState {
-    return {
-      position: this.kite.position.clone(),
-      velocity: this.state.velocity.clone(),
-      angularVelocity: this.state.angularVelocity.clone(),
-      orientation: this.kite.quaternion.clone(),
-      acceleration: this.state.acceleration?.clone(),
-      angularAcceleration: this.state.angularAcceleration?.clone(),
-      mass: this.state.mass,
-      totalLiftForce: this.lastLiftForce ? this.lastLiftForce.clone() : undefined,
-      totalDragForce: this.lastDragForce ? this.lastDragForce.clone() : undefined,
-    };
+    return { ...this.state };
   }
 
   getKite(): Kite {
@@ -324,11 +252,6 @@ export class KiteController {
 
   setLineLength(length: number): void {
     this.kite.userData.lineLength = length;
-  }
-
-  setAerodynamicSnapshot(lift: THREE.Vector3, drag: THREE.Vector3): void {
-    this.lastLiftForce = lift.clone();
-    this.lastDragForce = drag.clone();
   }
 
   /**
@@ -352,7 +275,6 @@ export class KiteController {
 
   /**
    * Définit le taux de lissage des forces physiques
-   * @param rate - Taux en 1/s (valeurs typiques: 1-10, plus élevé = lissage plus rapide)
    */
   setForceSmoothing(rate: number): void {
     this.forceSmoothingRate = Math.max(

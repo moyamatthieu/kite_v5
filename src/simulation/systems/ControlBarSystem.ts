@@ -1,38 +1,42 @@
 /**
  * ControlBarSystem.ts - Système ECS pour la gestion de la barre de contrôle
  *
- * Responsabilités :
+ * NOUVELLES RESPONSABILITÉS :
  *   - Gère l'entité de la barre de contrôle (position, rotation, visuel)
- *   - Calcule l'orientation basée sur l'axe des lignes du kite
- *   - Met à jour la représentation 3D de la barre
+ *   - La barre est contrôlée directement par les inputs utilisateur (flèches)
+ *   - Pivot central fixe avec rotation horizontale selon les commandes
+ *   - Les poignées sont positionnées aux extrémités de la barre
  *
- * Architecture ECS :
+ * NOUVELLE ARCHITECTURE :
  *   - Opère sur une ControlBarEntity avec TransformComponent et MeshComponent
- *   - Lecture des inputs depuis InputSystem
- *   - Lecture de la position du kite pour calculer l'orientation
+ *   - Lecture directe des inputs depuis InputSystem (pas de calcul basé sur le kite)
+ *   - Rotation directe selon les commandes fléchées (-1 à +1)
+ *   - Position centrale fixe devant le pilote
  */
 
 import * as THREE from 'three';
 
 import { BaseSimulationSystem, SimulationContext } from '../../base/BaseSimulationSystem';
-import { Entity } from '../entities/Entity';
+import { Logger } from '../../utils/Logging';
+import { CONFIG } from '../config/SimulationConfig';
 import { TransformComponent } from '../components/TransformComponent';
 import { MeshComponent } from '../components/MeshComponent';
-import { Kite } from '../../objects/Kite';
-import { CONFIG } from '../config/SimulationConfig';
-import { HandlePositions } from '../types';
-import { Logger } from '../../utils/Logging';
+import { Entity } from '../entities/Entity';
+import { HandlePositions } from '../types/PhysicsTypes';
+
+import { InputSystem } from './InputSystem';
 
 export class ControlBarSystem extends BaseSimulationSystem {
   private logger: Logger;
   private controlBarEntity: Entity | null = null;
-  private kite: Kite | null = null; // Référence temporaire jusqu'à migration complète du Kite en entité
-  private targetRotation: number = 0; // Rotation cible (input utilisateur)
-  private currentRotation: number = 0; // Rotation actuelle (smoothed)
-  private smoothingFactor: number = 0.15; // Facteur de lissage (0-1, plus petit = plus smooth)
+  private inputSystem: InputSystem | null = null;
+  private kiteEntity: Entity | null = null; // Référence à l'entité kite
+  private currentRotation: number = 0; // Rotation input utilisateur (radians)
+  private smoothingFactor: number = CONFIG.defaults.smoothingFactor;
 
   constructor() {
-    super('ControlBarSystem', 5); // Priorité moyenne (après Input, avant Render)
+    // Priorité moyenne (après Input, avant Render)
+    super('ControlBarSystem', 5);
     this.logger = Logger.getInstance();
   }
 
@@ -51,101 +55,109 @@ export class ControlBarSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Définit la référence au kite (temporaire, sera remplacé par query ECS)
+   * Enregistre l'entité du kite (pour orientation physique)
    */
-  setKite(kite: Kite): void {
-    this.kite = kite;
+  setKiteEntity(entity: Entity): void {
+    this.kiteEntity = entity;
   }
 
   /**
-   * Met à jour la rotation cible de la barre (appelé par l'input)
+   * Définit la référence au système d'inputs
    */
-  setRotation(rotation: number): void {
-    this.targetRotation = rotation;
+  setInputSystem(inputSystem: InputSystem): void {
+    this.inputSystem = inputSystem;
   }
 
   getRotation(): number {
     return this.currentRotation;
   }
 
-  update(context: SimulationContext): void {
-    if (!this.controlBarEntity || !this.kite) return;
+  /**
+   * Calcule la rotation physique de la barre vers le kite
+   */
+  private computePhysicalRotation(): number {
+    const toKite = this.computeToKiteVector();
+    if (toKite.length() < 1e-4) return 0;
+    toKite.normalize();
+    // Angle entre l'axe X local de la barre et le vecteur vers le kite
+    const angle = Math.atan2(toKite.z, toKite.x); // Angle dans le plan XZ
+    return angle;
+  }
+
+  /**
+   * Calcule le vecteur du centre de la barre vers le kite (plan horizontal)
+   */
+  private computeToKiteVector(): THREE.Vector3 {
+    if (!this.controlBarEntity || !this.kiteEntity) return new THREE.Vector3();
+    const barTransform = this.controlBarEntity.getComponent<TransformComponent>('transform');
+    const kiteTransform = this.kiteEntity.getComponent<TransformComponent>('transform');
+    if (!barTransform || !kiteTransform) return new THREE.Vector3();
+    // Vecteur du centre de la barre vers le kite (plan horizontal)
+    const toKite = kiteTransform.position.clone().sub(barTransform.position);
+    toKite.y = 0; // Garder dans le plan horizontal
+    return toKite;
+  }
+
+  update(_context: SimulationContext): void {
+    if (!this.controlBarEntity || !this.inputSystem) return;
 
     const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
     const mesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
-
     if (!transform || !mesh) return;
 
-    // Appliquer le smoothing sur la rotation (lerp)
+    // La barre est maintenant un enfant du pilote, donc position RELATIVE
+    // Position relative fixe par rapport au pilote (ne change pas)
+    transform.position.set(
+      0, // Même X que le pilote
+      CONFIG.controlBar.offsetY, // Au-dessus du pilote
+      CONFIG.controlBar.offsetZ  // Devant le pilote
+    );
+
+    // Input utilisateur (-1 à +1)
+    const inputState = this.inputSystem.getInputState();
+    // Inverser le signe : ArrowLeft (-1) doit donner rotation positive (vers la gauche quand on regarde depuis le pilote)
+    const targetRotation = -inputState.barPosition * CONFIG.input.maxRotation;
     this.currentRotation = THREE.MathUtils.lerp(
       this.currentRotation,
-      this.targetRotation,
+      targetRotation,
       this.smoothingFactor
     );
 
-    // Calculer le quaternion de rotation basé sur l'axe du kite
-    const quaternion = this.computeRotationQuaternion();
-    if (quaternion) {
-      transform.quaternion.copy(quaternion);
+    // Rotation physique vers le kite (si kiteEntity disponible)
+    const physicalRotation = this.computePhysicalRotation();
 
-      // Synchroniser avec le mesh Three.js
-      mesh.syncToObject3D({
-        position: transform.position,
-        quaternion: transform.quaternion,
-        scale: transform.scale
-      });
-    }
-  }
+    // Pondération entre input et physique (80% input, 20% physique)
+    const finalRotation = this.currentRotation * 0.8 + physicalRotation * 0.2;
 
-  /**
-   * Calcule le quaternion de rotation de la barre basé sur le vecteur vers le kite
-   * Logique issue de la branche main qui fonctionne correctement
-   */
-  private computeRotationQuaternion(): THREE.Quaternion | null {
-    if (!this.kite || !this.controlBarEntity) return null;
+    // Calculer l'axe de rotation : perpendiculaire au plan défini par l'axe X de la barre et le vecteur vers le kite
+    // Cela permet une rotation "dans l'axe" en regardant le kite
+    const barDirection = new THREE.Vector3(1, 0, 0); // Axe X local de la barre
+    const toKite = this.computeToKiteVector();
+    const rotationAxis = new THREE.Vector3().crossVectors(barDirection, toKite);
 
-    const ctrlLeft = this.kite.getPoint('CTRL_GAUCHE');
-    const ctrlRight = this.kite.getPoint('CTRL_DROIT');
-
-    if (!ctrlLeft || !ctrlRight) return null;
-
-    // Convertir en coordonnées monde
-    const kiteLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
-    const kiteRightWorld = this.kite.toWorldCoordinates(ctrlRight);
-
-    // Calculer le centre du kite
-    const centerKite = new THREE.Vector3()
-      .addVectors(kiteLeftWorld, kiteRightWorld)
-      .multiplyScalar(0.5);
-
-    // Vecteur de la barre vers le kite
-    const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
-    if (!transform) return null;
-
-    const toKiteVector = new THREE.Vector3()
-      .subVectors(centerKite, transform.position)
-      .normalize();
-
-    // Direction initiale de la barre (axe X)
-    const barDirection = new THREE.Vector3(1, 0, 0);
-
-    // Calculer l'axe de rotation via produit vectoriel
-    const rotationAxis = new THREE.Vector3()
-      .crossVectors(barDirection, toKiteVector)
-      .normalize();
-
-    // Si l'axe est trop petit (barre alignée avec le kite), utiliser Y par défaut
-    const DEADZONE = 0.001;
-    if (rotationAxis.length() < DEADZONE) {
-      rotationAxis.set(0, 1, 0);
+    // Gestion du cas dégénéré (axe quasi-nul)
+    if (rotationAxis.length() < 0.01) { // PhysicsConstants.CONTROL_DEADZONE
+      rotationAxis.set(0, 1, 0); // Fallback vers axe Y vertical
+    } else {
+      rotationAxis.normalize();
     }
 
-    // Créer le quaternion avec l'axe calculé et la rotation lissée
-    return new THREE.Quaternion().setFromAxisAngle(rotationAxis, this.currentRotation);
+    // Appliquer la rotation autour de cet axe (rotation dans l'axe du regard)
+    transform.quaternion.setFromAxisAngle(rotationAxis, finalRotation);
+
+    // Synchroniser avec le mesh Three.js
+    mesh.syncToObject3D({
+      position: transform.position,
+      quaternion: transform.quaternion,
+      scale: transform.scale
+    });
   }
+
 
   /**
    * Obtient les positions des poignées (pour le rendu des lignes)
+   * Les poignées sont aux extrémités de la barre et suivent la rotation combinée
+   * Puisque la barre est un enfant du pilote, on doit calculer les positions dans le monde
    */
   getHandlePositions(): HandlePositions | null {
     if (!this.controlBarEntity) return null;
@@ -153,38 +165,46 @@ export class ControlBarSystem extends BaseSimulationSystem {
     const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
     if (!transform) return null;
 
-    const rotationQuaternion = this.computeRotationQuaternion();
-    if (!rotationQuaternion) {
-      // Fallback : orientation par défaut
-      const halfWidth = CONFIG.controlBar.width / 2;
-      return {
-        left: transform.position.clone().add(new THREE.Vector3(-halfWidth, 0, 0)),
-        right: transform.position.clone().add(new THREE.Vector3(halfWidth, 0, 0)),
-      };
-    }
-
+    // Les poignées sont positionnées relativement à la barre
     const halfWidth = CONFIG.controlBar.width / 2;
     const handleLeftLocal = new THREE.Vector3(-halfWidth, 0, 0);
     const handleRightLocal = new THREE.Vector3(halfWidth, 0, 0);
 
-    handleLeftLocal.applyQuaternion(rotationQuaternion);
-    handleRightLocal.applyQuaternion(rotationQuaternion);
+    // Appliquer la rotation de la barre aux positions locales des poignées
+    handleLeftLocal.applyQuaternion(transform.quaternion);
+    handleRightLocal.applyQuaternion(transform.quaternion);
+
+    // Ajouter la position relative de la barre
+    handleLeftLocal.add(transform.position);
+    handleRightLocal.add(transform.position);
+
+    // Maintenant convertir en coordonnées monde : ajouter la position du pilote
+    // (puisque la barre est enfant du pilote)
+    const pilotPosition = CONFIG.pilot.position;
+    handleLeftLocal.add(pilotPosition);
+    handleRightLocal.add(pilotPosition);
 
     return {
-      left: handleLeftLocal.clone().add(transform.position),
-      right: handleRightLocal.clone().add(transform.position),
+      left: handleLeftLocal,
+      right: handleRightLocal,
     };
   }
 
   reset(): void {
-    this.targetRotation = 0;
     this.currentRotation = 0;
 
     if (this.controlBarEntity) {
       const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
       if (transform) {
-        transform.position.copy(CONFIG.controlBar.position);
-        transform.quaternion.identity();
+        // Position relative par rapport au pilote (la barre est enfant du pilote)
+        transform.position.set(
+          0, // Même X que le pilote
+          CONFIG.controlBar.offsetY, // Au-dessus du pilote
+          CONFIG.controlBar.offsetZ  // Devant le pilote
+        );
+        // Orientation horizontale par défaut vers l'avant (axe Z)
+        const defaultAxis = new THREE.Vector3(0, 0, 1);
+        transform.quaternion.setFromAxisAngle(defaultAxis, CONFIG.controlBar.barRotation);
       }
     }
 
@@ -193,7 +213,7 @@ export class ControlBarSystem extends BaseSimulationSystem {
 
   dispose(): void {
     this.controlBarEntity = null;
-    this.kite = null;
+    this.inputSystem = null;
     this.logger.info('ControlBarSystem disposed', 'ControlBarSystem');
   }
 }

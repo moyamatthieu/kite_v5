@@ -3,7 +3,6 @@ import * as THREE from "three";
 import { CONFIG } from "../config/SimulationConfig";
 import { DebugRenderer } from "../rendering/DebugRenderer";
 import { KiteGeometry } from "../config/KiteGeometry";
-import { PhysicsConstants } from "../config/PhysicsConstants";
 import type { KiteState } from "../types";
 
 export interface BridleLengths {
@@ -52,6 +51,14 @@ export interface SimulationControls {
  *
  * Gère les contrôles et interactions utilisateur
  */
+export interface SliderConfig {
+  id: string;
+  initialValue: number;
+  onInput: (value: number) => void;
+  formatter?: (value: number) => string;
+  step?: number;
+}
+
 export class UIManager {
   private simulation: SimulationControls;
   private debugRenderer: DebugRenderer;
@@ -110,187 +117,169 @@ export class UIManager {
     this.setupWindControls();
   }
 
-  private setupWindControls(): void {
+  // Interface SliderConfig définie en dehors de la classe
+
+  /**
+   * Crée et configure un slider générique
+   */
+  private createSlider(config: SliderConfig): void {
+    const slider = document.getElementById(config.id) as HTMLInputElement | null;
+    const valueElement = document.getElementById(`${config.id}-value`);
+
+    if (!slider || !valueElement) return;
+
+    slider.value = config.initialValue.toFixed(config.step ?? 1);
+    valueElement.textContent = config.formatter
+      ? config.formatter(config.initialValue)
+      : config.initialValue.toFixed(config.step ?? 1);
+
+    slider.oninput = () => {
+      const value = parseFloat(slider.value);
+      config.onInput(value);
+
+      valueElement.textContent = config.formatter
+        ? config.formatter(value)
+        : value.toFixed(config.step ?? 1);
+    };
+  }
+
+  /**
+   * Configure les contrôles de vent
+   */
+  private setupWindControlsGroup(): void {
     const currentWind = this.simulation.getWindState();
 
-    const speedSlider = document.getElementById("wind-speed") as HTMLInputElement | null;
-    const speedValue = document.getElementById("wind-speed-value");
-    if (speedSlider && speedValue) {
-      const initialSpeedKmh = (currentWind?.baseSpeed ?? CONFIG.wind.defaultSpeed / 3.6) * 3.6;
-      speedSlider.value = initialSpeedKmh.toFixed(1);
-      speedValue.textContent = `${initialSpeedKmh.toFixed(1)} km/h`;
+    // Vitesse du vent
+    this.createSlider({
+      id: "wind-speed",
+      initialValue: (currentWind?.baseSpeed ?? CONFIG.wind.defaultSpeed) * (1 / CONFIG.conversions.kmhToMs),
+      onInput: (speed) => this.simulation.setWindParams({ speed }),
+      formatter: (value) => `${value.toFixed(1)} km/h`
+    });
 
-      speedSlider.oninput = () => {
-        const speed = parseFloat(speedSlider.value);
-        this.simulation.setWindParams({ speed });
-        speedValue.textContent = `${speed.toFixed(1)} km/h`;
-      };
-    }
+    // Direction du vent
+    this.createSlider({
+      id: "wind-direction",
+      initialValue: this.computeDirectionDegrees(currentWind?.baseDirection),
+      onInput: (direction) => this.simulation.setWindParams({ direction }),
+      formatter: (value) => `${value.toFixed(0)}°`,
+      step: 1
+    });
 
-    const directionSlider = document.getElementById("wind-direction") as HTMLInputElement | null;
-    const directionValue = document.getElementById("wind-direction-value");
-    if (directionSlider && directionValue) {
-      const currentDirectionDeg = this.computeDirectionDegrees(currentWind?.baseDirection);
-      directionSlider.value = currentDirectionDeg.toFixed(0);
-      directionValue.textContent = `${currentDirectionDeg.toFixed(0)}°`;
+    // Turbulence du vent
+    this.createSlider({
+      id: "wind-turbulence",
+      initialValue: currentWind?.turbulence ?? CONFIG.wind.defaultTurbulence,
+      onInput: (turbulence) => this.simulation.setWindParams({ turbulence }),
+      formatter: (value) => `${value.toFixed(1)}%`
+    });
+  }
 
-      directionSlider.oninput = () => {
-        const direction = parseFloat(directionSlider.value);
-        this.simulation.setWindParams({ direction });
-        directionValue.textContent = `${direction.toFixed(0)}°`;
-      };
-    }
+  /**
+   * Configure les contrôles des lignes
+   */
+  private setupLineControlsGroup(): void {
+    // Longueur des lignes
+    this.createSlider({
+      id: "line-length",
+      initialValue: this.simulation.getLineLength(),
+      onInput: (length) => this.simulation.setLineLength(length),
+      formatter: (value) => `${value.toFixed(0)}m`,
+      step: 1
+    });
 
-    const turbulenceSlider = document.getElementById("wind-turbulence") as HTMLInputElement | null;
-    const turbulenceValue = document.getElementById("wind-turbulence-value");
-    if (turbulenceSlider && turbulenceValue) {
-      const initialTurbulence = currentWind?.turbulence ?? CONFIG.wind.defaultTurbulence;
-      turbulenceSlider.value = initialTurbulence.toFixed(1);
-      turbulenceValue.textContent = `${initialTurbulence.toFixed(1)}%`;
-
-      turbulenceSlider.oninput = () => {
-        const turbulence = parseFloat(turbulenceSlider.value);
-        this.simulation.setWindParams({ turbulence });
-        turbulenceValue.textContent = `${turbulence.toFixed(1)}%`;
-      };
-    }
-
-    const lineSlider = document.getElementById("line-length") as HTMLInputElement | null;
-    const lineValue = document.getElementById("line-length-value");
-    if (lineSlider && lineValue) {
-      const initialLineLength = this.simulation.getLineLength();
-      lineSlider.value = initialLineLength.toFixed(0);
-      lineValue.textContent = `${initialLineLength.toFixed(0)}m`;
-
-      lineSlider.oninput = () => {
-        const length = parseFloat(lineSlider.value);
-        this.simulation.setLineLength(length);
-        lineValue.textContent = `${length.toFixed(0)}m`;
-      };
-    }
-
+    // Brides
     const currentBridle = this.simulation.getBridleLengths();
 
-    const bridleNezSlider = document.getElementById("bridle-nez") as HTMLInputElement | null;
-    const bridleNezValue = document.getElementById("bridle-nez-value");
-    if (bridleNezSlider && bridleNezValue) {
-      bridleNezSlider.value = currentBridle.nez.toFixed(2);
-      bridleNezValue.textContent = `${currentBridle.nez.toFixed(2)}m`;
+    this.createSlider({
+      id: "bridle-nez",
+      initialValue: currentBridle.nez,
+      onInput: (length) => this.simulation.setBridleLength("nez", length),
+      formatter: (value) => `${value.toFixed(2)}m`
+    });
 
-      bridleNezSlider.oninput = () => {
-        const length = parseFloat(bridleNezSlider.value);
-        this.simulation.setBridleLength("nez", length);
-        bridleNezValue.textContent = `${length.toFixed(2)}m`;
-      };
-    }
+    this.createSlider({
+      id: "bridle-inter",
+      initialValue: currentBridle.inter,
+      onInput: (length) => this.simulation.setBridleLength("inter", length),
+      formatter: (value) => `${value.toFixed(2)}m`
+    });
 
-    const bridleInterSlider = document.getElementById("bridle-inter") as HTMLInputElement | null;
-    const bridleInterValue = document.getElementById("bridle-inter-value");
-    if (bridleInterSlider && bridleInterValue) {
-      bridleInterSlider.value = currentBridle.inter.toFixed(2);
-      bridleInterValue.textContent = `${currentBridle.inter.toFixed(2)}m`;
+    this.createSlider({
+      id: "bridle-centre",
+      initialValue: currentBridle.centre,
+      onInput: (length) => this.simulation.setBridleLength("centre", length),
+      formatter: (value) => `${value.toFixed(2)}m`
+    });
+  }
 
-      bridleInterSlider.oninput = () => {
-        const length = parseFloat(bridleInterSlider.value);
-        this.simulation.setBridleLength("inter", length);
-        bridleInterValue.textContent = `${length.toFixed(2)}m`;
-      };
-    }
+  /**
+   * Configure les contrôles de physique
+   */
+  private setupPhysicsControlsGroup(): void {
+    // Amortissement linéaire
+    this.createSlider({
+      id: "linear-damping",
+      initialValue: CONFIG.physics.linearDampingCoeff,
+      onInput: (damping) => { CONFIG.physics.linearDampingCoeff = damping; }
+    });
 
-    const bridleCentreSlider = document.getElementById("bridle-centre") as HTMLInputElement | null;
-    const bridleCentreValue = document.getElementById("bridle-centre-value");
-    if (bridleCentreSlider && bridleCentreValue) {
-      bridleCentreSlider.value = currentBridle.centre.toFixed(2);
-      bridleCentreValue.textContent = `${currentBridle.centre.toFixed(2)}m`;
+    // Facteur de traînée angulaire
+    this.createSlider({
+      id: "angular-damping",
+      initialValue: CONFIG.physics.angularDragFactor,
+      onInput: (dragFactor) => { CONFIG.physics.angularDragFactor = dragFactor; }
+    });
 
-      bridleCentreSlider.oninput = () => {
-        const length = parseFloat(bridleCentreSlider.value);
-        this.simulation.setBridleLength("centre", length);
-        bridleCentreValue.textContent = `${length.toFixed(2)}m`;
-      };
-    }
-
-    const linearDampingSlider = document.getElementById("linear-damping") as HTMLInputElement | null;
-    const linearDampingValue = document.getElementById("linear-damping-value");
-    if (linearDampingSlider && linearDampingValue) {
-      linearDampingSlider.value = CONFIG.physics.linearDampingCoeff.toFixed(2);
-      linearDampingValue.textContent = CONFIG.physics.linearDampingCoeff.toFixed(2);
-
-      linearDampingSlider.oninput = () => {
-        const damping = parseFloat(linearDampingSlider.value);
-        CONFIG.physics.linearDampingCoeff = damping;
-        linearDampingValue.textContent = damping.toFixed(2);
-      };
-    }
-
-    const angularDampingSlider = document.getElementById("angular-damping") as HTMLInputElement | null;
-    const angularDampingValue = document.getElementById("angular-damping-value");
-    if (angularDampingSlider && angularDampingValue) {
-      angularDampingSlider.value = CONFIG.physics.angularDragFactor.toFixed(2);
-      angularDampingValue.textContent = CONFIG.physics.angularDragFactor.toFixed(2);
-
-      angularDampingSlider.oninput = () => {
-        const dragFactor = parseFloat(angularDampingSlider.value);
-        CONFIG.physics.angularDragFactor = dragFactor;
-        angularDampingValue.textContent = dragFactor.toFixed(2);
-      };
-    }
-
-    const meshLevelSlider = document.getElementById("mesh-subdivision-level") as HTMLInputElement | null;
-    const meshLevelValue = document.getElementById("mesh-subdivision-level-value");
-    if (meshLevelSlider && meshLevelValue) {
-      meshLevelSlider.value = CONFIG.kite.defaultMeshSubdivisionLevel.toString();
-      meshLevelValue.textContent = `${CONFIG.kite.defaultMeshSubdivisionLevel} (${Math.pow(4, CONFIG.kite.defaultMeshSubdivisionLevel + 1)} triangles)`;
-
-      meshLevelSlider.oninput = () => {
-        const level = parseInt(meshLevelSlider.value, 10);
-        CONFIG.kite.defaultMeshSubdivisionLevel = level;
-        KiteGeometry.setMeshSubdivisionLevel(level);
+    // Niveau de subdivision du maillage
+    this.createSlider({
+      id: "mesh-subdivision-level",
+      initialValue: CONFIG.kite.defaultMeshSubdivisionLevel,
+      onInput: (level) => {
+        const intLevel = parseInt(level.toString(), 10);
+        CONFIG.kite.defaultMeshSubdivisionLevel = intLevel;
+        KiteGeometry.setMeshSubdivisionLevel(intLevel);
+      },
+      formatter: (value) => {
+        const level = parseInt(value.toString(), 10);
         const triangleCount = Math.pow(4, level + 1);
-        meshLevelValue.textContent = `${level} (${triangleCount} triangles)`;
-        console.log(`🔧 Maillage changé : niveau ${level} = ${triangleCount} triangles`);
-      };
-    }
+        return `${level} (${triangleCount} triangles)`;
+      },
+      step: 1
+    });
+  }
 
-    const liftScaleSlider = document.getElementById("lift-scale") as HTMLInputElement | null;
-    const liftScaleValue = document.getElementById("lift-scale-value");
-    if (liftScaleSlider && liftScaleValue) {
-      liftScaleSlider.value = CONFIG.aero.liftScale.toFixed(2);
-      liftScaleValue.textContent = CONFIG.aero.liftScale.toFixed(2);
+  /**
+   * Configure les contrôles aérodynamiques
+   */
+  private setupAerodynamicControlsGroup(): void {
+    // Échelle de portance
+    this.createSlider({
+      id: "lift-scale",
+      initialValue: CONFIG.aero.liftScale,
+      onInput: (scale) => { CONFIG.aero.liftScale = scale; }
+    });
 
-      liftScaleSlider.oninput = () => {
-        const scale = parseFloat(liftScaleSlider.value);
-        CONFIG.aero.liftScale = scale;
-        liftScaleValue.textContent = scale.toFixed(2);
-      };
-    }
+    // Échelle de traînée
+    this.createSlider({
+      id: "drag-scale",
+      initialValue: CONFIG.aero.dragScale,
+      onInput: (scale) => { CONFIG.aero.dragScale = scale; }
+    });
 
-    const dragScaleSlider = document.getElementById("drag-scale") as HTMLInputElement | null;
-    const dragScaleValue = document.getElementById("drag-scale-value");
-    if (dragScaleSlider && dragScaleValue) {
-      dragScaleSlider.value = CONFIG.aero.dragScale.toFixed(2);
-      dragScaleValue.textContent = CONFIG.aero.dragScale.toFixed(2);
+    // Lissage des forces
+    this.createSlider({
+      id: "force-smoothing",
+      initialValue: this.simulation.getForceSmoothing(),
+      onInput: (smoothing) => this.simulation.setForceSmoothing(smoothing)
+    });
+  }
 
-      dragScaleSlider.oninput = () => {
-        const scale = parseFloat(dragScaleSlider.value);
-        CONFIG.aero.dragScale = scale;
-        dragScaleValue.textContent = scale.toFixed(2);
-      };
-    }
-
-    const forceSmoothingSlider = document.getElementById("force-smoothing") as HTMLInputElement | null;
-    const forceSmoothingValue = document.getElementById("force-smoothing-value");
-    if (forceSmoothingSlider && forceSmoothingValue) {
-      const currentSmoothing = this.simulation.getForceSmoothing();
-      forceSmoothingSlider.value = currentSmoothing.toFixed(2);
-      forceSmoothingValue.textContent = currentSmoothing.toFixed(2);
-
-      forceSmoothingSlider.oninput = () => {
-        const smoothing = parseFloat(forceSmoothingSlider.value);
-        this.simulation.setForceSmoothing(smoothing);
-        forceSmoothingValue.textContent = smoothing.toFixed(2);
-      };
-    }
+  private setupWindControls(): void {
+    this.setupWindControlsGroup();
+    this.setupLineControlsGroup();
+    this.setupPhysicsControlsGroup();
+    this.setupAerodynamicControlsGroup();
   }
 
   updatePlayButton(isPlaying: boolean): void {
