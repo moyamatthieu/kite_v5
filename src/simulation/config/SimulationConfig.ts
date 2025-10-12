@@ -77,7 +77,7 @@ export const CONFIG = {
   },
   aero: {
     // Forces aérodynamiques réalistes pour un cerf-volant delta
-    liftScale: 2.5, // Portance réaliste pour un kite de cette taille
+    liftScale: 4.5, // Portance réaliste pour un kite de cette taille
     dragScale: 1.8, // Traînée modérée mais présente
   },
   kite: {
@@ -96,7 +96,7 @@ export const CONFIG = {
   },
   bridle: {
     defaultLengths: Object.freeze({
-      nez: 0.65,
+      nez: 0.80,
       inter: 0.65,
       centre: 0.65,
     }),

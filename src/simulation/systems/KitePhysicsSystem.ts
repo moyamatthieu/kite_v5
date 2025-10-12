@@ -70,6 +70,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   // Forces aérodynamiques pour le log et l'UI
   private lastLiftForce: THREE.Vector3 = new THREE.Vector3();
   private lastDragForce: THREE.Vector3 = new THREE.Vector3();
+  private lastSurfaceForces: SurfaceForce[] = []; // Ajout pour stocker les forces par surface
 
   private lastLogTime: number = 0;
   private readonly LOG_INTERVAL: number = CONFIG.conversions.gravityFactor * 1000; // Log toutes les secondes
@@ -195,6 +196,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       );
       this.lastLiftForce.copy(aeroForces.lift);
       this.lastDragForce.copy(aeroForces.drag);
+      this.lastSurfaceForces = aeroForces.surfaceForces; // Stocker les forces
     } else {
       aeroForces = {
         lift: new THREE.Vector3(),
@@ -205,6 +207,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       };
       this.lastLiftForce.set(0, 0, 0);
       this.lastDragForce.set(0, 0, 0);
+      this.lastSurfaceForces = []; // Vider le tableau
     }
 
     // 5. Combiner toutes les forces
@@ -544,6 +547,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       lift: this.lastLiftForce.clone(),
       drag: this.lastDragForce.clone()
     };
+  }
+
+  /**
+   * Retourne les forces aérodynamiques par surface (pour le debug)
+   */
+  getSurfaceForces(): SurfaceForce[] {
+    return this.lastSurfaceForces;
   }
 
   /**

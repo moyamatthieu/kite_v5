@@ -209,4 +209,55 @@ export class Primitive {
       headWidth
     );
   }
+
+  /**
+   * Créer un label textuel pour les vecteurs de debug
+   *
+   * @param text - Texte à afficher
+   * @param position - Position du label
+   * @param color - Couleur du texte (hex)
+   * @param size - Taille du texte
+   * @returns THREE.Sprite avec le texte
+   */
+  static textLabel(
+    text: string,
+    position: THREE.Vector3,
+    color: number = 0xffffff,
+    size: number = 0.5
+  ): THREE.Object3D {
+    // Créer un canvas pour le texte
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    canvas.width = 256;
+    canvas.height = 128;
+
+    // Style du texte
+    context.font = `Bold ${size * 20}px Arial`;
+    context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    // Fond semi-transparent
+    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Texte
+    context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    // Créer la texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+
+    // Créer le sprite
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMaterial);
+
+    // Positionner et dimensionner
+    sprite.position.copy(position);
+    sprite.scale.set(size, size * 0.5, 1);
+
+    return sprite;
+  }
 }

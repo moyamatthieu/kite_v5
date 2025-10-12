@@ -587,17 +587,25 @@ export class SimulationApp {
       // Mise à jour UI
       this.uiManager?.updateDebugInfo();
 
-      // Debug visualization
-      // TODO: Réimplémenter avec ECS quand nécessaire
-      // if (this.debugRenderer && this.kitePhysicsSystem && this.debugRenderer.isDebugMode()) {
-      //   const kiteEntity = this.entityManager.getEntity('kite');
-      //   if (kiteEntity) {
-      //     const kiteMesh = kiteEntity.getComponent<MeshComponent>('mesh');
-      //     if (kiteMesh) {
-      //       this.debugRenderer.updateDebugArrows(kiteMesh.object3D as Kite, this.kitePhysicsSystem);
-      //     }
-      //   }
-      // }
+      // Mise à jour des informations de debug avec les données ECS
+      if (this.debugRenderer && this.kitePhysicsSystem) {
+        this.debugRenderer.updateDebugDisplay(this.kitePhysicsSystem);
+      }
+
+      // Debug visualization avec ECS
+      if (this.debugRenderer && this.kitePhysicsSystem && this.debugRenderer.isDebugMode()) {
+        const kiteEntity = this.entityManager.getEntity('kite');
+        if (kiteEntity) {
+          const kiteMesh = kiteEntity.getComponent<MeshComponent>('mesh');
+          if (kiteMesh && kiteMesh.object3D) {
+            // Récupérer l'objet Kite depuis le MeshComponent
+            const kite = KiteEntityFactory.getKiteObject(kiteEntity);
+            if (kite) {
+              this.debugRenderer.updateDebugVectors(kite, this.kitePhysicsSystem);
+            }
+          }
+        }
+      }
 
     } catch (error) {
       this.logger.error(`Update error: ${error}`, 'SimulationApp');
