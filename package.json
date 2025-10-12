@@ -15,6 +15,8 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
     "@types/three": "^0.160.0",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
@@ -25,6 +27,7 @@
     "vite": "^5.4.19"
   },
   "dependencies": {
+    "jest": "^30.2.0",
     "three": "^0.160.0",
     "three-bvh-csg": "^0.0.17"
   }

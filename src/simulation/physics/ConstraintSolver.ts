@@ -266,7 +266,7 @@ export class ConstraintSolver {
 
     const lineLength =
       kite.userData.lineLength || CONFIG.lines.defaultLength;
-    const tol = PhysicsConstants.LINE_CONSTRAINT_TOLERANCE;
+  // Tolérance gérée implicitement par la logique de contrainte (plus de soustraction de tolérance)
 
     const ctrlLeft = kite.getPoint("CTRL_GAUCHE");
     const ctrlRight = kite.getPoint("CTRL_DROIT");
@@ -285,7 +285,9 @@ export class ConstraintSolver {
       const diff = cpWorld.clone().sub(handle);
       const dist = diff.length();
 
-      if (dist <= lineLength - tol) return; // Ligne molle
+  // Tolérance PBD: éviter de "raccourcir" la longueur cible.
+  // Fix bug critique: ne pas soustraire la tolérance de la longueur.
+  if (dist <= lineLength) return; // Ligne molle (aucune correction)
 
       const n = diff.clone().normalize();
       const C = dist - lineLength;
@@ -360,7 +362,7 @@ export class ConstraintSolver {
     state: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
     bridleLengths: BridleLengths
   ): void {
-    const tol = PhysicsConstants.LINE_CONSTRAINT_TOLERANCE;
+  // Tolérance gérée implicitement par la logique de contrainte (plus de soustraction de tolérance)
     const mass = CONFIG.kite.mass;
     const inertia = CONFIG.kite.inertia;
 
@@ -401,8 +403,9 @@ export class ConstraintSolver {
       const diff = endWorld.clone().sub(startWorld);
       const dist = diff.length();
 
-      // Si bride molle, pas de contrainte
-      if (dist <= bridleLength - tol) return;
+  // Si bride molle, pas de contrainte
+  // Même principe que pour les lignes: ne pas soustraire la tolérance
+  if (dist <= bridleLength) return;
 
       // Direction de contrainte (normalisée)
       const n = diff.clone().normalize();

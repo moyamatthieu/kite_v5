@@ -2,12 +2,14 @@
 
 Ce fichier fournit des directives pour travailler avec ce dépôt.
 
+MANDATORY   - NON NEGOCIABLE  : on fait un code propre sans rustine  !
+
 ## Vue d'ensemble du projet
 
 **Kite Simulator V8** - Simulateur de cerf-volant basé sur la physique utilisant une architecture Entity-Component-System (ECS). Projet TypeScript/Three.js simulant un kite delta avec aérodynamique réaliste, système de bridage, lignes de contrôle et physique du vent.
 
 **Version actuelle** : V8 (migration vers ECS pur en cours)
-**Branch** : `refactor/pure-ecs-architecture`
+**Branch** : `clean-code-refactor`
 **Date dernière révision** : 12 octobre 2025
 
 ## Commandes de développement
@@ -110,55 +112,6 @@ Rendu
 - **Solution** : Remplacer par `dist <= lineLength` (sans tolérance)
 - **Référence** : Voir `QUICK_FIX_GUIDE.md` et `AUDIT_COMPLET_2025-10-12.md`
 
-### Architecture de l'Objet Kite
-
-**Structure du Kite** (`src/objects/Kite.ts`) :
-- Étend `StructuredObject` depuis `src/core/`
-- Utilise le pattern Factory pour la création de géométrie :
-  - `PointFactory` - Points anatomiques (NEZ, CTRL_GAUCHE, CTRL_DROIT, etc.)
-  - `FrameFactory` - Structure en carbone (spine, leading edges, struts)
-  - `SurfaceFactory` - Panneaux de voile (subdivision paramétrable)
-- `pointsMap` centrale stocke toutes les positions anatomiques (Single Source of Truth)
-- Système de bridage avec 6 lignes (3 par côté : nez, inter, centre)
-- Masse et inertie calculées automatiquement depuis `KiteGeometry`
-
-**Méthodes clés du Kite :**
-- `setBridleLengths(lengths)` - Ajuster les longueurs physiques des brides, reconstruit la géométrie
-- `toWorldCoordinates(localPos)` - Transformer points locaux vers espace monde
-- `updateBridleVisualization(tensions)` - Colorer les brides par tension (vert→jaune→rouge)
-- `create()` - Créer la géométrie complète (frames + surfaces + brides)
-
-**Propriétés physiques (auto-calculées) :**
-- Masse totale : ~0.31 kg (tissu ripstop nylon 120 g/m² + frame carbone)
-- Surface : calculée par `KiteGeometry.TOTAL_AREA`
-- Inertie : calculée par `KiteGeometry.INERTIA` (I ≈ m·r²)
-- Subdivision de maillage : paramétrable (0=4 triangles, 1=16, 2=64, 3=256)
-
-### Système de Configuration
-
-**Configuration centralisée** (`src/simulation/config/SimulationConfig.ts`) :
-- Objet `CONFIG` - Source unique de vérité pour tous les paramètres de simulation
-- `KiteGeometry.ts` - Calculs de géométrie (masse, inertie, surface)
-- `PhysicsConstants.ts` - Limites physiques et tolérances
-- `PILOT_CONFIG` - Configuration du pilote (position, dimensions)
-- `CONTROL_BAR_CONFIG` - Configuration de la barre de contrôle
-
-**Sections principales du CONFIG :**
-- `CONFIG.physics` - Gravité (9.81 m/s²), densité air (1.225 kg/m³), amortissement
-- `CONFIG.aero` - Échelles portance/traînée (liftScale: 4.5, dragScale: 1.8)
-- `CONFIG.kite` - Masse (~0.31 kg), inertie, surface (auto-calculées)
-- `CONFIG.bridle` - Longueurs par défaut des brides (nez, inter, centre)
-- `CONFIG.lines` - Raideur lignes, limites de tension, longueur par défaut (15m)
-- `CONFIG.wind` - Paramètres de vent (vitesse, direction, turbulence)
-- `CONFIG.controlBar` - Dimensions barre (largeur 0.6m, offsets Y/Z)
-- `CONFIG.input` - Lissage entrées, limites de rotation
-- `CONFIG.pilot` - Position (0,0,0), dimensions (1.6m hauteur)
-
-**⚠️ IMPORTANT :**
-- Ne jamais utiliser de "magic numbers" dans le code
-- Toujours référencer `CONFIG` pour les paramètres physiques
-- Les valeurs auto-calculées (masse, inertie) proviennent de `KiteGeometry`
-
 ### Alias de Chemins
 
 **Toujours utiliser les alias de chemins** (jamais de chemins relatifs profonds) :
@@ -211,32 +164,9 @@ import { WindConfig } from '@types'
 5. Composants, systèmes, entités
 6. Fichiers locaux
 
-## Project Structure
-
-```
-src/
-├── base/           - Base classes (BaseSimulationSystem, BaseComponent, BaseFactory)
-├── core/           - Core framework (StructuredObject, Primitive)
-├── factories/      - Factory pattern for object creation
-│   └── presets/    - Physical presets
-├── objects/        - 3D objects (Kite extends StructuredObject)
-├── simulation/     - Main simulation code
-│   ├── components/ - ECS components (TransformComponent, PhysicsComponent, MeshComponent)
-│   ├── config/     - Configuration (SimulationConfig, KiteGeometry, PhysicsConstants)
-│   ├── controllers/- Legacy controllers being migrated (KiteController, ControlBarManager, InputHandler)
-│   ├── entities/   - ECS entities (Entity, EntityManager, LineEntity, PilotEntity)
-│   ├── physics/    - Physics modules (AerodynamicsCalculator, LineSystem, WindSimulator, etc.)
-│   ├── rendering/  - Rendering (RenderManager, DebugRenderer)
-│   ├── systems/    - ECS systems (KitePhysicsSystem, InputSystem, RenderSystem, etc.)
-│   ├── types/      - TypeScript types
-│   └── ui/         - UI (UIManager)
-├── types/          - Shared TypeScript types
-└── utils/          - Utilities (MathUtils, Logging, GeometryUtils)
-```
-
 ## Contexte de Migration
 
-**Branch Actuelle :** `refactor/pure-ecs-architecture`
+**Branch Actuelle :** `clean-code-refactor`
 
 Le projet migre d'une architecture hybride vers ECS pur. Changements récents :
 - ControlBar migrée vers ECS (ControlBarSystem + Entity)
@@ -292,3 +222,5 @@ Le projet migre d'une architecture hybride vers ECS pur. Changements récents :
 - **Visualisation des brides :** Les brides changent de couleur selon la tension (vert=relâché, jaune=moyen, rouge=élevé)
 - **Systèmes de coordonnées :** Utiliser `kite.toWorldCoordinates()` pour transformer local → monde
 - **Comportement émergent :** Faire confiance à la physique - ne pas scripter les comportements, les laisser émerger des forces + contraintes
+
+Non négrociable :--- Toujours mettre a jour ce fichier si besoin  ---

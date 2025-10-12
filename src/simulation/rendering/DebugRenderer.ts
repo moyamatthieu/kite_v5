@@ -32,7 +32,7 @@ import * as THREE from "three";
 import { Primitive } from "@core/Primitive";
 
 import { Kite } from "../../objects/Kite";
-import { SurfaceForce } from "../types";
+// Types agrégés disponibles via ../types (SurfaceForce inutilisé ici)
 import type { LineSystem } from "../physics/LineSystem";
 import type { WindSimulator } from "../physics/WindSimulator";
 import { CONFIG } from "../config/SimulationConfig";
@@ -64,7 +64,7 @@ const DEBUG_COLORS = {
   
   // Masse distribuée
   surfaceMass: 0xff00ff,     // Magenta - Force gravitationnelle par surface
-  torque: 0xffa500,          // Orange - Couple aérodynamique
+  
 };
 
 /**
@@ -80,7 +80,7 @@ const VECTOR_SCALES = {
   surfaceFriction: 0.3,
   surfaceResultant: 0.7, // Résultante locale plus visible
   surfaceMass: 4.0,     // Gravité distribuée plus visible
-  torque: 0.8,          // Couple plus visible
+  
 };
 
 /**
@@ -123,13 +123,15 @@ interface VectorVisibility {
   globalForces: boolean;
   surfaceForces: boolean;
   surfaceMass: boolean;  // Afficher forces gravitationnelles distribuées
-  torque: boolean; // Nouvelle option pour le couple
+  
+  meshWireframe: boolean; // Afficher le maillage (wireframe)
 }
 
 export class DebugRenderer {
   private renderTarget: DebugRenderTarget;
   private debugArrows: THREE.ArrowHelper[] = [];
   private debugLabels: THREE.Object3D[] = []; // Nouveaux labels textuels
+  private debugLines: THREE.Object3D[] = []; // Lignes de maillage/wireframe
   private debugMode: boolean;
   private vectorVisibility: VectorVisibility = {
     velocity: true,
@@ -137,7 +139,8 @@ export class DebugRenderer {
     globalForces: true,
     surfaceForces: true,
     surfaceMass: false,  // Désactivé par défaut (peut surcharger l'affichage)
-    torque: true, // Activé par défaut
+    
+    meshWireframe: false,
   };
   private physicsSystem: any;
 
@@ -291,8 +294,11 @@ export class DebugRenderer {
                 <span style="color: #ff00ff;">●</span> Masse distribuée
               </label>
               <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="toggle-torque" checked style="margin-right: 8px; cursor: pointer;">
-                <span style="color: #ffa500;">●</span> Couple aérodynamique
+                
+              </label>
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="toggle-mesh-wireframe" style="margin-right: 8px; cursor: pointer;">
+                <span style="color: #ffffff;">●</span> Maillage (wireframe)
               </label>
             </div>
           </div>
@@ -308,7 +314,7 @@ export class DebugRenderer {
           this.vectorVisibility.globalForces = checked;
           this.vectorVisibility.surfaceForces = checked;
           this.vectorVisibility.surfaceMass = checked;
-          this.vectorVisibility.torque = checked;
+          // Ne pas activer par défaut le wireframe avec le sélecteur global (reste au choix)
 
           // Mettre à jour tous les checkboxes
           (document.getElementById("toggle-velocity") as HTMLInputElement).checked = checked;
@@ -316,7 +322,7 @@ export class DebugRenderer {
           (document.getElementById("toggle-global-forces") as HTMLInputElement).checked = checked;
           (document.getElementById("toggle-surface-forces") as HTMLInputElement).checked = checked;
           (document.getElementById("toggle-surface-mass") as HTMLInputElement).checked = checked;
-          (document.getElementById("toggle-torque") as HTMLInputElement).checked = checked;
+          
         });
 
         // Contrôle d'échelle globale
@@ -345,8 +351,10 @@ export class DebugRenderer {
           this.vectorVisibility.surfaceMass = (e.target as HTMLInputElement).checked;
         });
 
-        document.getElementById("toggle-torque")?.addEventListener("change", (e) => {
-          this.vectorVisibility.torque = (e.target as HTMLInputElement).checked;
+        // (Couple aérodynamique supprimé)
+
+        document.getElementById("toggle-mesh-wireframe")?.addEventListener("change", (e) => {
+          this.vectorVisibility.meshWireframe = (e.target as HTMLInputElement).checked;
         });
       }
     }
@@ -363,6 +371,12 @@ export class DebugRenderer {
       this.renderTarget.removeObject(label);
     });
     this.debugLabels = [];
+
+    // Nettoyer les lignes (wireframe)
+    this.debugLines.forEach((line) => {
+      this.renderTarget.removeObject(line);
+    });
+    this.debugLines = [];
   }
 
   /**
@@ -451,9 +465,7 @@ export class DebugRenderer {
     }
 
     // Afficher le couple aérodynamique
-    if (this.vectorVisibility.torque) {
-      this.displayTorqueVector(kitePhysicsSystem, centerWorld);
-    }
+    // Couple aérodynamique: supprimé (émergent via r × F)
 
     // Afficher les contraintes (tensions des lignes et brides)
     this.displayConstraintForces(kitePhysicsSystem, kite);
@@ -461,6 +473,11 @@ export class DebugRenderer {
     // Afficher la gravité distribuée si activé
     if (this.vectorVisibility.surfaceMass) {
       this.displayGravityForces(kite);
+    }
+
+    // Afficher le maillage (wireframe)
+    if (this.vectorVisibility.meshWireframe) {
+      this.displayMeshWireframe(kite);
     }
   }
 
@@ -605,50 +622,95 @@ export class DebugRenderer {
   /**
    * Affiche les forces par surface depuis l'architecture ECS
    */
-  private displaySurfaceForcesFromECS(kitePhysicsSystem: any, kite: Kite): void {
+  private displaySurfaceForcesFromECS(kitePhysicsSystem: any, _kite: Kite): void {
     const surfaceForces = kitePhysicsSystem.getSurfaceForces();
-    if (surfaceForces && surfaceForces.length > 0) {
-      // TODO: Implémenter displaySurfaceForces quand la méthode sera disponible
-      // this.displaySurfaceForces(surfaceForces, kite);
+    if (!surfaceForces || surfaceForces.length === 0) return;
+
+    const minLen = CONFIG.debug.minVectorLength;
+
+    // Dessiner pour chaque surface: lift, drag, résultante (+ friction si dispo)
+    for (const sf of surfaceForces) {
+      const center = sf.center instanceof THREE.Vector3 ? sf.center.clone() : new THREE.Vector3();
+      // Légèrement décaler le point le long de la normale pour éviter le z-fighting et améliorer la lisibilité.
+      if (sf.normal && (sf.normal as any).x !== undefined) {
+        center.add((sf.normal as THREE.Vector3).clone().normalize().multiplyScalar(CONFIG.visualization.surfaceVectorOffset));
+      }
+
+      // Lift
+      if (sf.lift && sf.lift.length() > minLen) {
+        const mag = sf.lift.length();
+        const dir = sf.lift.clone().normalize();
+        const scale = this.calculateAdaptiveScale(mag, VECTOR_SCALES.surfaceLift);
+        const length = Math.sqrt(mag) * scale;
+        const arrow = Primitive.arrow(
+          dir,
+          center,
+          length,
+          DEBUG_COLORS.surfaceLift,
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
+        );
+        this.debugArrows.push(arrow);
+        this.renderTarget.addObject(arrow);
+      }
+
+      // Drag
+      if (sf.drag && sf.drag.length() > minLen) {
+        const mag = sf.drag.length();
+        const dir = sf.drag.clone().normalize();
+        const scale = this.calculateAdaptiveScale(mag, VECTOR_SCALES.surfaceDrag);
+        const length = Math.sqrt(mag) * scale;
+        const arrow = Primitive.arrow(
+          dir,
+          center,
+          length,
+          DEBUG_COLORS.surfaceDrag,
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
+        );
+        this.debugArrows.push(arrow);
+        this.renderTarget.addObject(arrow);
+      }
+
+      // Friction (si fournie)
+      if (sf.friction && sf.friction.length && sf.friction.length() > minLen) {
+        const mag = sf.friction.length();
+        const dir = sf.friction.clone().normalize();
+        const scale = this.calculateAdaptiveScale(mag, VECTOR_SCALES.surfaceFriction);
+        const length = Math.sqrt(mag) * scale;
+        const arrow = Primitive.arrow(
+          dir,
+          center,
+          length,
+          DEBUG_COLORS.surfaceFriction,
+          ARROW_HEAD_CONFIG.tiny.headLength,
+          ARROW_HEAD_CONFIG.tiny.headWidth
+        );
+        this.debugArrows.push(arrow);
+        this.renderTarget.addObject(arrow);
+      }
+
+      // Résultante locale
+      if (sf.resultant && sf.resultant.length() > minLen) {
+        const mag = sf.resultant.length();
+        const dir = sf.resultant.clone().normalize();
+        const scale = this.calculateAdaptiveScale(mag, VECTOR_SCALES.surfaceResultant);
+        const length = Math.sqrt(mag) * scale;
+        const arrow = Primitive.arrow(
+          dir,
+          center,
+          length,
+          DEBUG_COLORS.surfaceResultant,
+          ARROW_HEAD_CONFIG.small.headLength,
+          ARROW_HEAD_CONFIG.small.headWidth
+        );
+        this.debugArrows.push(arrow);
+        this.renderTarget.addObject(arrow);
+      }
     }
   }
 
-  /**
-   * Affiche le vecteur de couple aérodynamique
-   */
-  private displayTorqueVector(kitePhysicsSystem: any, kitePosition: THREE.Vector3): void {
-    // Note: Dans l'architecture actuelle, le couple n'est pas directement exposé
-    // Nous utilisons une approximation basée sur les forces aérodynamiques disponibles
-    const forces = kitePhysicsSystem.getAerodynamicForces();
-    if (!forces) return;
-
-    const kiteState = kitePhysicsSystem.getKiteState();
-    if (!kiteState) return;
-
-    const { lift } = forces;
-
-    // Approximation du couple basée sur la portance (en utilisant une distance arbitraire)
-    // Dans un système complet, cela devrait venir directement du système de physique
-    const approximateTorqueMagnitude = lift.length() * 0.5; // Distance arbitraire de 0.5m
-
-    if (approximateTorqueMagnitude < CONFIG.debug.minVectorLength) return;
-
-    // Créer un vecteur de couple approximatif (direction perpendiculaire à la portance)
-    const torqueVector = new THREE.Vector3(-lift.y, lift.x, 0).normalize().multiplyScalar(approximateTorqueMagnitude);
-
-    const dir = torqueVector.clone().normalize();
-    const length = Math.sqrt(approximateTorqueMagnitude) * VECTOR_SCALES.torque;
-
-    this.createLabeledVector(
-      dir,
-      kitePosition, // Position du centre du kite sur sa surface
-      length,
-      DEBUG_COLORS.torque,
-      `${approximateTorqueMagnitude.toFixed(1)} N·m`,
-      ARROW_HEAD_CONFIG.large.headLength,
-      ARROW_HEAD_CONFIG.large.headWidth
-    );
-  }
+  
 
   /**
    * Affiche les vecteurs de tension des lignes et brides
@@ -735,6 +797,39 @@ export class DebugRenderer {
         this.debugArrows.push(gravityArrow);
       }
     });
+  }
+
+  /**
+   * Affiche le maillage du kite (wireframe) à partir des surfaces subdivisées
+   */
+  private displayMeshWireframe(kite: Kite): void {
+    const positions: number[] = [];
+    const q = kite.quaternion;
+    const pos = kite.position;
+
+    // Parcourir les surfaces subdivisées pour dessiner les arêtes
+    KiteGeometry.SUBDIVIDED_SURFACES.forEach((surface: any) => {
+      const v0 = surface.vertices[0].clone().applyQuaternion(q).add(pos);
+      const v1 = surface.vertices[1].clone().applyQuaternion(q).add(pos);
+      const v2 = surface.vertices[2].clone().applyQuaternion(q).add(pos);
+
+      // Arête v0-v1
+      positions.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
+      // Arête v1-v2
+      positions.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+      // Arête v2-v0
+      positions.push(v2.x, v2.y, v2.z, v0.x, v0.y, v0.z);
+    });
+
+    if (positions.length === 0) return;
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+    const lines = new THREE.LineSegments(geom, mat);
+
+    this.debugLines.push(lines);
+    this.renderTarget.addObject(lines);
   }
 }
 

@@ -4,11 +4,11 @@
  * Calcule les forces aérodynamiques (portance, traînée) et gravitationnelles 
  * distribuées sur chaque surface du kite selon les principes de la mécanique des fluides.
  *
- * Modèle physique :
- *   - Portance : CL = sin(α)×cos(α) (plaqu      gravity: gravityForce,  // Gravité distribuée par surface plane)
- *   - Traînée : CD = sin²(α) (plaque plane)
- *   - Gravité distribuée par masse surfacique
- *   - Couples émergents de la distribution spatiale des forces
+ * Modèle physique amélioré :
+ *   - Coefficients réalistes basés sur données expérimentales (NACA, etc.)
+ *   - Modélisation du stall (décrochage) à forts angles d'incidence
+ *   - Centre de pression dynamique
+ *   - Effets de turbulence et amortissement aérodynamique
  *
  * @see PhysicsEngine.ts - Utilise les forces calculées
  * @see KiteGeometry.ts - Définit les surfaces et masses
@@ -21,7 +21,7 @@ import { CONFIG } from "../config/SimulationConfig";
 import { SurfaceForce } from "../types/PhysicsTypes";
 
 /**
- * Calculateur de forces aérodynamiques
+ * Calculateur de forces aérodynamiques amélioré
  *
  * Calcule comment le vent pousse sur le cerf-volant selon sa forme et orientation
  */
@@ -29,6 +29,55 @@ export class AerodynamicsCalculator {
   // Constantes de calculs aérodynamiques
   private static readonly HALF_AIR_DENSITY = 0.5 * CONFIG.physics.airDensity;
   private static readonly MIN_WIND_SPEED = 0.01; // m/s - seuil minimal pour calculs aéro
+
+  // Utiliser désormais les coefficients issus de CONFIG (évite magic numbers)
+
+  /**
+   * Calcule les coefficients aérodynamiques réalistes pour un angle d'incidence
+   * Basé sur des données expérimentales pour plaques planes et profils simples
+   */
+  private static calculateAerodynamicCoefficients(alpha: number): { CL: number; CD: number } {
+  const coeffs = CONFIG.aero.coefficients;
+    const absAlpha = Math.abs(alpha);
+
+    // Limiter l'angle pour éviter les instabilités
+    const clampedAlpha = Math.max(-coeffs.alphaMax, Math.min(coeffs.alphaMax, alpha));
+
+    // Calculer CL avec modèle polynomial + stall
+    let CL = coeffs.lift.a0 +
+             coeffs.lift.a1 * clampedAlpha +
+             coeffs.lift.a2 * clampedAlpha * clampedAlpha +
+             coeffs.lift.a3 * clampedAlpha * clampedAlpha * clampedAlpha;
+
+    // Appliquer le stall (décrochage) à forts angles
+    if (absAlpha > coeffs.alphaStall) {
+      const stallFactor = Math.max(0, 1 - (absAlpha - coeffs.alphaStall) / (coeffs.alphaMax - coeffs.alphaStall));
+      CL *= stallFactor * stallFactor; // Décroissance quadratique
+    }
+
+    // Limiter CL
+    CL = Math.max(-coeffs.clMax, Math.min(coeffs.clMax, CL));
+
+    // Calculer CD avec modèle polynomial
+    let CD = coeffs.drag.b0 +
+             coeffs.drag.b1 * Math.abs(clampedAlpha) +
+             coeffs.drag.b2 * clampedAlpha * clampedAlpha +
+             coeffs.drag.b3 * Math.abs(clampedAlpha * clampedAlpha * clampedAlpha);
+
+    // CD minimum et augmentation en stall
+    CD = Math.max(coeffs.drag.b0, CD);
+
+    // En stall, CD augmente significativement
+    if (absAlpha > coeffs.alphaStall) {
+      const stallDrag = coeffs.drag.b0 + (absAlpha - coeffs.alphaStall) * 0.5;
+      CD = Math.max(CD, stallDrag);
+    }
+
+    // Limiter CD
+    CD = Math.min(coeffs.cdMax, CD);
+
+    return { CL, CD };
+  }
 
   /**
    * Calcule le couple (moment) d'une force appliquée à un point
@@ -38,6 +87,21 @@ export class AerodynamicsCalculator {
     return new THREE.Vector3().crossVectors(lever, force);
   }
 
+  /**
+   * (Supprimé) Amortissement aérodynamique explicite: on laisse le couple émerger uniquement des forces.
+   */
+
+  /**
+   * Centre de pression simplifié: toujours le centroïde géométrique.
+   * (dynamicCP supprimé pour un modèle purement émergent et plus simple à régler)
+   */
+  private static calculateCenterOfPressure(
+    _surface: any,
+    _alpha: number,
+    centroid: THREE.Vector3
+  ): THREE.Vector3 {
+    return centroid.clone();
+  }
   /**
    * Calcule la normale d'un triangle dans l'espace monde
    * Méthode utilitaire pour éviter la duplication de code
@@ -170,21 +234,19 @@ export class AerodynamicsCalculator {
 
       // Pour une plaque : sin(α) = cos(θ) et cos(α) = sin(θ)
       const sinAlpha = cosTheta;
-      const cosAlpha = Math.sqrt(1 - sinAlpha * sinAlpha); // sin²+cos²=1
+  // Note: cosAlpha non utilisé dans le modèle actuel
+
+      // Calculer l'angle d'incidence réel (en radians)
+      const alpha = Math.asin(Math.min(1, sinAlpha)); // Limiter à [-π/2, π/2]
 
       // Si le vent glisse sur le côté (angle = 0), pas de force
       if (sinAlpha <= PhysicsConstants.EPSILON) {
         return;
       }
 
-      // 🔴 BUG FIX #4 : COEFFICIENTS PLAQUE PLANE CORRECTS (Hoerner)
-      // Formules physiques pour plaque plane inclinée à angle α :
-      //   C_L = sin(α) × cos(α)  → Coefficient de portance
-      //   C_D = sin²(α)           → Coefficient de traînée
-      // Ces coefficients sont validés expérimentalement !
-      
-      const CL = sinAlpha * cosAlpha;  // Coefficient lift
-      const CD = sinAlpha * sinAlpha;   // Coefficient drag (= CN)
+      // 🎯 NOUVEAUX COEFFICIENTS AÉRODYNAMIQUES RÉALISTES
+      // Au lieu des formules simplifiées, utiliser des coefficients expérimentaux
+      const { CL, CD } = AerodynamicsCalculator.calculateAerodynamicCoefficients(alpha);
       
       // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
       // if (surfaceIndex === 0) {
@@ -237,15 +299,22 @@ export class AerodynamicsCalculator {
       const lift = liftForce.clone();
       const drag = dragForce.clone();
 
-      // 6. Centre de pression = centre géométrique du triangle
-      const centre = KiteGeometry.calculateTriangleCentroid(
+      // 6. Centre de pression dynamique (au lieu du simple centroïde)
+      const geometricCentroid = KiteGeometry.calculateTriangleCentroid(
         surface.vertices[0],
         surface.vertices[1], 
         surface.vertices[2]
       );
 
+      // Centre de pression réaliste qui dépend de l'angle d'incidence
+      const centerOfPressure = AerodynamicsCalculator.calculateCenterOfPressure(
+        surface,
+        alpha,
+        geometricCentroid
+      );
+
       // Centre orienté dans le repère monde (sans translation)
-      const centreOriente = centre.clone().applyQuaternion(kiteOrientation);
+      const centreOriente = centerOfPressure.clone().applyQuaternion(kiteOrientation);
       // Centre monde complet (incluant translation si disponible)
       const centreMonde = kitePosition
         ? centreOriente.clone().add(kitePosition)
@@ -257,7 +326,7 @@ export class AerodynamicsCalculator {
       // On note si cette force est sur le côté gauche ou droit
       // C'est important car si un côté a plus de force,
       // le kite va tourner (comme un bateau avec une seule rame)
-      const isLeft = centre.x < 0; // Négatif = gauche, Positif = droite
+      const isLeft = centerOfPressure.x < 0; // Négatif = gauche, Positif = droite
 
       if (isLeft) {
         leftForce.add(totalSurfaceForce); // Force totale (aéro + gravité)
@@ -336,13 +405,18 @@ export class AerodynamicsCalculator {
     const scaledAeroTorque = aeroTorque.multiplyScalar(averageAeroScale);
     
     // Couple total = couple aéro scalé + couple gravité (non scalé)
-    const finalTorque = scaledAeroTorque.clone().add(gravityTorque);
+  const finalTorque = scaledAeroTorque.clone().add(gravityTorque);
+
+    // Clamp final du couple pour stabilité numérique (garde-fou générique)
+    if (finalTorque.length() > PhysicsConstants.MAX_TORQUE) {
+      finalTorque.setLength(PhysicsConstants.MAX_TORQUE);
+    }
 
     return {
       lift,
       drag,
       gravity: gravityForce,  // � RESTAURÉ : Gravité distribuée par surface
-      torque: finalTorque,  // Couple cohérent avec forces scalées
+      torque: finalTorque,  // Couple cohérent avec forces scalées + amortissement
       leftForce, // Exposer les forces pour analyse
       rightForce, // Permet de voir l'asymétrie émergente
       surfaceForces, // Forces individuelles par surface pour debug

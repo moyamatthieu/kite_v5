@@ -43,4 +43,5 @@ export class PhysicsConstants {
   static readonly MAX_ANGULAR_VELOCITY = 15; // rad/s - Limite élevée pour permettre convergence naturelle
   static readonly MAX_ACCELERATION = 100; // m/s² - Accélération maximale (~10G)
   static readonly MAX_ANGULAR_ACCELERATION = 5; // rad/s² - Accélération angulaire réaliste
+  static readonly MAX_TORQUE = 20; // N·m - Garde-fou sur le couple (émergent)
 }

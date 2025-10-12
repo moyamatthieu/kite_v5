@@ -8,7 +8,7 @@
  *
  * Architecture :
  *   - Réutilise la classe Line (même que lignes principales)
- *   - Config différente : plus rigides, plus courtes, moins élastiques
+ *   - Config différente : plus courtes
  *   - Pattern Factory comme LineFactory
  *
  * Relation avec les autres modules :
@@ -39,9 +39,6 @@ export class BridleFactory {
    *
    * Les brides sont plus rigides et moins élastiques que les lignes principales :
    * - Plus courtes (0.5-0.7m vs 15m)
-   * - Plus rigides (5000 N/m vs 2200 N/m)
-   * - Moins d'amortissement (quasi-rigides)
-   * - Très légères
    */
   private static readonly BRIDLE_CONFIG: Omit<LineConfig, 'length'> = {
     stiffness: 5000,           // N/m - Très rigides (Dyneema courte)

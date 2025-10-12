@@ -70,15 +70,35 @@ export const CONFIG = {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
     deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
-    controlDeadzone: 0.1, // m - Petite zone de tolérance pour la tension des lignes
+    controlDeadzone: 0.01, // m - Petite zone de tolérance pour la tension des lignes
     // Amortissement réaliste pour un cerf-volant
-    linearDampingCoeff: 1.5, // Amortissement linéaire modéré pour stabilité
-    angularDragFactor: 1.5, // Amortissement angulaire pour éviter les oscillations
+    linearDampingCoeff: 2, // Amortissement linéaire modéré pour stabilité
+    angularDragFactor: 2, // Amortissement angulaire pour éviter les oscillations
   },
   aero: {
     // Forces aérodynamiques réalistes pour un cerf-volant delta
-    liftScale: 4.5, // Portance réaliste pour un kite de cette taille
-    dragScale: 1.8, // Traînée modérée mais présente
+    liftScale: 2, // Portance réaliste pour un kite de cette taille
+    dragScale: 2, // Traînée modérée mais présente
+    // Coefficients aérodynamiques (plaque plane/profil simple)
+    coefficients: {
+      lift: {
+        a0: 0.0,
+        a1: 0.1,
+        a2: 0.0,
+        a3: -0.005,
+      },
+      drag: {
+        b0: 0.01,
+        b1: 0.0,
+        b2: 0.05,
+        b3: 0.002,
+      },
+      alphaStall: Math.PI / 6, // 30°
+      alphaMax: Math.PI / 3,   // 60°
+      clMax: 1.2,
+      cdMax: 2.0,
+    },
+    // Centre de pression: simplifié → toujours le centroïde géométrique (dynamicCP supprimé)
   },
   kite: {
     // Masse et inertie calculées AUTOMATIQUEMENT depuis la géométrie
@@ -96,7 +116,7 @@ export const CONFIG = {
   },
   bridle: {
     defaultLengths: Object.freeze({
-      nez: 0.80,
+      nez: 0.70,
       inter: 0.65,
       centre: 0.65,
     }),
@@ -130,6 +150,7 @@ export const CONFIG = {
   },
   visualization: {
     lineWidth: 2, // pixels - Largeur des lignes de contrôle
+    surfaceVectorOffset: 0.02, // m - Décalage des flèches de forces par face le long de la normale (visibilité)
   },
   debug: {
     // Seuils de tension des brides pour couleurs visuelles
@@ -138,7 +159,7 @@ export const CONFIG = {
     bridleTensionHigh: 100, // N - Seuil tension élevée (rouge)
     // Seuils pour vecteurs debug
     minVectorLength: 0.01, // m - Longueur minimale pour afficher un vecteur
-    minVelocityDisplay: 0.1, // m/s - Vitesse minimale pour afficher vecteur vitesse
+    minVelocityDisplay: 0.01, // m/s - Vitesse minimale pour afficher vecteur vitesse
   },
   input: {
     rotationSpeed: 0.5, // rad/s - Vitesse de rotation de la barre (input utilisateur)

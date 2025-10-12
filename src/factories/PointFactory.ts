@@ -7,14 +7,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from '@/simulation/config/SimulationConfig';
-
-// Constantes géométriques locales
-const GEOMETRY = {
-  half: 0.5,
-  third: 1 / 3,
-  twoThirds: 2 / 3,
-  quarter: 0.25,
-};
+import { Point } from '@/objects/Point';
 
 /**
  * Longueurs physiques des brides (en mètres)
@@ -36,6 +29,17 @@ export interface KiteParams {
  * Factory simple qui encapsule la logique de calcul des points
  */
 export class PointFactory {
+  /**
+   * Crée un point à partir de coordonnées.
+   * @param x - Coordonnée X.
+   * @param y - Coordonnée Y.
+   * @param z - Coordonnée Z.
+   * @returns Instance de Point.
+   */
+  static createPoint(x: number, y: number, z: number): Point {
+    return new Point(x, y, z);
+  }
+
   /**
    * Crée le repère local pour la trilatération 3D
    */
@@ -155,7 +159,7 @@ export class PointFactory {
     interGauchePos: [number, number, number];
     interDroitPos: [number, number, number];
   } {
-    const centreY = height * GEOMETRY.quarter;
+    const centreY = height * CONFIG.geometry.quarter;
     const ratio = (height - centreY) / height;
     const interGaucheX = ratio * (-width / 2);
     const interDroitX = ratio * (width / 2);
@@ -199,35 +203,35 @@ export class PointFactory {
     width: number,
     height: number,
     depth: number,
-    anchorPoints: { nezPos: [number, number, number]; centrePos: [number, number, number]; interGauchePos: [number, number, number]; interDroitPos: [number, number, number] },
-    controlPoints: { ctrlGauche: [number, number, number]; ctrlDroit: [number, number, number] }
-  ): Map<string, [number, number, number]> {
+    anchorPoints: { nezPos: Point; centrePos: Point; interGauchePos: Point; interDroitPos: Point },
+    controlPoints: { ctrlGauche: Point; ctrlDroit: Point }
+  ): Map<string, Point> {
     const { nezPos, centrePos, interGauchePos, interDroitPos } = anchorPoints;
     const { ctrlGauche, ctrlDroit } = controlPoints;
 
-    const fixRatio = GEOMETRY.twoThirds;
+    const fixRatio = CONFIG.geometry.twoThirds;
 
-    return new Map<string, [number, number, number]>([
+    return new Map<string, Point>([
       // Points structurels principaux
-      ["SPINE_BAS", [0, 0, 0]],
+      ["SPINE_BAS", new Point(0, 0, 0)],
       ["CENTRE", centrePos],
       ["NEZ", nezPos],
 
       // Points des bords d'attaque
-      ["BORD_GAUCHE", [-width / 2, 0, 0]],
-      ["BORD_DROIT", [width / 2, 0, 0]],
+      ["BORD_GAUCHE", new Point(-width / 2, 0, 0)],
+      ["BORD_DROIT", new Point(width / 2, 0, 0)],
 
       // Points d'intersection pour le spreader
       ["INTER_GAUCHE", interGauchePos],
       ["INTER_DROIT", interDroitPos],
 
       // Points de fixation whiskers
-      ["FIX_GAUCHE", [fixRatio * interGauchePos[0], centrePos[1], 0]],
-      ["FIX_DROIT", [fixRatio * interDroitPos[0], centrePos[1], 0]],
+      ["FIX_GAUCHE", new Point(fixRatio * interGauchePos.position.x, centrePos.position.y, 0)],
+      ["FIX_DROIT", new Point(fixRatio * interDroitPos.position.x, centrePos.position.y, 0)],
 
       // Points des whiskers
-      ["WHISKER_GAUCHE", [-width / 4, 0.1, -depth]],
-      ["WHISKER_DROIT", [width / 4, 0.1, -depth]],
+      ["WHISKER_GAUCHE", new Point(-width / 4, 0.1, -depth)],
+      ["WHISKER_DROIT", new Point(width / 4, 0.1, -depth)],
 
       // Points de contrôle (bridage) - calculés depuis longueurs physiques
       ["CTRL_GAUCHE", ctrlGauche],
@@ -246,17 +250,45 @@ export class PointFactory {
   /**
    * Calcule toutes les positions des points anatomiques d'un cerf-volant delta
    */
-  static calculateDeltaKitePoints(params: KiteParams): Map<string, [number, number, number]> {
+  static calculateDeltaKitePoints(params: KiteParams): Map<string, Point> {
     const { width, height, depth, bridleLengths } = params;
     const effectiveBridleLengths: BridleLengths = bridleLengths ?? { ...CONFIG.bridle.defaultLengths };
 
     // Calculer les points d'ancrage
     const anchorPoints = this.calculateAnchorPoints(width, height);
+    const anchorPointsAsPoints = {
+      nezPos: new Point(...anchorPoints.nezPos),
+      centrePos: new Point(...anchorPoints.centrePos),
+      interGauchePos: new Point(...anchorPoints.interGauchePos),
+      interDroitPos: new Point(...anchorPoints.interDroitPos),
+    };
 
     // Calculer les points de contrôle
     const controlPoints = this.calculateControlPoints(anchorPoints, effectiveBridleLengths);
+    const controlPointsAsPoints = {
+      ctrlGauche: new Point(...controlPoints.ctrlGauche),
+      ctrlDroit: new Point(...controlPoints.ctrlDroit),
+    };
 
     // Créer la collection complète
-    return this.createPointCollection(width, height, depth, anchorPoints, controlPoints);
+    return this.createPointCollection(width, height, depth, anchorPointsAsPoints, controlPointsAsPoints);
+  }
+
+  /**
+   * Converts a tuple to a Point instance.
+   * @param tuple - A tuple representing [x, y, z] coordinates.
+   * @returns A Point instance.
+   */
+  private static tupleToPoint(tuple: [number, number, number]): Point {
+    return new Point(tuple[0], tuple[1], tuple[2]);
+  }
+
+  /**
+   * Converts a Point instance to a tuple.
+   * @param point - A Point instance.
+   * @returns A tuple representing [x, y, z] coordinates.
+   */
+  private static pointToTuple(point: Point): [number, number, number] {
+    return [point.position.x, point.position.y, point.position.z];
   }
 }
