@@ -1,9 +1,15 @@
 import { Simulation } from "./simulation";
 
+// Ajout de logs pour le débogage
+console.log('Chargement du fichier main.ts');
+
 // Initialisation de la simulation
 async function startSimulation() {
   try {
     const app = new Simulation();
+
+    // Ajout de logs pour vérifier l'initialisation
+    console.log('Initialisation de l\'application');
     await app.initialize();
 
     // Démarrer la simulation
@@ -22,3 +28,6 @@ async function startSimulation() {
 
 // Lancer la simulation au chargement
 startSimulation();
+
+// Ajout de logs pour vérifier le rendu
+console.log('Rendu en cours...');

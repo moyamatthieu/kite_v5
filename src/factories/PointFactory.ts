@@ -86,14 +86,27 @@ export class PointFactory {
     const x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
     const y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
 
-    // Calcul de z
+    // Calcul de z - VALIDATION GÉOMÉTRIQUE CRITIQUE
     const zSquared = r1 * r1 - x * x - y * y;
     let z: number;
     if (zSquared < 0) {
-      console.warn(`⚠️ Configuration de brides impossible (z²=${zSquared.toFixed(3)}), approximation`);
-      z = 0; // Solution dégénérée
+      // 🚨 CONFIGURATION GÉOMÉTRIQUEMENT IMPOSSIBLE !
+      // Les 3 sphères n'ont pas d'intersection commune
+      console.error(`❌ BRIDES INCOMPATIBLES: z² = ${zSquared.toFixed(6)} < 0`);
+      console.error(`   Longueurs: nez=${r1.toFixed(3)}m, inter=${r2.toFixed(3)}m, centre=${r3.toFixed(3)}m`);
+      console.error(`   Position locale calculée: x=${x.toFixed(3)}, y=${y.toFixed(3)}`);
+      console.error(`   → Les longueurs de brides ne peuvent pas former une pyramide stable !`);
+
+      // Fallback : position sur plan z=0 (géométrie dégénérée)
+      z = 0;
+      console.warn(`   → Utilisation position dégénérée z=0 (kite plat)`);
     } else {
       z = Math.sqrt(zSquared); // z > 0 vers l'arrière du kite
+
+      // 🎯 Validation réussie - structure pyramidale stable
+      if (z < 0.01) {
+        console.warn(`⚠️ Pyramide très plate: z=${z.toFixed(4)}m (brides presque coplanaires)`);
+      }
     }
 
     return { x, y, z };
@@ -116,9 +129,27 @@ export class PointFactory {
   }
 
   /**
-   * Calcule la position du point de contrôle (CTRL) par trilatération 3D analytique
-   * Résout l'intersection de 3 sphères centrées en NEZ, INTER, CENTRE
-   * avec rayons = longueurs de brides respectives
+   * 🎯 GÉOMÉTRIE RIGIDE - Calcule la position du point de contrôle (CTRL)
+   *
+   * PRINCIPE PHYSIQUE FONDAMENTAL :
+   * Les brides forment une structure pyramidale RIGIDE dans le référentiel du kite.
+   * Cette position est calculée UNE SEULE FOIS par trilatération 3D et reste
+   * FIXE dans le référentiel local du kite.
+   *
+   * STRUCTURE PYRAMIDALE :
+   * - Base : triangle NEZ-INTER-CENTRE (fixe dans référentiel kite)
+   * - Sommet : point CTRL (calculé par intersection de 3 sphères)
+   * - Résultat : position unique, stable, pas de sur-contrainte
+   *
+   * IMPORTANT : Cette position NE BOUGE JAMAIS dans le référentiel kite.
+   * Seul le kite entier bouge comme corps rigide 6 DOF dans l'espace world.
+   *
+   * @param nez Position du point NEZ dans référentiel kite
+   * @param inter Position du point INTER dans référentiel kite
+   * @param centre Position du point CENTRE dans référentiel kite
+   * @param bridleLengths Longueurs physiques des 3 brides
+   * @param _side Côté (utilisé pour debug, géométrie symétrique)
+   * @returns Position CTRL dans référentiel kite [x, y, z]
    */
   private static calculateControlPoint(
     nez: [number, number, number],

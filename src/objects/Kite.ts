@@ -73,12 +73,20 @@ export class Kite extends StructuredObject implements ICreatable {
     const { width, height, depth } = this.params;
 
     // Utiliser PointFactory pour calculer les positions avec bridleLengths physiques
-    this.pointsMap = PointFactory.calculateDeltaKitePoints({
+    const calculatedPoints = PointFactory.calculateDeltaKitePoints({
       width,
       height,
       depth,
       bridleLengths: this.bridleLengths
     });
+
+    // Convertir les objets Point en tuples de coordonnées
+    this.pointsMap = new Map(
+      Array.from(calculatedPoints.entries()).map(([name, point]) => [
+        name,
+        [point.position.x, point.position.y, point.position.z] as [number, number, number]
+      ])
+    );
 
     // Enregistrer dans StructuredObject pour compatibilité avec le système existant
     this.pointsMap.forEach((position, name) => {

@@ -25,7 +25,16 @@
       "Bash(timeout 10 npm run dev)",
       "Bash(npm run type-check:*)",
       "Bash(tree:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(echo $TEMP)",
+      "Bash(tasklist)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(npm run dev:debug:*)",
+      "Bash(timeout 8 npm run dev:debug)",
+      "Bash(timeout 10 npm run dev:debug)",
+      "Bash(del test_force_3d.js)",
+      "Bash(timeout 8 npm run dev)"
     ],
     "deny": [],
     "ask": []

@@ -344,170 +344,46 @@ export class ConstraintSolver {
   }
 
   /**
-   * Applique les contraintes des brides - Solver PBD (Position-Based Dynamics)
-   * 
-   * Les brides sont des contraintes INTERNES au kite qui relient :
-   * - NEZ → CTRL_GAUCHE / CTRL_DROIT
-   * - INTER_GAUCHE → CTRL_GAUCHE
-   * - INTER_DROIT → CTRL_DROIT
-   * - CENTRE → CTRL_GAUCHE / CTRL_DROIT
-   * 
-   * Contrairement aux lignes principales (kite ↔ pilote), les brides lient
-   * des points du MÊME objet (le kite). Elles définissent la forme et rigidité
-   * interne du cerf-volant.
+   * 🚫 MÉTHODE DÉPRÉCIÉE - Les brides ne sont PLUS des contraintes dynamiques !
+   *
+   * NOUVELLE ARCHITECTURE :
+   * Les brides définissent la géométrie RIGIDE interne du kite.
+   * Les positions CTRL sont calculées une seule fois par trilatération
+   * dans PointFactory.calculateControlPoint() et restent FIXES dans
+   * le référentiel local du kite.
+   *
+   * POURQUOI CE CHANGEMENT :
+   * - Les brides forment des pyramides tétraédriques rigides
+   * - Pas de sur-contrainte : 3 brides → 1 position CTRL unique
+   * - Le kite complet bouge comme un corps rigide 6 DOF
+   * - Seules les LIGNES sont des contraintes dynamiques (pivot sphérique)
+   *
+   * @deprecated Utilisez la géométrie rigide définie par PointFactory
    */
   static enforceBridleConstraints(
-    kite: Kite,
-    predictedPosition: THREE.Vector3,
-    state: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
-    bridleLengths: BridleLengths
+    _kite: Kite,
+    _predictedPosition: THREE.Vector3,
+    _state: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
+    _bridleLengths: BridleLengths
   ): void {
-  // Tolérance gérée implicitement par la logique de contrainte (plus de soustraction de tolérance)
-    const mass = CONFIG.kite.mass;
-    const inertia = CONFIG.kite.inertia;
-
-    // Définition des 6 brides (3 par côté)
-    const bridles = [
-      // Brides gauches
-      { start: "NEZ", end: "CTRL_GAUCHE", length: bridleLengths.nez },
-      { start: "INTER_GAUCHE", end: "CTRL_GAUCHE", length: bridleLengths.inter },
-      { start: "CENTRE", end: "CTRL_GAUCHE", length: bridleLengths.centre },
-      // Brides droites
-      { start: "NEZ", end: "CTRL_DROIT", length: bridleLengths.nez },
-      { start: "INTER_DROIT", end: "CTRL_DROIT", length: bridleLengths.inter },
-      { start: "CENTRE", end: "CTRL_DROIT", length: bridleLengths.centre },
-    ];
-
-    // Résolution PBD pour chaque bride
-    const solveBridle = (
-      startName: string,
-      endName: string,
-      bridleLength: number
-    ) => {
-      const startLocal = kite.getPoint(startName);
-      const endLocal = kite.getPoint(endName);
-
-      if (!startLocal || !endLocal) {
-        console.warn(`⚠️ Points bride introuvables: ${startName} ou ${endName}`);
-        return;
-      }
-
-      // Convertir points locaux en coordonnées monde (avec position prédite)
-      const originalPos = kite.position.clone();
-      kite.position.copy(predictedPosition);
-      const startWorld = kite.toWorldCoordinates(startLocal);
-      const endWorld = kite.toWorldCoordinates(endLocal);
-      kite.position.copy(originalPos);
-
-      // Calculer distance actuelle
-      const diff = endWorld.clone().sub(startWorld);
-      const dist = diff.length();
-
-  // Si bride molle, pas de contrainte
-  // Même principe que pour les lignes: ne pas soustraire la tolérance
-  if (dist <= bridleLength) return;
-
-      // Direction de contrainte (normalisée)
-      const n = diff.clone().normalize();
-
-      // Violation de contrainte C = distance - longueur_bride
-      const C = dist - bridleLength;
-
-      // Calcul des bras de levier pour rotation
-      const rStart = startWorld.clone().sub(predictedPosition);
-      const rEnd = endWorld.clone().sub(predictedPosition);
-
-      // Moments angulaires
-      const alphaStart = new THREE.Vector3().crossVectors(rStart, n);
-      const alphaEnd = new THREE.Vector3().crossVectors(rEnd, n.clone().negate());
-
-      // Inverse masses
-      const invMass = 1 / mass;
-      const invInertia = 1 / Math.max(inertia, PhysicsConstants.EPSILON);
-
-      // Dénominateur pour lambda (inclut rotation)
-      // Les deux points appartiennent au même corps rigide, donc contribution double
-      const denom =
-        2 * invMass +
-        alphaStart.lengthSq() * invInertia +
-        alphaEnd.lengthSq() * invInertia;
-
-      const lambda = C / Math.max(denom, PhysicsConstants.EPSILON);
-
-      // Corrections de position
-      // Point start : poussé dans direction -n
-      const dPosStart = n.clone().multiplyScalar(-invMass * lambda);
-      // Point end : poussé dans direction +n
-      const dPosEnd = n.clone().multiplyScalar(invMass * lambda);
-
-      // Correction nette de position (moyenne)
-      const dPos = dPosStart.clone().add(dPosEnd).multiplyScalar(0.5);
-      predictedPosition.add(dPos);
-
-      // Correction de rotation (moyenne des deux contributions)
-      const dThetaStart = alphaStart.clone().multiplyScalar(-invInertia * lambda);
-      const dThetaEnd = alphaEnd.clone().multiplyScalar(-invInertia * lambda);
-      const dTheta = dThetaStart.clone().add(dThetaEnd).multiplyScalar(0.5);
-
-      const angle = dTheta.length();
-      if (angle > PhysicsConstants.EPSILON) {
-        const axis = dTheta.normalize();
-        const dq = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-        kite.quaternion.premultiply(dq).normalize();
-      }
-
-      // Correction de vitesse (dampening)
-      kite.position.copy(predictedPosition);
-      const startWorld2 = kite.toWorldCoordinates(startLocal);
-      const endWorld2 = kite.toWorldCoordinates(endLocal);
-      kite.position.copy(originalPos);
-
-      const n2 = endWorld2.clone().sub(startWorld2).normalize();
-      const rStart2 = startWorld2.clone().sub(predictedPosition);
-      const rEnd2 = endWorld2.clone().sub(predictedPosition);
-
-      // Vitesses des points
-      const velStart = state.velocity
-        .clone()
-        .add(new THREE.Vector3().crossVectors(state.angularVelocity, rStart2));
-      const velEnd = state.velocity
-        .clone()
-        .add(new THREE.Vector3().crossVectors(state.angularVelocity, rEnd2));
-
-      // Vitesse relative le long de la bride
-      const relVel = velEnd.clone().sub(velStart);
-      const radialSpeed = relVel.dot(n2);
-
-      // Si les points s'éloignent, appliquer correction de vitesse
-      if (radialSpeed > 0) {
-        const rxnStart = new THREE.Vector3().crossVectors(rStart2, n2);
-        const rxnEnd = new THREE.Vector3().crossVectors(rEnd2, n2.clone().negate());
-        const eff =
-          2 * invMass + rxnStart.lengthSq() * invInertia + rxnEnd.lengthSq() * invInertia;
-        const J = -radialSpeed / Math.max(eff, PhysicsConstants.EPSILON);
-
-        // Correction vitesse linéaire
-        state.velocity.add(n2.clone().multiplyScalar(J * invMass));
-
-        // Correction vitesse angulaire (moyenne des deux contributions)
-        const angImpulseStart = new THREE.Vector3().crossVectors(
-          rStart2,
-          n2.clone().multiplyScalar(J)
-        );
-        const angImpulseEnd = new THREE.Vector3().crossVectors(
-          rEnd2,
-          n2.clone().multiplyScalar(-J)
-        );
-        const angImpulse = angImpulseStart.clone().add(angImpulseEnd).multiplyScalar(0.5);
-        state.angularVelocity.add(angImpulse.multiplyScalar(invInertia));
-      }
-    };
-
-    // Résoudre toutes les brides (1 passe suffit généralement)
-    // Les brides sont courtes et rigides, convergence rapide
-    bridles.forEach(({ start, end, length }) => {
-      solveBridle(start, end, length);
-    });
+    // 🔥 REFACTORING ARCHITECTURAL MAJEUR 🔥
+    //
+    // Cette méthode ne fait plus RIEN car les brides sont maintenant
+    // gérées comme structure géométrique RIGIDE du kite.
+    //
+    // AVANT (PROBLÉMATIQUE) :
+    // - PBD tentait de résoudre 4 contraintes sur chaque point CTRL
+    // - Conflit entre contraintes de brides et contraintes de lignes
+    // - Instabilité numérique et oscillations
+    //
+    // MAINTENANT (CORRECT) :
+    // - Positions CTRL calculées UNE SEULE FOIS par trilatération
+    // - Structure pyramidale rigide dans référentiel kite
+    // - Le kite entier bouge comme un corps rigide 6 DOF
+    // - Seules les lignes sont des contraintes dynamiques
+    //
+    // La géométrie interne est définie dans PointFactory.calculateControlPoint()
+    // et reste fixe dans le référentiel local du kite.
   }
 
   /**

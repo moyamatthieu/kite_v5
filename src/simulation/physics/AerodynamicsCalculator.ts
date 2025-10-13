@@ -33,50 +33,92 @@ export class AerodynamicsCalculator {
   // Utiliser désormais les coefficients issus de CONFIG (évite magic numbers)
 
   /**
-   * Calcule les coefficients aérodynamiques réalistes pour un angle d'incidence
-   * Basé sur des données expérimentales pour plaques planes et profils simples
+   * 🎯 CALCUL SIMPLE DES COEFFICIENTS AÉRODYNAMIQUES
+   *
+   * Modèle basique pour plaque plane (cerf-volant) :
+   * - Portance proportionnelle à sin(α) × cos(α)
+   * - Traînée proportionnelle à sin²(α)
+   * - Pas de stall, pas de complexité inutile
+   *
+   * @param alpha Angle d'incidence en radians
+   * @returns Coefficients CL (portance) et CD (traînée)
    */
   private static calculateAerodynamicCoefficients(alpha: number): { CL: number; CD: number } {
-  const coeffs = CONFIG.aero.coefficients;
-    const absAlpha = Math.abs(alpha);
+    // Modèle simple plaque plane
+    const sinAlpha = Math.sin(alpha);
+    const cosAlpha = Math.cos(alpha);
 
-    // Limiter l'angle pour éviter les instabilités
-    const clampedAlpha = Math.max(-coeffs.alphaMax, Math.min(coeffs.alphaMax, alpha));
+    // Portance : CL = 2 × sin(α) × cos(α) = sin(2α)
+    const CL = 2.0 * sinAlpha * cosAlpha;
 
-    // Calculer CL avec modèle polynomial + stall
-    let CL = coeffs.lift.a0 +
-             coeffs.lift.a1 * clampedAlpha +
-             coeffs.lift.a2 * clampedAlpha * clampedAlpha +
-             coeffs.lift.a3 * clampedAlpha * clampedAlpha * clampedAlpha;
-
-    // Appliquer le stall (décrochage) à forts angles
-    if (absAlpha > coeffs.alphaStall) {
-      const stallFactor = Math.max(0, 1 - (absAlpha - coeffs.alphaStall) / (coeffs.alphaMax - coeffs.alphaStall));
-      CL *= stallFactor * stallFactor; // Décroissance quadratique
-    }
-
-    // Limiter CL
-    CL = Math.max(-coeffs.clMax, Math.min(coeffs.clMax, CL));
-
-    // Calculer CD avec modèle polynomial
-    let CD = coeffs.drag.b0 +
-             coeffs.drag.b1 * Math.abs(clampedAlpha) +
-             coeffs.drag.b2 * clampedAlpha * clampedAlpha +
-             coeffs.drag.b3 * Math.abs(clampedAlpha * clampedAlpha * clampedAlpha);
-
-    // CD minimum et augmentation en stall
-    CD = Math.max(coeffs.drag.b0, CD);
-
-    // En stall, CD augmente significativement
-    if (absAlpha > coeffs.alphaStall) {
-      const stallDrag = coeffs.drag.b0 + (absAlpha - coeffs.alphaStall) * 0.5;
-      CD = Math.max(CD, stallDrag);
-    }
-
-    // Limiter CD
-    CD = Math.min(coeffs.cdMax, CD);
+    // Traînée : CD = 2 × sin²(α)
+    const CD = 2.0 * sinAlpha * sinAlpha;
 
     return { CL, CD };
+  }
+
+  /**
+   * 🎯 CALCUL SIMPLE DES FORCES POUR UNE FACE TRIANGULAIRE
+   *
+   * Fonction encapsulée qui prend tous les paramètres nécessaires
+   * et retourne les forces (portance + traînée) à appliquer.
+   *
+   * @param windVector Vecteur vent apparent (direction + vitesse)
+   * @param surfaceNormal Normale unitaire de la surface
+   * @param surfaceArea Aire de la surface en m²
+   * @returns Forces de portance et traînée
+   */
+  private static calculateSurfaceForces(
+    windVector: THREE.Vector3,
+    surfaceNormal: THREE.Vector3,
+    surfaceArea: number
+  ): { liftForce: THREE.Vector3; dragForce: THREE.Vector3 } {
+    const windSpeed = windVector.length();
+    if (windSpeed < AerodynamicsCalculator.MIN_WIND_SPEED) {
+      return {
+        liftForce: new THREE.Vector3(),
+        dragForce: new THREE.Vector3()
+      };
+    }
+
+    const windDir = windVector.clone().normalize();
+
+    // Angle d'incidence : angle entre vent et normale
+    const windDotNormal = windDir.dot(surfaceNormal);
+    const alpha = Math.acos(Math.abs(windDotNormal)); // Angle en radians
+
+    // Si vent parallèle à la surface, pas de force
+    if (Math.abs(windDotNormal) < PhysicsConstants.EPSILON) {
+      return {
+        liftForce: new THREE.Vector3(),
+        dragForce: new THREE.Vector3()
+      };
+    }
+
+    // Coefficients aérodynamiques basiques
+    const { CL, CD } = this.calculateAerodynamicCoefficients(alpha);
+
+    // Pression dynamique : ½ρv²
+    const dynamicPressure = 0.5 * CONFIG.physics.airDensity * windSpeed * windSpeed;
+
+    // Magnitudes des forces
+    const liftMagnitude = dynamicPressure * surfaceArea * CL;
+    const dragMagnitude = dynamicPressure * surfaceArea * CD;
+
+    // Direction de la portance : perpendiculaire au vent dans plan (vent, normale)
+    const windFacingNormal = windDotNormal >= 0 ? surfaceNormal.clone() : surfaceNormal.clone().negate();
+    const liftDir = windFacingNormal.clone()
+      .sub(windDir.clone().multiplyScalar(windFacingNormal.dot(windDir)))
+      .normalize();
+
+    // Direction de traînée : parallèle au vent
+    const dragDir = windDir.clone();
+
+    // Forces finales
+    const liftForce = liftDir.multiplyScalar(liftMagnitude);
+    const dragForce = dragDir.multiplyScalar(dragMagnitude);
+
+    return { liftForce, dragForce };
   }
 
   /**
@@ -196,96 +238,38 @@ export class AerodynamicsCalculator {
   // On examine chaque triangle du cerf-volant un par un
   // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
     KiteGeometry.SUBDIVIDED_SURFACES.forEach((surface, surfaceIndex) => {
-      // 🔴 MAILLAGE FIN : Distribuer la masse proportionnellement à l'aire
-      // Trouver quelle surface originale contient ce sous-triangle
+      // 🎯 CALCUL SIMPLE ET PROPRE pour chaque face triangulaire
+
+      // 1. Distribuer la masse proportionnellement à l'aire
       const trianglesPerSurface = KiteGeometry.TRIANGLES_PER_SURFACE_AT_LEVEL(
         KiteGeometry.getMeshSubdivisionLevel()
       );
       const originalSurfaceIndex = Math.floor(surfaceIndex / trianglesPerSurface);
       const originalSurfaceMass = KiteGeometry.SURFACE_MASSES[originalSurfaceIndex];
-
-      // Distribuer la masse proportionnellement à l'aire relative
       const totalAreaForOriginal = KiteGeometry.SURFACES[originalSurfaceIndex].area;
       const massRatio = surface.area / totalAreaForOriginal;
       const surfaceMass = originalSurfaceMass * massRatio;
-      // 🔴 DÉSACTIVATION TEMPORAIRE du vent apparent local pour debug
-      // Le calcul local peut réduire trop fortement le vent perçu en rotation
-      
-      // Utiliser le vent apparent GLOBAL pour toutes les surfaces
-      const localApparentWind = apparentWind.clone();
-      const localWindSpeed = localApparentWind.length();
-      
-      if (localWindSpeed < 0.1) {
-        return; // Pas de vent sur cette surface
-      }
-      
-      const localWindDir = localApparentWind.clone().normalize();
-      const localDynamicPressure = 0.5 * CONFIG.physics.airDensity * localWindSpeed * localWindSpeed;
-      
-      // Pour comprendre comment le vent frappe ce triangle,
-      // on doit savoir dans quelle direction il "regarde"
-      // (comme l'orientation d'un panneau solaire)
-      const normaleMonde = AerodynamicsCalculator.calculateSurfaceNormal(surface, kiteOrientation);
 
-      // Calcul de l'angle d'incidence pour une plaque plane (cerf-volant)
-      // α = angle entre la direction du vent et la surface
-      const windDotNormal = localWindDir.dot(normaleMonde);
-      const cosTheta = Math.abs(windDotNormal); // cos(θ) où θ = angle vent-normale
+      // 2. Calculer la normale de la surface dans l'espace monde
+      const surfaceNormal = AerodynamicsCalculator.calculateSurfaceNormal(surface, kiteOrientation);
 
-      // Pour une plaque : sin(α) = cos(θ) et cos(α) = sin(θ)
-      const sinAlpha = cosTheta;
-  // Note: cosAlpha non utilisé dans le modèle actuel
+      // 3. Calculer les forces aérodynamiques via méthode encapsulée
+      const { liftForce, dragForce } = AerodynamicsCalculator.calculateSurfaceForces(
+        apparentWind,
+        surfaceNormal,
+        surface.area
+      );
 
-      // Calculer l'angle d'incidence réel (en radians)
-      const alpha = Math.asin(Math.min(1, sinAlpha)); // Limiter à [-π/2, π/2]
-
-      // Si le vent glisse sur le côté (angle = 0), pas de force
-      if (sinAlpha <= PhysicsConstants.EPSILON) {
+      // 4. Si pas de force, passer au triangle suivant
+      if (liftForce.lengthSq() + dragForce.lengthSq() < PhysicsConstants.EPSILON) {
         return;
       }
 
-      // 🎯 NOUVEAUX COEFFICIENTS AÉRODYNAMIQUES RÉALISTES
-      // Au lieu des formules simplifiées, utiliser des coefficients expérimentaux
-      const { CL, CD } = AerodynamicsCalculator.calculateAerodynamicCoefficients(alpha);
-      
-      // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
-      // if (surfaceIndex === 0) {
-      //   const alphaDeg = Math.asin(sinAlpha) * 180 / Math.PI;
-
-      // }
-      
-      // Direction : normale à la surface, orientée face au vent
-      const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
-      
-      // DIRECTION LIFT : Perpendiculaire au vent, dans le plan (vent, normale)
-      // Méthode : liftDir = normalize(windFacingNormal - (windFacingNormal·windDir)×windDir)
-      const liftDir = windFacingNormal.clone()
-        .sub(localWindDir.clone().multiplyScalar(windFacingNormal.dot(localWindDir)))
-        .normalize();
-      
-      // Vérifier validité (éviter division par zéro si vent // normale)
-      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
-        liftDir.copy(windFacingNormal);  // Fallback : utiliser normale
-      }
-      
-      // DIRECTION DRAG : Parallèle au vent
-      const dragDir = localWindDir.clone();
-      
-      // FORCES AÉRODYNAMIQUES (AVANT scaling) avec pression dynamique LOCALE
-      const liftMagnitude = localDynamicPressure * surface.area * CL;
-      const dragMagnitude = localDynamicPressure * surface.area * CD;
-      
-      const liftForce = liftDir.clone().multiplyScalar(liftMagnitude);
-      const dragForce = dragDir.clone().multiplyScalar(dragMagnitude);
-      
-      // Force aérodynamique totale = lift + drag (vectoriel)
-      const aeroForce = liftForce.clone().add(dragForce);
-      
-      // GRAVITÉ DISTRIBUÉE (émergente, pas scriptée !)
-      // Chaque surface porte une fraction de la masse totale
-      // La gravité est appliquée au centre géométrique de chaque surface
-      // → Couple gravitationnel émerge naturellement de r × F_gravity
+      // 5. Calculer la gravité distribuée sur cette surface
       const gravity = new THREE.Vector3(0, -surfaceMass * CONFIG.physics.gravity, 0);
+
+      // 6. Force aérodynamique totale = portance + traînée
+      const aeroForce = liftForce.clone().add(dragForce);
       
       // Accumulation des forces par type
       totalLift.add(liftForce);
@@ -299,19 +283,14 @@ export class AerodynamicsCalculator {
       const lift = liftForce.clone();
       const drag = dragForce.clone();
 
-      // 6. Centre de pression dynamique (au lieu du simple centroïde)
+      // 7. Centre de pression = centroïde géométrique (simplifié)
       const geometricCentroid = KiteGeometry.calculateTriangleCentroid(
         surface.vertices[0],
-        surface.vertices[1], 
+        surface.vertices[1],
         surface.vertices[2]
       );
 
-      // Centre de pression réaliste qui dépend de l'angle d'incidence
-      const centerOfPressure = AerodynamicsCalculator.calculateCenterOfPressure(
-        surface,
-        alpha,
-        geometricCentroid
-      );
+      const centerOfPressure = geometricCentroid.clone();
 
       // Centre orienté dans le repère monde (sans translation)
       const centreOriente = centerOfPressure.clone().applyQuaternion(kiteOrientation);
@@ -349,7 +328,7 @@ export class AerodynamicsCalculator {
         friction,
         resultant,
         center: centreMonde,
-        normal: normaleMonde.clone(),
+        normal: surfaceNormal.clone(),
         area: surface.area,
       });
 

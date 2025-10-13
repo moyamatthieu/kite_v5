@@ -5,9 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev-new": "vite index_new.html",
-    "test-ecs": "tsx test_ecs_integration.ts",
-    "validate-migration": "tsx validate_migration.ts",
     "build": "vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
@@ -22,12 +19,15 @@
     "@typescript-eslint/parser": "^8.46.0",
     "eslint": "^9.37.0",
     "eslint-plugin-import": "^2.32.0",
+    "playwright": "^1.56.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "vite": "^5.4.19"
   },
   "dependencies": {
     "jest": "^30.2.0",
+    "node-fetch": "^3.3.2",
+    "ps-list": "^9.0.0",
     "three": "^0.160.0",
     "three-bvh-csg": "^0.0.17"
   }

@@ -88,17 +88,18 @@ export class KiteController {
         console.error(`⚠️ Erreur dans ConstraintSolver.enforceLineConstraints (iter ${iter}):`, err);
       }
 
-      // Appliquer les contraintes des brides (Position-Based Dynamics)
-      try {
-        ConstraintSolver.enforceBridleConstraints(
-          this.kite,
-          newPosition,
-          { velocity: this.state.velocity, angularVelocity: this.state.angularVelocity },
-          this.kite.getBridleLengths()
-        );
-      } catch (err) {
-        console.error(`⚠️ Erreur dans ConstraintSolver.enforceBridleConstraints (iter ${iter}):`, err);
-      }
+      // 🚫 SUPPRIMÉ - Les brides ne sont PLUS des contraintes dynamiques !
+      //
+      // NOUVELLE ARCHITECTURE :
+      // Les brides définissent la géométrie RIGIDE interne du kite.
+      // Positions CTRL calculées UNE FOIS par PointFactory.calculateControlPoint()
+      // et restent fixes dans le référentiel local du kite.
+      //
+      // Le kite entier bouge comme un corps rigide 6 DOF sous l'action
+      // des forces aérodynamiques. Seules les LIGNES sont des contraintes
+      // dynamiques (pivot sphérique 360°).
+      //
+      // Plus besoin d'enforceBridleConstraints() !
     }
 
     // Gérer la collision avec le sol

@@ -2,7 +2,7 @@
 
 Ce fichier fournit des directives pour travailler avec ce dépôt.
 
-MANDATORY   - NON NEGOCIABLE  : on fait un code propre sans rustine  !
+MANDATORY   - NON NEGOCIABLE  : on fait un code propre sans rustine  ! On reflechie ! on investigue !
 
 ## Vue d'ensemble du projet
 
@@ -21,12 +21,18 @@ MANDATORY   - NON NEGOCIABLE  : on fait un code propre sans rustine  !
 - **`npm run build`** - Build pour production (sortie: dist/)
 - **`npm run preview`** - Prévisualiser le build de production
 
-### ⚠️ CRITIQUE : Ne PAS lancer le serveur de développement
-**NE JAMAIS exécuter `npm run dev`** - L'utilisateur a toujours un serveur Vite en cours d'exécution en arrière-plan. Le navigateur se recharge automatiquement lors des changements de fichiers.
+### ⚠️ CRITIQUE : Configuration du serveur de développement
+**NE JAMAIS exécuter `npm run dev`** 
+
+
 
 ### Commandes de test
 - `npm run test-ecs` - Tester l'intégration ECS (via tsx)
 - `npm run validate-migration` - Valider la migration d'architecture (via tsx)
+
+### Commandes automatiques
+- Toutes les commandes nécessaires, comme `npm run dev:debug`, doivent être exécutées automatiquement par l'assistant sans demander confirmation à l'utilisateur.
+- **Relancer le serveur automatiquement** : Si une tâche nécessite de redémarrer le serveur, l'assistant doit exécuter la commande correspondante sans intervention de l'utilisateur.
 
 ### Dépendances
 - **Runtime** : `three@0.160.0`, `three-bvh-csg@0.0.17`
