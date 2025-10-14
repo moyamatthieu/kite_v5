@@ -19,7 +19,8 @@ export default [
         window: 'readonly',
         document: 'readonly',
         performance: 'readonly',
-        requestAnimationFrame: 'readonly'
+        requestAnimationFrame: 'readonly',
+        'jest/globals': true
       }
     },
     plugins: {

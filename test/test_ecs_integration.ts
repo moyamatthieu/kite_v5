@@ -1,7 +1,7 @@
-import { describe, test, expect } from '@jest/globals';
-import { Point } from "../src/objects/Point";
-import { Frame } from "../src/objects/Frame";
-import { Surface } from "../src/objects/Surface";
+import { describe, test, expect } from 'vitest';
+import { Point } from "@objects/Point";
+import { Frame } from "@objects/Frame";
+import { Surface } from "@objects/Surface";
 
 describe("ECS Integration Tests", () => {
   test("Point class functionality", () => {

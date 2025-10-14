@@ -10,9 +10,13 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
       '@core': resolve(__dirname, 'src/core'),
       '@base': resolve(__dirname, 'src/base'),
-      '@objects': resolve(__dirname, 'src/objects'),
-      '@factories': resolve(__dirname, 'src/factories'),
-      '@types': resolve(__dirname, 'src/types/index')
+      '@objects': resolve(__dirname, 'src/ecs/objects'),
+      '@factories': resolve(__dirname, 'src/ecs/factories'),
+      '@types': resolve(__dirname, 'src/ecs/types'),
+      '@utils': resolve(__dirname, 'src/ecs/utils'),
+      '@config': resolve(__dirname, 'src/ecs/config'),
+      '@systems': resolve(__dirname, 'src/ecs/systems'),
+      '@entities': resolve(__dirname, 'src/ecs/entities')
     }
   },
   server: {

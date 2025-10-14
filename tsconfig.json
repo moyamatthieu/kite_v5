@@ -20,13 +20,20 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"],
-      "@core/*": ["src/core/*"],
-      "@base/*": ["src/base/*"],
-      "@objects/*": ["src/objects/*"],
-      "@factories/*": ["src/factories/*"],
-      "@types": ["src/types/index"]
+      "@core/*": ["src/ecs/core/*"],
+      "@base/*": ["src/ecs/base/*"],
+      "@objects/*": ["src/ecs/objects/*"],
+      "@factories/*": ["src/ecs/factories/*"],
+      "@mytypes/*": ["src/ecs/types/*"],
+      "@ecs/*": ["src/ecs/*"],
+      "@components/*": ["src/ecs/components/*"],
+      "@systems/*": ["src/ecs/systems/*"],
+      "@entities/*": ["src/ecs/entities/*"],
+      "@utils/*": ["src/ecs/utils/*"],
+      "@config/*": ["src/ecs/config/*"],
+      "@factories": ["src/ecs/factories"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
