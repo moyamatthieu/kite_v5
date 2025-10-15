@@ -21,14 +21,17 @@ import { LineComponent } from '@components/LineComponent';
 import { PureConstraintSolver } from './ConstraintSolver.pure';
 import { Logger } from '@utils/Logging';
 
+export interface HandlePositionsProvider {
+  getHandlePositions(): { left: THREE.Vector3; right: THREE.Vector3 } | null;
+}
+
 export class ControlPointSystem extends BaseSimulationSystem {
   private kiteEntity: Entity | null = null;
   private ctrlLeftEntity: Entity | null = null;
   private ctrlRightEntity: Entity | null = null;
   private leftLineEntity: Entity | null = null;
   private rightLineEntity: Entity | null = null;
-  private leftHandlePosition: THREE.Vector3 = new THREE.Vector3();
-  private rightHandlePosition: THREE.Vector3 = new THREE.Vector3();
+  private handlesProvider: HandlePositionsProvider | null = null;
   private logger = Logger.getInstance();
   private entityManager: EntityManager;
 
@@ -55,11 +58,19 @@ export class ControlPointSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Met à jour les positions des poignées (appelé depuis SimulationApp)
+   * Configure le provider de positions des handles
+   */
+  setHandlesProvider(provider: HandlePositionsProvider): void {
+    this.handlesProvider = provider;
+  }
+
+  /**
+   * Met à jour les positions des poignées (obsolète - utiliser setHandlesProvider)
+   * @deprecated Utiliser setHandlesProvider à la place
    */
   setHandlePositions(left: THREE.Vector3, right: THREE.Vector3): void {
-    this.leftHandlePosition.copy(left);
-    this.rightHandlePosition.copy(right);
+    // Méthode conservée pour compatibilité
+    this.logger.warn('setHandlePositions() is deprecated, use setHandlesProvider()', 'ControlPointSystem');
   }
 
   initialize(): void {
@@ -75,6 +86,12 @@ export class ControlPointSystem extends BaseSimulationSystem {
       return;
     }
 
+    // Récupérer les positions des handles
+    const handles = this.handlesProvider?.getHandlePositions();
+    if (!handles) {
+      return; // Pas de positions disponibles
+    }
+
     // Récupérer les composants nécessaires
     const bridle = this.kiteEntity.getComponent<BridleComponent>('bridle');
     if (!bridle) return;
@@ -83,7 +100,7 @@ export class ControlPointSystem extends BaseSimulationSystem {
     this.resolveControlPoint(
       this.ctrlLeftEntity,
       this.leftLineEntity,
-      this.leftHandlePosition,
+      handles.left,
       bridle.lengths,
       {
         nez: 'NEZ',
@@ -96,7 +113,7 @@ export class ControlPointSystem extends BaseSimulationSystem {
     this.resolveControlPoint(
       this.ctrlRightEntity,
       this.rightLineEntity,
-      this.rightHandlePosition,
+      handles.right,
       bridle.lengths,
       {
         nez: 'NEZ',

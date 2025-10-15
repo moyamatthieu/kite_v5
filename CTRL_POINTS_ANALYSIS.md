@@ -46,14 +46,14 @@ CTRL est une particule libre dans l'espace
 
 Avec CTRL libre, l'orientation du kite émerge de l'équilibre des tensions :
 - Si ligne gauche plus courte → CTRL_GAUCHE plus proche de la poignée
-- Les 3 brides gauches tirent le kite vers la gauche
+- Les 3 brides gauches retiennent le kite vers la gauche
 - Le kite pivote naturellement vers la gauche
 
 ### 2. Angle d'Attaque
 
 L'angle d'attaque du kite n'est plus "scripté" mais émerge de :
-- Tension des brides (tirent le kite vers l'arrière)
-- Poussée du vent (pousse le kite vers l'avant)
+- Tension des brides (retiennent le kite vers l'avant z+)
+- Poussée du vent (pousse le kite vers l'ariere z-)
 - Gravité (tire vers le bas)
 - Équilibre dynamique résultant
 

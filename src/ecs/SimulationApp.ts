@@ -16,6 +16,7 @@ import { PilotEntityFactory } from "./entities/factories/PilotEntityFactory";
 import { KiteEntityFactory } from "./entities/factories/KiteEntityFactory";
 import { LineEntityFactory } from "./entities/factories/LineEntityFactory";
 import { ControlBarEntityFactory } from "./entities/factories/ControlBarEntityFactory";
+import { ControlPointEntityFactory } from "./entities/factories/ControlPointEntityFactory";
 import { EntityManager } from "./entities/EntityManager";
 import { SystemManager } from "./systems/SystemManager";
 
@@ -32,6 +33,7 @@ import { PilotSystem } from '@/ecs/systems/PilotSystem';
 import { GeometryRenderSystem } from '@/ecs/systems/GeometryRenderSystem';
 import { LoggingSystem } from "@/ecs/systems/LoggingSystem";
 import { AeroVectorsDebugSystem } from "@/ecs/systems/AeroVectorsDebugSystem";
+import { ControlPointSystem } from "@/ecs/systems/ControlPointSystem";
 import { Entity } from '@/ecs/base/Entity';
 import { EntityBuilder } from '@/ecs/entities/EntityBuilder';
 import {
@@ -81,12 +83,15 @@ export class SimulationApp {
   private geometryRenderSystem!: GeometryRenderSystem;
   private loggingSystem!: LoggingSystem;
   private aeroVectorsDebugSystem!: AeroVectorsDebugSystem;
+  private controlPointSystem?: ControlPointSystem;
 
   // === ENTITÉS PRINCIPALES ===
   // Références pour accès direct aux composants (UI, etc.)
   private kiteEntity?: Entity;
   private leftLineEntity?: Entity;
   private rightLineEntity?: Entity;
+  private ctrlLeftEntity?: Entity;
+  private ctrlRightEntity?: Entity;
 
   // === INTERFACE ===
   private uiManager?: UIManager;
@@ -231,6 +236,10 @@ export class SimulationApp {
       );
       this.systemManager.addSystem(this.kitePhysicsSystem);
       
+      // Système de points de contrôle libres (ordre 50 - après physique, avant lignes)
+      this.controlPointSystem = new ControlPointSystem(this.entityManager);
+      this.systemManager.addSystem(this.controlPointSystem);
+      
       // Système de visualisation des vecteurs aérodynamiques (debug)
       this.aeroVectorsDebugSystem = new AeroVectorsDebugSystem();
       this.systemManager.addSystem(this.aeroVectorsDebugSystem);
@@ -243,6 +252,91 @@ export class SimulationApp {
         "SimulationApp"
       );
     }
+  }
+
+  /**
+   * Calcule les positions initiales des points de contrôle (CTRL) par trilatération
+   * depuis la géométrie du kite
+   */
+  private calculateInitialCtrlPositions(kiteEntity: Entity): {
+    leftPosition: THREE.Vector3;
+    rightPosition: THREE.Vector3;
+  } {
+    const transform = kiteEntity.getComponent<TransformComponent>('transform');
+    const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    const bridle = kiteEntity.getComponent<BridleComponent>('bridle');
+
+    if (!transform || !geometry || !bridle) {
+      this.logger.error('Missing components for CTRL position calculation', 'SimulationApp');
+      // Fallback: positions arbitraires en dessous du kite
+      return {
+        leftPosition: new THREE.Vector3(-0.3, transform?.position.y || 0 - 1, transform?.position.z || 0),
+        rightPosition: new THREE.Vector3(0.3, transform?.position.y || 0 - 1, transform?.position.z || 0),
+      };
+    }
+
+    // Extraire les points d'attache depuis la géométrie (coordonnées locales)
+    const nezPos = geometry.points.get('NEZ');
+    const interLeftPos = geometry.points.get('INTER_GAUCHE');
+    const interRightPos = geometry.points.get('INTER_DROIT');
+    const centrePos = geometry.points.get('CENTRE');
+
+    if (!nezPos || !interLeftPos || !interRightPos || !centrePos) {
+      this.logger.error('Bridle attachment points not found in geometry', 'SimulationApp');
+      return {
+        leftPosition: new THREE.Vector3(-0.3, transform.position.y - 1, transform.position.z),
+        rightPosition: new THREE.Vector3(0.3, transform.position.y - 1, transform.position.z),
+      };
+    }
+
+    // Transformer en coordonnées monde (appliquer quaternion + position du kite)
+    const nezWorld = nezPos.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
+    const interLeftWorld = interLeftPos.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
+    const interRightWorld = interRightPos.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
+    const centreWorld = centrePos.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
+
+    // Résoudre trilatération pour CTRL gauche
+    const { PureConstraintSolver } = require('@/ecs/systems/ConstraintSolver.pure');
+    const leftSolutions = PureConstraintSolver.trilaterate3D(
+      nezWorld, bridle.lengths.nez,
+      interLeftWorld, bridle.lengths.inter,
+      centreWorld, bridle.lengths.centre
+    );
+
+    const rightSolutions = PureConstraintSolver.trilaterate3D(
+      nezWorld, bridle.lengths.nez,
+      interRightWorld, bridle.lengths.inter,
+      centreWorld, bridle.lengths.centre
+    );
+
+    // Prendre la première solution (en dessous du kite normalement)
+    // Filtre: choisir la solution avec Y la plus basse (dessous le kite)
+    const leftPosition = leftSolutions.length > 0
+      ? (leftSolutions.length === 2 
+          ? (leftSolutions[0].y < leftSolutions[1].y ? leftSolutions[0] : leftSolutions[1])
+          : leftSolutions[0])
+      : new THREE.Vector3(-0.3, transform.position.y - 1, transform.position.z);
+
+    const rightPosition = rightSolutions.length > 0
+      ? (rightSolutions.length === 2
+          ? (rightSolutions[0].y < rightSolutions[1].y ? rightSolutions[0] : rightSolutions[1])
+          : rightSolutions[0])
+      : new THREE.Vector3(0.3, transform.position.y - 1, transform.position.z);
+
+    this.logger.info(
+      `CTRL positions calculated: LEFT=${leftPosition.toArray()}, RIGHT=${rightPosition.toArray()}`,
+      'SimulationApp'
+    );
+
+    return { leftPosition, rightPosition };
   }
 
   /**
@@ -269,6 +363,21 @@ export class SimulationApp {
     // Créer l'entité barre de contrôle via la factory
     const controlBarEntity = ControlBarEntityFactory.create();
     this.entityManager.registerEntity(controlBarEntity);
+
+    // Calculer positions initiales des points de contrôle (CTRL)
+    const { leftPosition, rightPosition } = this.calculateInitialCtrlPositions(kiteEntity);
+
+    // Créer les entités CTRL (points de contrôle libres)
+    const { left: ctrlLeft, right: ctrlRight } = ControlPointEntityFactory.createPair(
+      leftPosition,
+      rightPosition
+    );
+    this.entityManager.registerEntity(ctrlLeft);
+    this.entityManager.registerEntity(ctrlRight);
+    
+    // Stocker les références CTRL
+    this.ctrlLeftEntity = ctrlLeft;
+    this.ctrlRightEntity = ctrlRight;
 
     // Créer les entités de lignes via la factory
     const leftLineEntity = LineEntityFactory.create("leftLine", {
@@ -341,6 +450,8 @@ export class SimulationApp {
     const controlBarEntity = this.entityManager.getEntity("controlBar");
     const leftLineEntity = this.entityManager.getEntity("leftLine");
     const rightLineEntity = this.entityManager.getEntity("rightLine");
+    const ctrlLeftEntity = this.entityManager.getEntity("ctrl-left");
+    const ctrlRightEntity = this.entityManager.getEntity("ctrl-right");
 
     if (!kiteEntity || !controlBarEntity) {
       this.logger.error(
@@ -348,6 +459,24 @@ export class SimulationApp {
         "SimulationApp"
       );
       return;
+    }
+
+    // Configurer ControlPointSystem (CTRL libres)
+    if (this.controlPointSystem && ctrlLeftEntity && ctrlRightEntity && leftLineEntity && rightLineEntity) {
+      this.controlPointSystem.setEntities(
+        kiteEntity,
+        ctrlLeftEntity,
+        ctrlRightEntity,
+        leftLineEntity,
+        rightLineEntity
+      );
+      // Configurer le provider de positions handles (mis à jour chaque frame)
+      this.controlPointSystem.setHandlesProvider({
+        getHandlePositions: () => this.controlBarSystem.getHandlePositions(),
+      });
+      this.logger.info('✅ ControlPointSystem configured with CTRL entities', 'SimulationApp');
+    } else {
+      this.logger.warn('⚠️ ControlPointSystem or CTRL entities not found', 'SimulationApp');
     }
 
     // Configurer KitePhysicsSystem
@@ -358,11 +487,15 @@ export class SimulationApp {
       });
     }
 
-    // Configurer LinesRenderSystem
+    // Configurer LinesRenderSystem avec entités CTRL
     this.linesRenderSystem.setKite(kiteEntity);
     this.linesRenderSystem.setControlBarSystem(this.controlBarSystem);
     if (this.kitePhysicsSystem) {
       this.linesRenderSystem.setKitePhysicsSystem(this.kitePhysicsSystem);
+    }
+    if (ctrlLeftEntity && ctrlRightEntity) {
+      this.linesRenderSystem.setControlPointEntities(ctrlLeftEntity, ctrlRightEntity);
+      this.logger.info('✅ LinesRenderSystem configured with CTRL entities', 'SimulationApp');
     }
     // Définir la scène pour LinesRenderSystem
     if (this.renderSystem) {

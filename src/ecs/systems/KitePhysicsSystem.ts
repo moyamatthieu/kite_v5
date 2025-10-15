@@ -157,6 +157,19 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       );
     }
 
+    // Configurer LineSystem avec les entités CTRL (points de contrôle libres)
+    const ctrlLeft = this.entityManager.getEntity("ctrl-left");
+    const ctrlRight = this.entityManager.getEntity("ctrl-right");
+    if (ctrlLeft && ctrlRight) {
+      this.lineSystem.setControlPointEntities(ctrlLeft, ctrlRight);
+      this.logger.info(`LineSystem configured with CTRL entities: ${ctrlLeft.id}, ${ctrlRight.id}`, "KitePhysicsSystem");
+    } else {
+      this.logger.warn(
+        "CTRL entities not found - LineSystem will use legacy geometry points",
+        "KitePhysicsSystem"
+      );
+    }
+
     // Instancier PureBridleSystem (ECS)
     this.bridleSystem = new PureBridleSystem(this.entityManager);
 
