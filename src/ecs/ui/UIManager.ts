@@ -128,10 +128,13 @@ export class UIManager {
 
     if (!slider || !valueElement) return;
 
-    slider.value = config.initialValue.toFixed(config.step ?? 1);
+    // Définir la valeur initiale du slider
+    slider.value = config.initialValue.toString();
+    
+    // Afficher la valeur initiale formatée
     valueElement.textContent = config.formatter
       ? config.formatter(config.initialValue)
-      : config.initialValue.toFixed(config.step ?? 1);
+      : config.initialValue.toFixed(2);
 
     slider.oninput = () => {
       const value = parseFloat(slider.value);
@@ -139,7 +142,7 @@ export class UIManager {
 
       valueElement.textContent = config.formatter
         ? config.formatter(value)
-        : value.toFixed(config.step ?? 1);
+        : value.toFixed(2);
     };
   }
 
