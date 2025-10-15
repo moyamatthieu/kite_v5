@@ -27,76 +27,46 @@ export class KiteEntityFactory {
     // Composant Geometry
     const geometry = new GeometryComponent();
     
-    // Points anatomiques du kite
-    geometry.setPoint('SPINE_BAS', new THREE.Vector3(0, 0, 0));
-    geometry.setPoint('CENTRE', new THREE.Vector3(0, 0.325, 0));
-    geometry.setPoint('NEZ', new THREE.Vector3(0, 0.65, 0));
-    geometry.setPoint('BORD_GAUCHE', new THREE.Vector3(-0.825, 0, 0));
-    geometry.setPoint('BORD_DROIT', new THREE.Vector3(0.825, 0, 0));
+    // Géométrie du delta - basée sur la branche main (PointFactory)
+    // Paramètres de base
+    const width = 1.65;      // Envergure (distance BORD_GAUCHE ↔ BORD_DROIT)
+    const height = 0.65;     // Hauteur (NEZ)
+    const depth = 0.15;      // Profondeur des whiskers (vers l'arrière)
     
-    // Géométrie du delta - toutes les positions calculées proportionnellement
-    const nezY = 0.65;      // Hauteur du nez
-    const bordX = 0.825;    // Demi-envergure
-    const spineY = 0;       // Bas de la spine
+    // Points structurels principaux
+    geometry.setPoint('SPINE_BAS', new THREE.Vector3(0, 0, 0));
+    geometry.setPoint('NEZ', new THREE.Vector3(0, height, 0));
+    geometry.setPoint('BORD_GAUCHE', new THREE.Vector3(-width / 2, 0, 0));
+    geometry.setPoint('BORD_DROIT', new THREE.Vector3(width / 2, 0, 0));
+    
+    // CENTRE - point central sur la spine (pour bride centrale)
+    const centreY = height / 4; // 25% de la hauteur
+    geometry.setPoint('CENTRE', new THREE.Vector3(0, centreY, 0));
     
     // INTER points - position de la barre transversale sur les bords d'attaque
-    const interRatio = 0.69; // À 69% du nez vers les pointes
-    geometry.setPoint('INTER_GAUCHE', new THREE.Vector3(
-      -bordX * interRatio,           // X: -0.569
-      nezY * (1 - interRatio),        // Y: 0.201
-      0
-    ));
-    geometry.setPoint('INTER_DROIT', new THREE.Vector3(
-      bordX * interRatio,             // X: 0.569
-      nezY * (1 - interRatio),        // Y: 0.201
-      0
-    ));
+    // Calculés proportionnellement : ratio = (height - centreY) / height = 0.75
+    const ratio = (height - centreY) / height;
+    const interGaucheX = ratio * (-width / 2);  // -0.619
+    const interDroitX = ratio * (width / 2);    // +0.619
+    geometry.setPoint('INTER_GAUCHE', new THREE.Vector3(interGaucheX, centreY, 0));
+    geometry.setPoint('INTER_DROIT', new THREE.Vector3(interDroitX, centreY, 0));
     
-    // CENTRE - point central sur la spine à mi-hauteur (pour bride centrale)
-    const centreRatio = 0.5; // 50% entre NEZ et SPINE_BAS
-    geometry.setPoint('CENTRE', new THREE.Vector3(0, nezY * centreRatio, 0));
+    // FIX points - points de fixation des whiskers sur les bords d'attaque
+    // Positionnés à 2/3 de la distance entre CENTRE et INTER (sur l'axe X)
+    const fixRatio = 2 / 3;
+    geometry.setPoint('FIX_GAUCHE', new THREE.Vector3(fixRatio * interGaucheX, centreY, 0));
+    geometry.setPoint('FIX_DROIT', new THREE.Vector3(fixRatio * interDroitX, centreY, 0));
     
-    // FIX points - points de fixation des brides sur les bords d'attaque
-    // Positionnés à mi-chemin entre NEZ et INTER (environ 35% du bord d'attaque)
-    const fixRatio = 0.35;
-    geometry.setPoint('FIX_GAUCHE', new THREE.Vector3(
-      -bordX * fixRatio,              // X: -0.289
-      nezY * (1 - fixRatio),          // Y: 0.423
-      0
-    ));
-    geometry.setPoint('FIX_DROIT', new THREE.Vector3(
-      bordX * fixRatio,               // X: 0.289
-      nezY * (1 - fixRatio),          // Y: 0.423
-      0
-    ));
-    
-    // WHISKER points - longerons arrière partant de la barre transversale
-    // Position : 1/3 de la distance INTER → CENTRE (spine) en X, même Y que INTER, Z négatif
-    const whiskerRatio = 1/3; // 1/3 de la distance INTER → CENTRE
-    const interX = bordX * interRatio;  // Distance X de INTER depuis le centre
-    const whiskerX = interX * (1 - whiskerRatio); // 2/3 de la distance (se rapproche du centre)
-    const whiskerZ = -0.15;     // Profondeur en arrière du kite (longueur du whisker)
-    
-    geometry.setPoint('WHISKER_GAUCHE', new THREE.Vector3(
-      -whiskerX,                // X: entre INTER_GAUCHE et CENTRE (à 1/3 du chemin)
-      nezY * (1 - interRatio),  // Même Y que INTER_GAUCHE  
-      whiskerZ                  // En arrière
-    ));
-    geometry.setPoint('WHISKER_DROIT', new THREE.Vector3(
-      whiskerX,                 // X: entre INTER_DROIT et CENTRE (à 1/3 du chemin)
-      nezY * (1 - interRatio),  // Même Y que INTER_DROIT
-      whiskerZ                  // En arrière
-    ));
+    // WHISKER points - longerons arrière partant des FIX vers l'arrière
+    // Positionnés à 1/4 de l'envergure depuis le centre, légèrement bas, en arrière
+    geometry.setPoint('WHISKER_GAUCHE', new THREE.Vector3(-width / 4, 0.1, -depth));
+    geometry.setPoint('WHISKER_DROIT', new THREE.Vector3(width / 4, 0.1, -depth));
     
     // Calculer les points de contrôle par trilatération 3D
     // Les brides convergent vers ces points pour former une pyramide
-    const nezPos = new THREE.Vector3(0, nezY, 0);
-    const centrePos = new THREE.Vector3(0, nezY * centreRatio, 0);
-    const interDroitPos = new THREE.Vector3(
-      bordX * interRatio,
-      nezY * (1 - interRatio),
-      0
-    );
+    const nezPos = new THREE.Vector3(0, height, 0);
+    const centrePos = new THREE.Vector3(0, centreY, 0);
+    const interDroitPos = new THREE.Vector3(interDroitX, centreY, 0);
     const bridleLengths = { ...CONFIG.bridle.defaultLengths };
     
     const ctrlDroit = this.calculateControlPoint(nezPos, interDroitPos, centrePos, bridleLengths);
@@ -111,52 +81,27 @@ export class KiteEntityFactory {
     geometry.setPoint('CTRL_GAUCHE', ctrlGauche);
     geometry.setPoint('CTRL_DROIT', ctrlDroit);
     
-    // Connexions pour la structure
+    // Connexions pour la structure (basée sur la branche main)
     // Spine centrale
-    geometry.addConnection('NEZ', 'CENTRE');        // Haut de spine
-    geometry.addConnection('CENTRE', 'SPINE_BAS');  // Bas de spine
+    geometry.addConnection('NEZ', 'SPINE_BAS');
     
-    // Bords d'attaque (Leading Edge) - segmentés par les points de fixation
-    // Gauche: NEZ → FIX_GAUCHE → INTER_GAUCHE → BORD_GAUCHE
-    geometry.addConnection('NEZ', 'FIX_GAUCHE');
-    geometry.addConnection('FIX_GAUCHE', 'INTER_GAUCHE');
-    geometry.addConnection('INTER_GAUCHE', 'BORD_GAUCHE');
+    // Bords d'attaque (Leading Edge)
+    geometry.addConnection('NEZ', 'BORD_GAUCHE');
+    geometry.addConnection('NEZ', 'BORD_DROIT');
     
-    // Droit: NEZ → FIX_DROIT → INTER_DROIT → BORD_DROIT
-    geometry.addConnection('NEZ', 'FIX_DROIT');
-    geometry.addConnection('FIX_DROIT', 'INTER_DROIT');
-    geometry.addConnection('INTER_DROIT', 'BORD_DROIT');
-    
-    // Barre transversale (Crossbar)
+    // Barre transversale (Crossbar/Spreader)
     geometry.addConnection('INTER_GAUCHE', 'INTER_DROIT');
     
-    // Whiskers (longerons arrière) - partent de la barre transversale vers l'arrière
-    // pour tendre la toile et donner du profil au kite
-    geometry.addConnection('INTER_GAUCHE', 'WHISKER_GAUCHE');
-    geometry.addConnection('INTER_DROIT', 'WHISKER_DROIT');
+    // Whiskers - longerons arrière connectés aux FIX (pas aux INTER)
+    geometry.addConnection('WHISKER_GAUCHE', 'FIX_GAUCHE');
+    geometry.addConnection('WHISKER_DROIT', 'FIX_DROIT');
     
-    // Saumons (trailing edge) - connectent les pointes aux whiskers et au centre
-    geometry.addConnection('BORD_GAUCHE', 'WHISKER_GAUCHE');
-    geometry.addConnection('WHISKER_GAUCHE', 'SPINE_BAS');
-    geometry.addConnection('BORD_DROIT', 'WHISKER_DROIT');
-    geometry.addConnection('WHISKER_DROIT', 'SPINE_BAS');
-    
-    // Surfaces de la voile - découpage cohérent avec la structure
-    // Partie avant gauche (nez → bord d'attaque → whisker)
-    geometry.addSurface(['NEZ', 'INTER_GAUCHE', 'WHISKER_GAUCHE']);
-    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'SPINE_BAS']);
-    
-    // Partie arrière gauche (whisker → saumon → centre)
-    geometry.addSurface(['INTER_GAUCHE', 'BORD_GAUCHE', 'WHISKER_GAUCHE']);
-    geometry.addSurface(['WHISKER_GAUCHE', 'BORD_GAUCHE', 'SPINE_BAS']);
-    
-    // Partie avant droite (nez → bord d'attaque → whisker)
-    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'INTER_DROIT']);
-    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_DROIT']);
-    
-    // Partie arrière droite (whisker → saumon → centre)
-    geometry.addSurface(['INTER_DROIT', 'WHISKER_DROIT', 'BORD_DROIT']);
-    geometry.addSurface(['WHISKER_DROIT', 'SPINE_BAS', 'BORD_DROIT']);
+    // Surfaces de la voile (basées sur KiteGeometry.ts de la branche main)
+    // 4 triangles formant le delta
+    geometry.addSurface(['NEZ', 'BORD_GAUCHE', 'WHISKER_GAUCHE']);  // Surface haute gauche
+    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'SPINE_BAS']);     // Surface basse gauche
+    geometry.addSurface(['NEZ', 'BORD_DROIT', 'WHISKER_DROIT']);    // Surface haute droite
+    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'SPINE_BAS']);     // Surface basse droite
     kiteEntity.addComponent(geometry);
 
     // Composant Visual
