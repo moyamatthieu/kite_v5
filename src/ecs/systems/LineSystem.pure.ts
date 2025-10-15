@@ -30,11 +30,22 @@ export class PureLineSystem extends BaseSimulationSystem {
   private entityManager: EntityManager;
   private leftLineEntity: Entity | null = null;
   private rightLineEntity: Entity | null = null;
+  private ctrlLeftEntity: Entity | null = null;
+  private ctrlRightEntity: Entity | null = null;
   private logger = Logger.getInstance();
 
   constructor(entityManager: EntityManager) {
     super('PureLineSystem', 50); // Priorité 50 (après physique, avant rendu)
     this.entityManager = entityManager;
+  }
+
+  /**
+   * Configure les entités de points de contrôle
+   */
+  setControlPointEntities(ctrlLeft: Entity, ctrlRight: Entity): void {
+    this.ctrlLeftEntity = ctrlLeft;
+    this.ctrlRightEntity = ctrlRight;
+    this.logger.info('Control point entities configured', 'PureLineSystem');
   }
 
   /**
@@ -116,12 +127,20 @@ export class PureLineSystem extends BaseSimulationSystem {
       };
     }
 
-    const kiteGeometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    if (!this.ctrlLeftEntity || !this.ctrlRightEntity) {
+      this.logger.warn('Control point entities not configured', 'PureLineSystem');
+      return {
+        leftForce: new THREE.Vector3(),
+        rightForce: new THREE.Vector3(),
+        torque: new THREE.Vector3()
+      };
+    }
+
     const kiteTransform = kiteEntity.getComponent<TransformComponent>('transform');
 
-    if (!kiteGeometry || !kiteTransform) {
+    if (!kiteTransform) {
       this.logger.warn(
-        'Kite entity missing geometry or transform component',
+        'Kite entity missing transform component',
         'PureLineSystem'
       );
       return {
@@ -131,12 +150,12 @@ export class PureLineSystem extends BaseSimulationSystem {
       };
     }
 
-    // Récupérer les points d'attache sur le kite (coordonnées locales)
-    const ctrlLeft = kiteGeometry.getPoint('CTRL_GAUCHE');
-    const ctrlRight = kiteGeometry.getPoint('CTRL_DROIT');
+    // Récupérer les positions des points CTRL depuis leurs entités
+    const ctrlLeftTransform = this.ctrlLeftEntity.getComponent<TransformComponent>('transform');
+    const ctrlRightTransform = this.ctrlRightEntity.getComponent<TransformComponent>('transform');
 
-    if (!ctrlLeft || !ctrlRight) {
-      this.logger.warn('Kite missing control points', 'PureLineSystem');
+    if (!ctrlLeftTransform || !ctrlRightTransform) {
+      this.logger.warn('Control point transforms not found', 'PureLineSystem');
       return {
         leftForce: new THREE.Vector3(),
         rightForce: new THREE.Vector3(),
@@ -144,15 +163,9 @@ export class PureLineSystem extends BaseSimulationSystem {
       };
     }
 
-    // Convertir points locaux en coordonnées monde
-    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
-      return localPoint.clone()
-        .applyQuaternion(kiteTransform.quaternion)
-        .add(kiteTransform.position);
-    };
-
-    const ctrlLeftWorld = toWorldCoordinates(ctrlLeft);
-    const ctrlRightWorld = toWorldCoordinates(ctrlRight);
+    // Positions monde des points CTRL (directement depuis leurs transforms)
+    const ctrlLeftWorld = ctrlLeftTransform.position.clone();
+    const ctrlRightWorld = ctrlRightTransform.position.clone();
 
     // Calculer les forces pour chaque ligne
     const leftForce = this.calculateLineForce(
@@ -280,29 +293,20 @@ export class PureLineSystem extends BaseSimulationSystem {
    * Obtient les distances actuelles des lignes
    */
   getLineDistances(kiteEntity: Entity, handles: HandlePositions): { left: number; right: number } {
-    const kiteGeometry = kiteEntity.getComponent<GeometryComponent>('geometry');
-    const kiteTransform = kiteEntity.getComponent<TransformComponent>('transform');
-
-    if (!kiteGeometry || !kiteTransform) {
+    if (!this.ctrlLeftEntity || !this.ctrlRightEntity) {
       return { left: 0, right: 0 };
     }
 
-    const ctrlLeft = kiteGeometry.getPoint("CTRL_GAUCHE");
-    const ctrlRight = kiteGeometry.getPoint("CTRL_DROIT");
+    const ctrlLeftTransform = this.ctrlLeftEntity.getComponent<TransformComponent>('transform');
+    const ctrlRightTransform = this.ctrlRightEntity.getComponent<TransformComponent>('transform');
 
-    if (!ctrlLeft || !ctrlRight) {
+    if (!ctrlLeftTransform || !ctrlRightTransform) {
       return { left: 0, right: 0 };
     }
 
-    // Convertir points locaux en coordonnées monde
-    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
-      return localPoint.clone()
-        .applyQuaternion(kiteTransform.quaternion)
-        .add(kiteTransform.position);
-    };
-
-    const ctrlLeftWorld = toWorldCoordinates(ctrlLeft);
-    const ctrlRightWorld = toWorldCoordinates(ctrlRight);
+    // Positions monde des points CTRL (directement depuis leurs transforms)
+    const ctrlLeftWorld = ctrlLeftTransform.position.clone();
+    const ctrlRightWorld = ctrlRightTransform.position.clone();
 
     return {
       left: ctrlLeftWorld.distanceTo(handles.left),

@@ -59,11 +59,22 @@ export class LinesRenderSystem extends BaseSimulationSystem {
   private kiteEntity: Entity | null = null;
   private controlBarSystem: ControlBarSystem | null = null;
   private kitePhysicsSystem: KitePhysicsSystem | null = null;
+  private ctrlLeftEntity: Entity | null = null;
+  private ctrlRightEntity: Entity | null = null;
   private hasLoggedWarning: boolean = false;
 
   constructor() {
     super('LinesRenderSystem', 6); // Après ControlBarSystem, avant RenderSystem
     this.logger = Logger.getInstance();
+  }
+
+  /**
+   * Configure les entités de points de contrôle
+   */
+  setControlPointEntities(ctrlLeft: Entity, ctrlRight: Entity): void {
+    this.ctrlLeftEntity = ctrlLeft;
+    this.ctrlRightEntity = ctrlRight;
+    this.logger.info('Control point entities configured for rendering', 'LinesRenderSystem');
   }
 
   reset(): void {
@@ -216,14 +227,11 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       return;
     }
 
-    // Récupérer les points de contrôle du kite (coordonnées locales)
-    const ctrlLeft = kiteGeometry.getPoint('CTRL_GAUCHE');
-    const ctrlRight = kiteGeometry.getPoint('CTRL_DROIT');
-
-    if (!ctrlLeft || !ctrlRight) {
+    // Récupérer les positions des points CTRL depuis leurs entités
+    if (!this.ctrlLeftEntity || !this.ctrlRightEntity) {
       if (!this.hasLoggedWarning) {
         this.logger.warn(
-          '🔴 LinesRenderSystem: points de contrôle kite manquants',
+          '🔴 LinesRenderSystem: entités de points de contrôle non configurées',
           'LinesRenderSystem'
         );
         this.hasLoggedWarning = true;
@@ -231,16 +239,23 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       return;
     }
 
-    // Convertir en coordonnées monde
-    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
-      return localPoint
-        .clone()
-        .applyQuaternion(kiteTransform.quaternion)
-        .add(kiteTransform.position);
-    };
+    const ctrlLeftTransform = this.ctrlLeftEntity.getComponent<TransformComponent>('transform');
+    const ctrlRightTransform = this.ctrlRightEntity.getComponent<TransformComponent>('transform');
 
-    const ctrlLeftWorld = toWorldCoordinates(ctrlLeft);
-    const ctrlRightWorld = toWorldCoordinates(ctrlRight);
+    if (!ctrlLeftTransform || !ctrlRightTransform) {
+      if (!this.hasLoggedWarning) {
+        this.logger.warn(
+          '🔴 LinesRenderSystem: transforms des points de contrôle manquants',
+          'LinesRenderSystem'
+        );
+        this.hasLoggedWarning = true;
+      }
+      return;
+    }
+
+    // Positions monde des points CTRL (directement depuis leurs transforms)
+    const ctrlLeftWorld = ctrlLeftTransform.position.clone();
+    const ctrlRightWorld = ctrlRightTransform.position.clone();
 
     this.lineEntities.forEach((entity, id) => {
       const baseRenderData = this.lineRenderData.get(id);
