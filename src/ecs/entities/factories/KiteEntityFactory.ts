@@ -115,6 +115,10 @@ export class KiteEntityFactory {
     // Composant Bridle
     const bridle = new BridleComponent();
     bridle.lengths = { ...CONFIG.bridle.defaultLengths };
+    console.log('🔧 BridleComponent après init:', {
+      lengths: bridle.lengths,
+      connections: bridle.connections.map(c => ({ from: c.from, to: c.to, length: c.length }))
+    });
     kiteEntity.addComponent(bridle);
 
     // Composant Aerodynamics
