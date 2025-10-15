@@ -21,7 +21,7 @@
  *   - src/simulation/config/SimulationConfig.ts
  */
 import * as THREE from "three";
-import { Point } from "@objects/Point";
+import { Point3D } from "@utils/geometry";
 
 /**
  * Géométrie du cerf-volant
@@ -38,12 +38,12 @@ export class KiteGeometry {
    * Converts the static POINTS to use the Point class instead of THREE.Vector3.
    */
   static readonly POINTS = {
-    NEZ: new Point(0, 0.65, 0), // Le bout pointu en haut
-    SPINE_BAS: new Point(0, 0, 0), // Le centre en bas
-    BORD_GAUCHE: new Point(-0.825, 0, 0), // L'extrémité de l'aile gauche
-    BORD_DROIT: new Point(0.825, 0, 0), // L'extrémité de l'aile droite
-    WHISKER_GAUCHE: new Point(-0.4125, 0.1, -0.15), // Stabilisateur gauche
-    WHISKER_DROIT: new Point(0.4125, 0.1, -0.15), // Stabilisateur droit
+    NEZ: new Point3D(0, 0.65, 0), // Le bout pointu en haut
+    SPINE_BAS: new Point3D(0, 0, 0), // Le centre en bas
+    BORD_GAUCHE: new Point3D(-0.825, 0, 0), // L'extrémité de l'aile gauche
+    BORD_DROIT: new Point3D(0.825, 0, 0), // L'extrémité de l'aile droite
+    WHISKER_GAUCHE: new Point3D(-0.4125, 0.1, -0.15), // Stabilisateur gauche
+    WHISKER_DROIT: new Point3D(0.4125, 0.1, -0.15), // Stabilisateur droit
   };
 
   /**
@@ -108,53 +108,53 @@ export class KiteGeometry {
     {
       // Surface haute gauche (normale doit pointer vers arrière)
       vertices: [
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.BORD_GAUCHE.toVector3(),
-        KiteGeometry.POINTS.WHISKER_GAUCHE.toVector3(),
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.BORD_GAUCHE,
+        KiteGeometry.POINTS.WHISKER_GAUCHE,
       ],
       area: KiteGeometry.calculateTriangleArea(
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.BORD_GAUCHE.toVector3(),
-        KiteGeometry.POINTS.WHISKER_GAUCHE.toVector3()
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.BORD_GAUCHE,
+        KiteGeometry.POINTS.WHISKER_GAUCHE
       ),
     },
     {
       // Surface basse gauche
       vertices: [
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.WHISKER_GAUCHE.toVector3(),
-        KiteGeometry.POINTS.SPINE_BAS.toVector3(),
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_GAUCHE,
+        KiteGeometry.POINTS.SPINE_BAS,
       ],
       area: KiteGeometry.calculateTriangleArea(
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.WHISKER_GAUCHE.toVector3(),
-        KiteGeometry.POINTS.SPINE_BAS.toVector3()
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_GAUCHE,
+        KiteGeometry.POINTS.SPINE_BAS
       ),
     },
     {
       // Surface haute droite
       vertices: [
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.WHISKER_DROIT.toVector3(),
-        KiteGeometry.POINTS.BORD_DROIT.toVector3(),
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.BORD_DROIT,
       ],
       area: KiteGeometry.calculateTriangleArea(
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.WHISKER_DROIT.toVector3(),
-        KiteGeometry.POINTS.BORD_DROIT.toVector3()
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.WHISKER_DROIT,
+        KiteGeometry.POINTS.BORD_DROIT
       ),
     },
     {
       // Surface basse droite
       vertices: [
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.SPINE_BAS.toVector3(),
-        KiteGeometry.POINTS.WHISKER_DROIT.toVector3(),
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.SPINE_BAS,
+        KiteGeometry.POINTS.WHISKER_DROIT,
       ],
       area: KiteGeometry.calculateTriangleArea(
-        KiteGeometry.POINTS.NEZ.toVector3(),
-        KiteGeometry.POINTS.SPINE_BAS.toVector3(),
-        KiteGeometry.POINTS.WHISKER_DROIT.toVector3()
+        KiteGeometry.POINTS.NEZ,
+        KiteGeometry.POINTS.SPINE_BAS,
+        KiteGeometry.POINTS.WHISKER_DROIT
       ),
     },
   ];

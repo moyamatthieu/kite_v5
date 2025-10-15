@@ -11,6 +11,7 @@ export interface SimulationContext {
   totalTime: number;
   isPaused: boolean;
   debugMode: boolean;
+  frameCount: number; // Ajout du nombre de frames
 }
 
 export abstract class BaseSimulationSystem {

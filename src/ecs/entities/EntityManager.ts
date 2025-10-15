@@ -7,7 +7,7 @@
  * - Fournir des méthodes de requête pour trouver des entités
  */
 
-import { Entity, ComponentType } from '../Entity';
+import { Entity, ComponentType } from '@base/Entity';
 
 /**
  * Gestionnaire central des entités

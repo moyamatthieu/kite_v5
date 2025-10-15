@@ -11,7 +11,7 @@ import { CONFIG } from '@config/SimulationConfig';
 import { TransformComponent } from '../components/TransformComponent';
 import { MeshComponent } from '../components/MeshComponent';
 
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 
 export type LineSide = 'left' | 'right';
 

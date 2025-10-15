@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 
-import { Component } from '../Component';
+import { Component } from '@base/Component';
 
 /**
  * Composant contenant un objet 3D Three.js

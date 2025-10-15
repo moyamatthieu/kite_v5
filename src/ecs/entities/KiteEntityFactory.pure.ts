@@ -14,7 +14,7 @@
  */
 
 import * as THREE from 'three';
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 import { CONFIG } from '../config/SimulationConfig';
 import { MathUtils } from '@utils/MathUtils';
 import {

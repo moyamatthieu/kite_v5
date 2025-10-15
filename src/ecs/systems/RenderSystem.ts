@@ -310,11 +310,22 @@ export class RenderSystem extends BaseSimulationSystem {
   startRendering(): void {
     if (this.renderState) {
       this.renderState.isRendering = true;
-      this.logger.info('Rendering started', 'RenderSystem');
-      this.logger.info(`Canvas element: ${this.renderState.canvas.id}`, 'RenderSystem');
-      this.logger.info(`Scene children count: ${this.renderState.scene.children.length}`, 'RenderSystem');
+      this.logger.info('✅ Rendering started', 'RenderSystem');
+      this.logger.info(`  Canvas: ${this.renderState.canvas.id}`, 'RenderSystem');
+      this.logger.info(`  Canvas size: ${this.renderState.canvas.width}x${this.renderState.canvas.height}`, 'RenderSystem');
+      this.logger.info(`  Scene children: ${this.renderState.scene.children.length}`, 'RenderSystem');
+      this.logger.info(`  Camera position: ${this.renderState.camera.position.toArray()}`, 'RenderSystem');
+      
+      // Lister tous les objets de la scène
+      this.renderState.scene.children.forEach((child, index) => {
+        this.logger.debug(`    [${index}] ${child.type} "${child.name}" at ${child.position.toArray()}`, 'RenderSystem');
+      });
+      
+      // Forcer un rendu immédiat pour tester
+      this.renderState.renderer.render(this.renderState.scene, this.renderState.camera);
+      this.logger.info('  First frame rendered', 'RenderSystem');
     } else {
-      this.logger.error('Cannot start rendering - renderState is null', 'RenderSystem');
+      this.logger.error('❌ Cannot start rendering - renderState is null', 'RenderSystem');
     }
   }
 

@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 
-import { Component } from '../Component';
+import { Component } from '@base/Component';
 
 // Importation des dépendances
 

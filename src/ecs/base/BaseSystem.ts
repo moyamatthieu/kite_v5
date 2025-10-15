@@ -1,5 +1,5 @@
 // Classe de base pour les systèmes dans l'architecture ECS
-import { Entity } from '@/ecs/Entity';
+import { Entity } from './Entity';
 
 export abstract class BaseSystem {
   constructor(public readonly name: string, public readonly priority: number) {}

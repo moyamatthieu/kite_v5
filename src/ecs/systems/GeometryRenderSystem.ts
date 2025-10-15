@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 import { GeometryComponent } from '../components/GeometryComponent';
 import { VisualComponent } from '../components/VisualComponent';
 import { BridleComponent } from '../components/BridleComponent';
@@ -31,13 +31,24 @@ export class GeometryRenderSystem {
    * Initialise le rendu d'une entité (crée la géométrie Three.js)
    */
   initializeEntity(entity: Entity): void {
+    console.log(`🎨 GeometryRenderSystem: Initializing entity ${entity.id}`);
+    
+    // Debug: liste tous les composants de l'entité
+    const allComponents = (entity as any).components;
+    if (allComponents instanceof Map) {
+      console.log(`  📦 Components on ${entity.id}:`, Array.from(allComponents.keys()));
+    }
+    
     const geometry = entity.getComponent<GeometryComponent>('geometry');
     const visual = entity.getComponent<VisualComponent>('visual');
 
     if (!geometry || !visual) {
-      console.warn('Entity nécessite GeometryComponent et VisualComponent');
+      console.warn(`  ⚠️ Entity ${entity.id} nécessite GeometryComponent et VisualComponent`);
+      console.warn(`    geometry=${!!geometry}, visual=${!!visual}`);
       return;
     }
+
+    console.log(`🎨 GeometryRenderSystem: Creating 3D objects for ${entity.id}...`);
 
     // Créer le group Three.js principal
     const group = new THREE.Group();
@@ -45,19 +56,23 @@ export class GeometryRenderSystem {
 
     // 1. Créer les frames (connexions)
     this.createFrames(group, geometry, visual);
+    console.log(`  ✅ Frames created: ${group.children.length} objects`);
 
     // 2. Créer les surfaces
     this.createSurfaces(group, geometry, visual);
+    console.log(`  ✅ Surfaces created: ${group.children.length} objects total`);
 
     // 3. Créer les brides (si présent)
     const bridle = entity.getComponent<BridleComponent>('bridle');
     if (bridle) {
       this.createBridles(group, geometry, bridle, visual);
+      console.log(`  ✅ Bridles created`);
     }
 
     // 4. Créer les marqueurs de debug (si activé)
     if (visual.showDebugMarkers) {
       this.createDebugMarkers(group, geometry, visual);
+      console.log(`  ✅ Debug markers created`);
     }
 
     // 5. Créer ou mettre à jour le MeshComponent
@@ -81,10 +96,13 @@ export class GeometryRenderSystem {
         quaternion: transform.quaternion,
         scale: transform.scale
       });
+      console.log(`  ✅ Transform synced: position ${transform.position.toArray()}`);
     }
 
     // 7. Ajouter à la scène
     this.scene.add(group);
+    console.log(`✅ GeometryRenderSystem: Entity ${entity.id} added to scene (${group.children.length} children)`);
+    console.log(`✅ Scene now has ${this.scene.children.length} children total`);
   }
 
   /**

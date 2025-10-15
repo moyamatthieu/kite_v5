@@ -16,8 +16,8 @@
 
 import * as THREE from 'three';
 
-import { BaseSystem } from '@/ecs/BaseSystem';
-import { Entity } from '@/ecs/Entity';
+import { BaseSystem } from '@base/BaseSystem';
+import { Entity } from '@base/Entity';
 import { TransformComponent } from '@/ecs/components/TransformComponent';
 import { MeshComponent } from '@/ecs/components/MeshComponent';
 import { InputSystem } from '@/ecs/systems/InputSystem';

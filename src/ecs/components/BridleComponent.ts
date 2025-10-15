@@ -9,7 +9,7 @@
  * Architecture ECS pure : données séparées de la physique.
  */
 
-import { Component } from '../Component';
+import { Component } from '@base/Component';
 
 /**
  * Longueurs physiques des brides (en mètres)

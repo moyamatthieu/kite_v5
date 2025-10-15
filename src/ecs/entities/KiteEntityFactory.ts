@@ -1,8 +1,8 @@
 /**
  * KiteEntityFactory.ts - Factory pour créer l'entité ECS Kite
  *
- * Responsabilité unique : Construction de l'entité Kite avec objet StructuredObject complet
- * Réutilise les factories géométriques existantes (PointFactory, FrameFactory, etc.)
+ * Responsabilité unique : Construction de l'entité Kite avec données géométriques pures
+ * Utilise les factories géométriques existantes pour calculer les données ECS
  *
  * Pattern : Factory Method + Composition
  * Utilisation : Appelée depuis SimulationApp.createKiteEntity()
@@ -10,13 +10,13 @@
 
 import * as THREE from 'three';
 
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 import { CONFIG } from '../config/SimulationConfig';
-
 import { EntityBuilder } from './EntityBuilder';
-
-import { Kite } from '@objects/Kite';
+import { GeometryComponent, VisualComponent } from '../components';
+import { PointFactory } from '../factories/PointFactory';
 import { MathUtils } from '@utils/MathUtils';
+import { KiteGeometry } from '../config/KiteGeometry';
 
 
 /**
@@ -34,15 +34,13 @@ export interface KiteFactoryParams {
 }
 
 /**
- * Factory pour créer l'entité ECS Kite avec objet StructuredObject complet
+ * Factory pour créer l'entité ECS Kite avec données géométriques pures
  *
- * Le kite est un objet complexe utilisant plusieurs factories géométriques :
- * - PointFactory : Points anatomiques (NEZ, CTRL_GAUCHE, CTRL_DROIT, etc.)
- * - FrameFactory : Structure en carbone
- * - SurfaceFactory : Panneaux de voile
- * - BridleFactory : Système de bridage (6 lignes)
+ * Le kite est défini par des données ECS pures :
+ * - GeometryComponent : Points, connexions, surfaces
+ * - VisualComponent : Couleurs, matériaux
  *
- * Cette factory ECS **compose** avec ces factories existantes via `new Kite()`.
+ * Les données géométriques viennent de KiteGeometry et PointFactory.
  *
  * @example
  * ```typescript
@@ -57,26 +55,92 @@ export interface KiteFactoryParams {
  */
 export class KiteEntityFactory {
   /**
-   * Crée une entité Kite complète avec objet StructuredObject Three.js
+   * Crée une entité Kite complète avec données géométriques ECS pures
    *
    * @param params - Paramètres de configuration
-   * @returns Entité ECS Kite prête à l'emploi (avec objet Kite accessible via MeshComponent)
+   * @returns Entité ECS Kite prête à l'emploi (avec GeometryComponent et VisualComponent)
    */
   static create(params: KiteFactoryParams = {}): Entity {
-    // 1. Créer l'objet Kite (StructuredObject)
-    // Cet objet utilise automatiquement PointFactory, FrameFactory, SurfaceFactory, BridleFactory
-    const kite = new Kite();
-    
-    // 2. Position initiale (auto-calculée ou fournie)
+    // Calculer la position initiale
     const position = params.position || this.calculateInitialPosition();
-    kite.position.copy(position);
     
-    // 3. Créer l'entité ECS avec Transform + Mesh (via EntityBuilder)
-    return EntityBuilder.createWithMesh(
-      params.name || 'kite',
-      kite,
-      position
-    );
+    // Créer l'entité ECS
+    const entity = new Entity(params.name || 'kite');
+    
+    // Ajouter le composant de transformation
+    EntityBuilder.addTransform(entity, position);
+    
+    // Créer et ajouter les composants géométriques
+    this.addGeometryComponents(entity);
+    
+    return entity;
+  }
+  
+  /**
+   * Ajoute les composants géométriques et visuels à l'entité kite
+   */
+  private static addGeometryComponents(entity: Entity): void {
+    // Créer le composant géométrie
+    const geometry = new GeometryComponent();
+    
+    // Ajouter les points de base depuis KiteGeometry
+    Object.entries(KiteGeometry.POINTS).forEach(([name, point]) => {
+      geometry.points.set(name, point.clone());
+    });
+    
+    // Calculer et ajouter les points de contrôle (bridle)
+    const kiteParams = {
+      width: 1.65, // Envergure calculée depuis KiteGeometry.POINTS
+      height: 0.65, // Hauteur depuis NEZ à SPINE_BAS
+      depth: 0.15, // Profondeur des whiskers
+      bridleLengths: CONFIG.bridle.defaultLengths
+    };
+    
+    const controlPoints = PointFactory.calculateDeltaKitePoints(kiteParams);
+    controlPoints.forEach((point, name) => {
+      geometry.points.set(name, point.clone());
+    });
+    
+    // Ajouter les connexions (frames)
+    // TODO: Définir les connexions pour la structure
+    
+    // Ajouter les surfaces
+    KiteGeometry.SURFACES.forEach((surface, index) => {
+      // Convertir les vertices en noms de points
+      const pointNames: string[] = [];
+      surface.vertices.forEach(vertex => {
+        // Trouver le nom du point correspondant
+        for (const [name, point] of Object.entries(KiteGeometry.POINTS)) {
+          if (point.equals(vertex)) {
+            pointNames.push(name);
+            break;
+          }
+        }
+      });
+      
+      if (pointNames.length === 3) {
+        geometry.surfaces.push({
+          points: pointNames
+        });
+      }
+    });
+    
+    entity.addComponent(geometry);
+    
+    // Créer le composant visuel
+    const visual = new VisualComponent();
+    visual.frameMaterial = {
+      color: '#333333', // CONFIG.colors.kiteFrame
+      diameter: 0.005 // Diamètre réaliste pour tubes
+    };
+    visual.surfaceMaterial = {
+      color: '#ffffff', // CONFIG.colors.kiteSail
+      opacity: 0.9,
+      transparent: true,
+      doubleSided: true
+    };
+    
+    entity.addComponent(visual);
   }
   
   /**
@@ -105,18 +169,5 @@ export class KiteEntityFactory {
       CONFIG.initialization.initialDistanceFactor,
       CONFIG.initialization.initialKiteZ
     );
-  }
-  
-  /**
-   * Extrait l'objet Kite d'une entité (helper utilitaire)
-   * 
-   * Wrapper typé autour de EntityBuilder.getMeshObject<Kite>()
-   * pour commodité et clarté du code.
-   * 
-   * @param entity - Entité contenant un MeshComponent avec objet Kite
-   * @returns Objet Kite ou null si non trouvé
-   */
-  static getKiteObject(entity: Entity): Kite | null {
-    return EntityBuilder.getMeshObject<Kite>(entity);
   }
 }

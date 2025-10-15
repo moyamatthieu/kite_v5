@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 import { CONFIG } from '../config/SimulationConfig';
 
 import { EntityBuilder } from './EntityBuilder';

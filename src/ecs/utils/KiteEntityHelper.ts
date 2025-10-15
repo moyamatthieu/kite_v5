@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { Entity } from '../Entity';
+import { Entity } from '@base/Entity';
 import {
   GeometryComponent,
   TransformComponent,

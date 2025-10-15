@@ -5,5 +5,6 @@
 export { ControlBarEntityFactory, type ControlBarFactoryParams } from './ControlBarEntityFactory';
 export { PilotEntityFactory, type PilotFactoryParams } from './PilotEntityFactory';
 export { KiteEntityFactory, type KiteFactoryParams } from './KiteEntityFactory';
+export { PureKiteEntityFactory } from './KiteEntityFactory.pure';
 export { EntityBuilder, type TransformOptions, type MeshOptions, type EntityWithMeshOptions } from './EntityBuilder';
 

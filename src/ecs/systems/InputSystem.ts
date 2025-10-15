@@ -4,8 +4,8 @@
 
 import * as THREE from 'three';
 
-import { BaseSystem } from '@/ecs/BaseSystem';
-import { Entity } from '@/ecs/Entity';
+import { BaseSystem } from '@base/BaseSystem';
+import { Entity } from '@base/Entity';
 
 export interface InputState {
   // Entrées analogiques (normalisées -1 à 1)
@@ -73,7 +73,7 @@ export class InputSystem extends BaseSystem {
     // Mettre à jour les états des boutons (pulse)
     this.updateButtonStates();
 
-    console.log('Updating input state');
+    // Log supprimé - trop verbeux
   }
 
   /**

@@ -474,4 +474,95 @@ export class AerodynamicsCalculator {
 
     return { apparentSpeed: windSpeed, liftMag, dragMag, lOverD, aoaDeg };
   }
+
+  /**
+   * VERSION ECS PURE : Calcule les forces depuis les composants
+   * Utilise AerodynamicsComponent au lieu de KiteGeometry hardcodé
+   */
+  static calculateForcesFromComponents(
+    apparentWind: THREE.Vector3,
+    transform: any, // TransformComponent
+    aeroComponent: any, // AerodynamicsComponent
+    _kiteVelocity: THREE.Vector3,
+    _angularVelocity: THREE.Vector3
+  ): {
+    lift: THREE.Vector3;
+    drag: THREE.Vector3;
+    gravity: THREE.Vector3;
+    torque: THREE.Vector3;
+  } {
+    const windSpeed = apparentWind.length();
+    if (windSpeed < 0.1) {
+      return {
+        lift: new THREE.Vector3(),
+        drag: new THREE.Vector3(),
+        gravity: new THREE.Vector3(),
+        torque: new THREE.Vector3()
+      };
+    }
+
+    const windDir = apparentWind.clone().normalize();
+    const dynamicPressure = 0.5 * CONFIG.physics.airDensity * windSpeed * windSpeed;
+
+    const totalLift = new THREE.Vector3();
+    const totalDrag = new THREE.Vector3();
+    const gravityForce = new THREE.Vector3();
+    const totalTorque = new THREE.Vector3();
+
+    // Itérer sur les surfaces du composant
+    aeroComponent.surfaces.forEach((surface: any) => {
+      // Transformer normale en coordonnées monde
+      const normal = surface.normal.clone().applyQuaternion(transform.quaternion);
+
+      // Calcul angle d'incidence
+      const windDotNormal = windDir.dot(normal);
+      const cosTheta = Math.abs(windDotNormal);
+      const sinAlpha = cosTheta;
+
+      if (sinAlpha <= PhysicsConstants.EPSILON) return;
+
+      const alpha = Math.asin(Math.min(1, sinAlpha));
+      const { CL, CD } = this.calculateAerodynamicCoefficients(alpha);
+
+      // Directions
+      const windFacingNormal = windDotNormal >= 0 ? normal.clone() : normal.clone().negate();
+      const liftDir = windFacingNormal.clone()
+        .sub(windDir.clone().multiplyScalar(windFacingNormal.dot(windDir)))
+        .normalize();
+
+      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
+        liftDir.copy(windFacingNormal);
+      }
+
+      const dragDir = windDir.clone();
+
+      // Forces
+      const liftMagnitude = dynamicPressure * surface.area * CL;
+      const dragMagnitude = dynamicPressure * surface.area * CD;
+
+      const liftForce = liftDir.multiplyScalar(liftMagnitude);
+      const dragForce = dragDir.multiplyScalar(dragMagnitude);
+
+      totalLift.add(liftForce);
+      totalDrag.add(dragForce);
+
+      // Gravité (masse répartie selon aire)
+      const surfaceMass = (surface.area / aeroComponent.totalArea) * CONFIG.kite.mass;
+      const gravity = new THREE.Vector3(0, -surfaceMass * CONFIG.physics.gravity, 0);
+      gravityForce.add(gravity);
+
+      // Couple
+      const centroid = surface.centroid.clone().applyQuaternion(transform.quaternion);
+      const aeroForce = liftForce.clone().add(dragForce);
+      const torque = this.calculateTorque(centroid, aeroForce.add(gravity));
+      totalTorque.add(torque);
+    });
+
+    return {
+      lift: totalLift.multiplyScalar(CONFIG.aero.liftScale),
+      drag: totalDrag.multiplyScalar(CONFIG.aero.dragScale),
+      gravity: gravityForce,
+      torque: totalTorque
+    };
+  }
 }

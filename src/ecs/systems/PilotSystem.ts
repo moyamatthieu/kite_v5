@@ -13,14 +13,14 @@
 import * as THREE from 'three';
 
 import { BaseSimulationSystem, SimulationContext } from '@ecs/base/BaseSimulationSystem';
-import { PilotEntity } from '@ecs/entities/PilotEntity';
+import { Entity } from '@base/Entity';
 import { TransformComponent } from '@ecs/components/TransformComponent';
 import { MeshComponent } from '@ecs/components/MeshComponent';
 import { Logger } from '@ecs/utils/Logging';
 
 export class PilotSystem extends BaseSimulationSystem {
   private logger: Logger;
-  private pilotEntity: PilotEntity | null = null;
+  private pilotEntity: Entity | null = null;
   private controlBarPosition: THREE.Vector3 = new THREE.Vector3();
 
   constructor() {
@@ -31,13 +31,16 @@ export class PilotSystem extends BaseSimulationSystem {
   async initialize(): Promise<void> {
     // Initialiser la position du pilote à (0, 0, 0)
     if (this.pilotEntity) {
-      this.pilotEntity.updatePosition();
+      // Mettre à jour la position via le TransformComponent
+      const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
+      if (transform) {
+        transform.position.set(0, 0, 0); // Exemple de mise à jour de la position
+      }
 
       // Synchroniser avec le mesh Three.js
-      const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
       const mesh = this.pilotEntity.getComponent<MeshComponent>('mesh');
 
-      if (transform && mesh) {
+      if (mesh && transform) {
         mesh.syncToObject3D({
           position: transform.position,
           quaternion: transform.quaternion,
@@ -60,16 +63,11 @@ export class PilotSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Enregistre l'entité du pilote
+   * Configure l'entité pilote
    */
-  setPilotEntity(entity: PilotEntity): void {
-    if (!entity.hasComponent('transform') || !entity.hasComponent('mesh')) {
-      throw new Error('PilotEntity must have Transform and Mesh components');
-    }
+  setPilotEntity(entity: Entity): void {
     this.pilotEntity = entity;
-  }
-
-  /**
+  }  /**
    * Met à jour la position de référence de la barre de contrôle
    */
   setControlBarPosition(position: THREE.Vector3): void {
@@ -86,6 +84,7 @@ export class PilotSystem extends BaseSimulationSystem {
     const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
     const mesh = this.pilotEntity.getComponent<MeshComponent>('mesh');
 
+    // Synchroniser avec le mesh Three.js si transform est défini
     if (transform && mesh) {
       mesh.syncToObject3D({
         position: transform.position,

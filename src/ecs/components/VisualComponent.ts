@@ -8,7 +8,7 @@
  * Architecture ECS pure : données séparées de la logique de rendu.
  */
 
-import { Component } from '../Component';
+import { Component } from '@base/Component';
 
 /**
  * Configuration matériau pour les frames/structures

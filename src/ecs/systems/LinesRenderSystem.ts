@@ -20,7 +20,7 @@ import { Logger } from '@utils/Logging';
 import { CONFIG } from '@config/SimulationConfig';
 import { Kite } from '@objects/Kite';
 import { MeshComponent } from '@components/MeshComponent';
-import { Entity } from '@/ecs/Entity';
+import { Entity } from '@base/Entity';
 import { LineEntity } from '@entities/LineEntity';
 
 import { ControlBarSystem } from '@/ecs/systems/ControlBarSystem';
@@ -42,6 +42,7 @@ export class LinesRenderSystem extends BaseSimulationSystem {
   private kite: Kite | null = null;
   private controlBarSystem: ControlBarSystem | null = null;
   private kitePhysicsSystem: KitePhysicsSystem | null = null;
+  private hasLoggedWarning: boolean = false;
 
   constructor() {
     super('LinesRenderSystem', 6); // Après ControlBarSystem, avant RenderSystem
@@ -92,7 +93,11 @@ export class LinesRenderSystem extends BaseSimulationSystem {
 
   update(_context: SimulationContext): void {
     if (!this.kite || !this.controlBarSystem) {
-      console.warn('🔴 LinesRenderSystem: kite ou controlBarSystem manquant');
+      // Log seulement une fois au lieu de polluer la console
+      if (!this.hasLoggedWarning) {
+        console.warn('🔴 LinesRenderSystem: kite ou controlBarSystem manquant');
+        this.hasLoggedWarning = true;
+      }
       return;
     }
 

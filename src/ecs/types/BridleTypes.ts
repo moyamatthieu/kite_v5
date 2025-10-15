@@ -74,7 +74,7 @@ export type BridleSide = 'left' | 'right';
 export type BridlePosition = 'nez' | 'inter' | 'centre';
 
 /**
- * Configuration complète d'une bride (utilisé par BridleFactory)
+ * Configuration complète d'une bride (utilisé par BridleSystem)
  */
 export interface BridleConfig {
   /** Côté de la bride */
