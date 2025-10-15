@@ -126,9 +126,13 @@ export class UIManager {
     const slider = document.getElementById(config.id) as HTMLInputElement | null;
     const valueElement = document.getElementById(`${config.id}-value`);
 
-    if (!slider || !valueElement) return;
+    if (!slider || !valueElement) {
+      console.warn(`⚠️ Slider not found: ${config.id}`);
+      return;
+    }
 
     // Définir la valeur initiale du slider
+    console.log(`🎚️ Setting slider ${config.id} to:`, config.initialValue);
     slider.value = config.initialValue.toString();
     
     // Afficher la valeur initiale formatée
@@ -183,9 +187,12 @@ export class UIManager {
    */
   private setupLineControlsGroup(): void {
     // Longueur des lignes
+    const lineLength = this.simulation.getLineLength();
+    console.log('🔍 UIManager init - Line length:', lineLength);
+    
     this.createSlider({
       id: "line-length",
-      initialValue: this.simulation.getLineLength(),
+      initialValue: lineLength,
       onInput: (length) => this.simulation.setLineLength(length),
       formatter: (value) => `${value.toFixed(0)}m`,
       step: 1
@@ -193,6 +200,11 @@ export class UIManager {
 
     // Brides
     const currentBridle = this.simulation.getBridleLengths();
+    console.log('🔍 UIManager init - Bridle lengths:', {
+      nez: currentBridle.nez,
+      inter: currentBridle.inter,
+      centre: currentBridle.centre
+    });
 
     this.createSlider({
       id: "bridle-nez",
