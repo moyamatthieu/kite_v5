@@ -64,7 +64,7 @@ export class LinesRenderSystem extends BaseSimulationSystem {
   private hasLoggedWarning: boolean = false;
 
   constructor() {
-    super('LinesRenderSystem', 6); // Après ControlBarSystem, avant RenderSystem
+    super('LinesRenderSystem', 95); // Après ControlPointSystem (50), avant RenderSystem (100)
     this.logger = Logger.getInstance();
   }
 
