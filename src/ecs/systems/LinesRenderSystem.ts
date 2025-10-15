@@ -268,8 +268,10 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       }
 
       const lineComponent = entity.getComponent<LineComponent>('line');
+      // IMPORTANT: Utiliser config.length (au repos) et non getCurrentLength() (avec strain)
+      // Car ControlPointSystem positionne les CTRL à exactement config.length du handle
       const dynamicLength = lineComponent
-        ? lineComponent.getCurrentLength()
+        ? lineComponent.config.length  // Longueur au repos, pas avec strain
         : baseRenderData.maxLength;
       const renderData: LineRenderData = {
         ...baseRenderData,
@@ -278,6 +280,18 @@ export class LinesRenderSystem extends BaseSimulationSystem {
 
       const start = renderData.side === 'left' ? handles.left : handles.right;
       const end = renderData.side === 'left' ? ctrlLeftWorld : ctrlRightWorld;
+
+      // DEBUG: Log pour vérifier l'alignement (1% des frames)
+      if (Math.random() < 0.01 && renderData.side === 'left') {
+        const actualDist = start.distanceTo(end);
+        this.logger.debug('LinesRenderSystem',
+          `LEFT line: handle=${start.toArray().map(v => v.toFixed(2))}, ` +
+          `ctrl=${end.toArray().map(v => v.toFixed(2))}, ` +
+          `maxLength=${renderData.maxLength.toFixed(2)}, ` +
+          `actualDist=${actualDist.toFixed(2)}, ` +
+          `diff=${(actualDist - renderData.maxLength).toFixed(3)}`
+        );
+      }
 
       const geometryData = this.computeLineGeometry(start, end, renderData);
 

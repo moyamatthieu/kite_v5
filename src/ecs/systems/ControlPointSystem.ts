@@ -155,6 +155,16 @@ export class ControlPointSystem extends BaseSimulationSystem {
       attachments
     );
 
+    // DEBUG: Log pour vérifier l'alignement
+    if (Math.random() < 0.01) { // 1% des frames
+      this.logger.debug('ControlPointSystem',
+        `${ctrlEntity.id}: handle=${handlePosition.toArray().map(v => v.toFixed(2))}, ` +
+        `resolved=${resolvedPosition.toArray().map(v => v.toFixed(2))}, ` +
+        `lineLength=${lineLength.toFixed(2)}, ` +
+        `actualDist=${handlePosition.distanceTo(resolvedPosition).toFixed(2)}`
+      );
+    }
+
     // Mettre à jour la position du point CTRL
     ctrlComponent.updatePosition(resolvedPosition);
     ctrlTransform.position.copy(resolvedPosition);
