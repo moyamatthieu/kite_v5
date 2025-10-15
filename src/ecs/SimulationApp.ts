@@ -34,6 +34,7 @@ import { GeometryRenderSystem } from '@/ecs/systems/GeometryRenderSystem';
 import { LoggingSystem } from "@/ecs/systems/LoggingSystem";
 import { AeroVectorsDebugSystem } from "@/ecs/systems/AeroVectorsDebugSystem";
 import { ControlPointSystem } from "@/ecs/systems/ControlPointSystem";
+import { PureConstraintSolver } from "@/ecs/systems/ConstraintSolver.pure";
 import { Entity } from '@/ecs/base/Entity';
 import { EntityBuilder } from '@/ecs/entities/EntityBuilder';
 import {
@@ -303,33 +304,19 @@ export class SimulationApp {
       .applyQuaternion(transform.quaternion)
       .add(transform.position);
 
-    // Résoudre trilatération pour CTRL gauche
-    const { PureConstraintSolver } = require('@/ecs/systems/ConstraintSolver.pure');
-    const leftSolutions = PureConstraintSolver.trilaterate3D(
+    // Résoudre trilatération pour CTRL gauche (retourne position unique)
+    const leftPosition = PureConstraintSolver.trilaterate3D(
       nezWorld, bridle.lengths.nez,
       interLeftWorld, bridle.lengths.inter,
       centreWorld, bridle.lengths.centre
     );
 
-    const rightSolutions = PureConstraintSolver.trilaterate3D(
+    // Résoudre trilatération pour CTRL droit
+    const rightPosition = PureConstraintSolver.trilaterate3D(
       nezWorld, bridle.lengths.nez,
       interRightWorld, bridle.lengths.inter,
       centreWorld, bridle.lengths.centre
     );
-
-    // Prendre la première solution (en dessous du kite normalement)
-    // Filtre: choisir la solution avec Y la plus basse (dessous le kite)
-    const leftPosition = leftSolutions.length > 0
-      ? (leftSolutions.length === 2 
-          ? (leftSolutions[0].y < leftSolutions[1].y ? leftSolutions[0] : leftSolutions[1])
-          : leftSolutions[0])
-      : new THREE.Vector3(-0.3, transform.position.y - 1, transform.position.z);
-
-    const rightPosition = rightSolutions.length > 0
-      ? (rightSolutions.length === 2
-          ? (rightSolutions[0].y < rightSolutions[1].y ? rightSolutions[0] : rightSolutions[1])
-          : rightSolutions[0])
-      : new THREE.Vector3(0.3, transform.position.y - 1, transform.position.z);
 
     this.logger.info(
       `CTRL positions calculated: LEFT=${leftPosition.toArray()}, RIGHT=${rightPosition.toArray()}`,

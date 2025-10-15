@@ -603,7 +603,7 @@ export class PureConstraintSolver {
    * @param r3 - Rayon sphère 3
    * @returns Point d'intersection (ou approximation si pas de solution exacte)
    */
-  private static trilaterate3D(
+  public static trilaterate3D(
     p1: THREE.Vector3,
     r1: number,
     p2: THREE.Vector3,
