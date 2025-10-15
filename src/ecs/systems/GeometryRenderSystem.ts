@@ -67,20 +67,21 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
    * Met à jour une entité existante (géométrie dynamique)
    */
   private updateEntity(entity: Entity): void {
-    const bridle = entity.getComponent<BridleComponent>('bridle');
+    // TODO: Adapter le rendu des brides pour utiliser les entités CTRL libres
+    // TEMPORAIREMENT DÉSACTIVÉ car utilise anciennes positions CTRL depuis GeometryComponent
+    // Ce qui crée un décalage visuel avec les lignes qui utilisent les entités CTRL
     
-    // Mettre à jour les brides (positions et tensions)
+    /* DÉSACTIVÉ - à réimplémenter avec entités CTRL
+    const bridle = entity.getComponent<BridleComponent>('bridle');
     if (bridle) {
-      // D'abord calculer et stocker les tensions dans le BridleComponent
       const tensions = this.calculateBridleTensionsFromGeometry(entity);
       if (tensions) {
         bridle.tensions = tensions;
       }
-      
-      // Puis mettre à jour la géométrie et les couleurs
       this.updateBridleGeometry(entity);
       this.updateBridleTensions(entity);
     }
+    */
   }
 
   /**
