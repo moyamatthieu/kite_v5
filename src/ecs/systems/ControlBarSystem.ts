@@ -14,19 +14,20 @@
  *   - Position centrale fixe devant le pilote
  */
 
+// External libraries
 import * as THREE from 'three';
-
-import { BaseSystem } from '@base/BaseSystem';
+import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { Entity } from '@base/Entity';
-import { TransformComponent } from '@/ecs/components/TransformComponent';
-import { MeshComponent } from '@/ecs/components/MeshComponent';
-import { InputSystem } from '@/ecs/systems/InputSystem';
 import { HandlePositions } from '@mytypes/PhysicsTypes';
-
 import { Logger } from '@utils/Logging';
 import { CONFIG } from '@config/SimulationConfig';
 
-export class ControlBarSystem extends BaseSystem {
+import { TransformComponent } from '@/ecs/components/TransformComponent';
+import { MeshComponent } from '@/ecs/components/MeshComponent';
+import { InputSystem } from '@/ecs/systems/InputSystem';
+
+
+export class ControlBarSystem extends BaseSimulationSystem {
   private logger: Logger;
   private controlBarEntity: Entity | null = null;
   private inputSystem: InputSystem | null = null;
@@ -41,15 +42,42 @@ export class ControlBarSystem extends BaseSystem {
 
   initialize(): Promise<void> {
     this.logger.info('ControlBarSystem initialized', 'ControlBarSystem');
+    
+    // Synchroniser la position initiale de la barre avec le mesh Three.js
+    if (this.controlBarEntity) {
+      const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
+      const mesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
+
+      if (mesh && transform) {
+        mesh.syncToObject3D({
+          position: transform.position,
+          quaternion: transform.quaternion,
+          scale: transform.scale
+        });
+      }
+    }
+    
     return Promise.resolve();
   }
 
-  /**
-   * Enregistre l'entité de la barre de contrôle
-   */
+  reset(): void {
+    this.currentRotation = 0;
+    if (this.controlBarEntity) {
+      const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
+      if (transform) {
+        transform.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
+      }
+    }
+  }
+
+  dispose(): void {
+    this.controlBarEntity = null;
+    this.inputSystem = null;
+  }
+
   setControlBarEntity(entity: Entity): void {
-    if (!entity.getComponent<TransformComponent>('transform') || !entity.getComponent<MeshComponent>('mesh')) {
-      throw new Error('ControlBarEntity must have Transform and Mesh components');
+    if (!entity.getComponent<TransformComponent>('transform')) {
+      throw new Error('ControlBarEntity must have Transform component');
     }
     this.controlBarEntity = entity;
   }
@@ -87,11 +115,12 @@ export class ControlBarSystem extends BaseSystem {
     return toKite;
   }
 
-  update(entities: Entity[], deltaTime: number): void {
+  update(context: SimulationContext): void {
     if (!this.controlBarEntity || !this.inputSystem) return;
 
     const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
-    if (!transform) return;
+    const mesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
+    if (!transform || !mesh) return;
 
     // Input utilisateur (-1 à +1)
     const inputState = this.inputSystem.getInputState();
@@ -100,47 +129,23 @@ export class ControlBarSystem extends BaseSystem {
     this.currentRotation = THREE.MathUtils.lerp(
       this.currentRotation,
       targetRotation,
-      this.smoothingFactor
+      this.smoothingFactor * (60 * context.deltaTime) // Rendre le lissage indépendant du framerate
     );
 
-    // Rotation physique vers le kite (si kiteEntity disponible)
-    const physicalRotation = this.computePhysicalRotation();
-
-    // Pondération entre input et physique (80% input, 20% physique)
-    const finalRotation = this.currentRotation * 0.8 + physicalRotation * 0.2;
-
-    // Calculer l'axe de rotation : perpendiculaire au plan défini par l'axe X de la barre et le vecteur vers le kite
-    // Cela permet une rotation "dans l'axe" en regardant le kite
-    const barDirection = new THREE.Vector3(1, 0, 0); // Axe X local de la barre
-    const toKite = this.computeToKiteVector();
-    const rotationAxis = new THREE.Vector3().crossVectors(barDirection, toKite);
-
-    // Gestion du cas dégénéré (axe quasi-nul)
-    if (rotationAxis.length() < 0.01) { // PhysicsConstants.CONTROL_DEADZONE
-      rotationAxis.set(0, 1, 0); // Fallback vers axe Y vertical
-    } else {
-      rotationAxis.normalize();
-    }
-
-    // Appliquer la rotation autour de cet axe (rotation dans l'axe du regard)
-    transform.quaternion.setFromAxisAngle(rotationAxis, finalRotation);
+    // Appliquer la rotation au transform
+    transform.quaternion.setFromEuler(new THREE.Euler(0, this.currentRotation, 0));
 
     // Synchroniser avec le mesh Three.js
-    const mesh = this.controlBarEntity.getComponent<MeshComponent>('mesh');
-    if (mesh) {
-      mesh.syncToObject3D({
-        position: transform.position,
-        quaternion: transform.quaternion,
-        scale: transform.scale
-      });
-    }
+    mesh.syncToObject3D({
+      position: transform.position,
+      quaternion: transform.quaternion,
+      scale: transform.scale
+    });
   }
-
 
   /**
    * Obtient les positions des poignées (pour le rendu des lignes)
-   * Les poignées sont aux extrémités de la barre et suivent la rotation combinée
-   * Puisque la barre est un enfant du pilote, on doit calculer les positions dans le monde
+   * Les poignées sont aux extrémités de la barre et suivent la rotation
    */
   getHandlePositions(): HandlePositions | null {
     if (!this.controlBarEntity) return null;
@@ -157,46 +162,13 @@ export class ControlBarSystem extends BaseSystem {
     handleLeftLocal.applyQuaternion(transform.quaternion);
     handleRightLocal.applyQuaternion(transform.quaternion);
 
-    // Ajouter la position relative de la barre
+    // Ajouter la position de la barre (déjà en coordonnées monde)
     handleLeftLocal.add(transform.position);
     handleRightLocal.add(transform.position);
-
-    // Maintenant convertir en coordonnées monde : ajouter la position du pilote
-    // (puisque la barre est enfant du pilote)
-    const pilotPosition = CONFIG.pilot.position;
-    handleLeftLocal.add(pilotPosition);
-    handleRightLocal.add(pilotPosition);
 
     return {
       left: handleLeftLocal,
       right: handleRightLocal,
     };
-  }
-
-  reset(): void {
-    this.currentRotation = 0;
-
-    if (this.controlBarEntity) {
-      const transform = this.controlBarEntity.getComponent<TransformComponent>('transform');
-      if (transform) {
-        // Position relative par rapport au pilote (la barre est enfant du pilote)
-        transform.position.set(
-          0, // Même X que le pilote
-          CONFIG.controlBar.offsetY, // Au-dessus du pilote
-          CONFIG.controlBar.offsetZ  // Devant le pilote
-        );
-        // Orientation horizontale par défaut vers l'avant (axe Z)
-        const defaultAxis = new THREE.Vector3(0, 0, 1);
-        transform.quaternion.setFromAxisAngle(defaultAxis, CONFIG.controlBar.barRotation);
-      }
-    }
-
-    this.logger.info('ControlBarSystem reset', 'ControlBarSystem');
-  }
-
-  dispose(): void {
-    this.controlBarEntity = null;
-    this.inputSystem = null;
-    this.logger.info('ControlBarSystem disposed', 'ControlBarSystem');
   }
 }

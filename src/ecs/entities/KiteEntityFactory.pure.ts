@@ -15,7 +15,6 @@
 
 import * as THREE from 'three';
 import { Entity } from '@base/Entity';
-import { CONFIG } from '../config/SimulationConfig';
 import { MathUtils } from '@utils/MathUtils';
 import {
   GeometryComponent,
@@ -25,6 +24,8 @@ import {
   TransformComponent,
   PhysicsComponent
 } from '@components/index';
+
+import { CONFIG } from '../config/SimulationConfig';
 
 export interface KiteFactoryParams {
   position?: THREE.Vector3;
@@ -107,17 +108,35 @@ export class PureKiteEntityFactory {
     geometry.setPoint('BORD_DROIT', new THREE.Vector3(width / 2, 0, 0));
 
     // Points d'intersection pour le spreader
-    geometry.setPoint('INTER_GAUCHE', new THREE.Vector3(interGaucheX, centreY, 0));
-    geometry.setPoint('INTER_DROIT', new THREE.Vector3(interDroitX, centreY, 0));
+    geometry.setPoint(
+      'INTER_GAUCHE',
+      new THREE.Vector3(interGaucheX, centreY, 0)
+    );
+    geometry.setPoint(
+      'INTER_DROIT',
+      new THREE.Vector3(interDroitX, centreY, 0)
+    );
 
     // Points de fixation whiskers
     const fixRatio = CONFIG.geometry.twoThirds;
-    geometry.setPoint('FIX_GAUCHE', new THREE.Vector3(fixRatio * interGaucheX, centreY, 0));
-    geometry.setPoint('FIX_DROIT', new THREE.Vector3(fixRatio * interDroitX, centreY, 0));
+    geometry.setPoint(
+      'FIX_GAUCHE',
+      new THREE.Vector3(fixRatio * interGaucheX, centreY, 0)
+    );
+    geometry.setPoint(
+      'FIX_DROIT',
+      new THREE.Vector3(fixRatio * interDroitX, centreY, 0)
+    );
 
     // Points des whiskers
-    geometry.setPoint('WHISKER_GAUCHE', new THREE.Vector3(-width / 4, 0.1, -depth));
-    geometry.setPoint('WHISKER_DROIT', new THREE.Vector3(width / 4, 0.1, -depth));
+    geometry.setPoint(
+      'WHISKER_GAUCHE',
+      new THREE.Vector3(-width / 4, 0.1, -depth)
+    );
+    geometry.setPoint(
+      'WHISKER_DROIT',
+      new THREE.Vector3(width / 4, 0.1, -depth)
+    );
 
     // Points de contrôle (bridage) - calculés par trilatération
     const nezPos = new THREE.Vector3(0, height, 0);

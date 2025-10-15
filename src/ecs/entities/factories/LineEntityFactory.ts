@@ -5,12 +5,15 @@ import { GeometryComponent } from '@components/GeometryComponent';
 import { VisualComponent } from '@components/VisualComponent';
 import { TransformComponent } from '@components/TransformComponent';
 import { CONFIG } from '@config/SimulationConfig';
+import { Logger } from '@utils/Logging';
 
 export class LineEntityFactory {
-  static create(name: 'leftLine' | 'rightLine', attachments: { kitePoint: string; pilotPoint: string }): Entity {
-    console.log(`🔧 LineEntityFactory: Creating ${name}`);
+  static create(
+    name: 'leftLine' | 'rightLine',
+    attachments: { kitePoint: string; pilotPoint: string }
+  ): Entity {
     const lineEntity = new Entity(name);
-    
+
     // Composant LineComponent (physique)
     const lineConfig = {
       length: CONFIG.lines.defaultLength,
@@ -21,18 +24,14 @@ export class LineEntityFactory {
       linearMass: CONFIG.lines.linearMassDensity
     };
     lineEntity.addComponent(new LineComponent(lineConfig, attachments));
-    
+
     // Composant Transform
     lineEntity.addComponent(new TransformComponent({ position: new THREE.Vector3() }));
-    
-    // Composant Geometry (ligne entre 2 points)
+
+    // Composant Geometry (vide pour les lignes dynamiques - géré par LinesRenderSystem)
     const geometry = new GeometryComponent();
-    geometry.setPoint('start', new THREE.Vector3(0, 0, 0));
-    geometry.setPoint('end', new THREE.Vector3(0, 0, -CONFIG.lines.defaultLength));
-    geometry.addConnection('start', 'end');
     lineEntity.addComponent(geometry);
-    console.log(`  ✅ GeometryComponent added with ${geometry.points.size} points`);
-    
+
     // Composant Visual
     const visual = new VisualComponent();
     visual.frameMaterial = {
@@ -40,8 +39,7 @@ export class LineEntityFactory {
       diameter: 0.002 // 2mm de diamètre
     };
     lineEntity.addComponent(visual);
-    console.log(`  ✅ VisualComponent added`);
-    
+
     return lineEntity;
   }
 }

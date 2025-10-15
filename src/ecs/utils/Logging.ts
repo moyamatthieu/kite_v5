@@ -15,7 +15,7 @@ export interface LogEntry {
   message: string;
   timestamp: number;
   category?: string;
-  data?: any;
+  data?: unknown;
 }
 
 export class Logger {
@@ -55,40 +55,46 @@ export class Logger {
   /**
    * Log de debug
    */
-  debug(message: string, category?: string, data?: any): void {
+  debug(message: string, category?: string, data?: unknown): void {
     this.log(LogLevel.DEBUG, message, category, data);
   }
 
   /**
    * Log d'information
    */
-  info(message: string, category?: string, data?: any): void {
+  info(message: string, category?: string, data?: unknown): void {
     this.log(LogLevel.INFO, message, category, data);
   }
 
   /**
    * Log d'avertissement
    */
-  warn(message: string, category?: string, data?: any): void {
+  warn(message: string, category?: string, data?: unknown): void {
     this.log(LogLevel.WARN, message, category, data);
   }
 
   /**
    * Log d'erreur
    */
-  error(message: string, category?: string, data?: any): void {
+  error(message: string, category?: string, data?: unknown): void {
     this.log(LogLevel.ERROR, message, category, data);
   }
 
   /**
    * Log générique
    */
-  private log(level: LogLevel, message: string, category?: string, data?: any): void {
+  private log(
+    level: LogLevel,
+    message: string,
+    category?: string,
+    data?: unknown
+  ): void {
     // Vérifier le niveau
     if (level < this.logLevel) return;
 
-    // Vérifier la catégorie si spécifiée
-    if (category && !this.categories.has(category)) return;
+    // Vérifier la catégorie si des catégories sont configurées
+    // Si aucune catégorie n'est configurée, on affiche tout
+    if (this.categories.size > 0 && category && !this.categories.has(category)) return;
 
     const entry: LogEntry = {
       level,
@@ -110,15 +116,19 @@ export class Logger {
 
     switch (level) {
       case LogLevel.DEBUG:
+        // eslint-disable-next-line no-console
         console.debug(`🐛 ${formattedMessage}`, data || '');
         break;
       case LogLevel.INFO:
+        // eslint-disable-next-line no-console
         console.info(`ℹ️ ${formattedMessage}`, data || '');
         break;
       case LogLevel.WARN:
+        // eslint-disable-next-line no-console
         console.warn(`⚠️ ${formattedMessage}`, data || '');
         break;
       case LogLevel.ERROR:
+        // eslint-disable-next-line no-console
         console.error(`❌ ${formattedMessage}`, data || '');
         break;
     }

@@ -44,4 +44,9 @@ export class PhysicsConstants {
   static readonly MAX_ACCELERATION = 100; // m/s² - Accélération maximale (~10G)
   static readonly MAX_ANGULAR_ACCELERATION = 5; // rad/s² - Accélération angulaire réaliste
   static readonly MAX_TORQUE = 20; // N·m - Garde-fou sur le couple (émergent)
+
+  // Conversion
+  static readonly KMH_TO_MS = 1 / 3.6;
+  static readonly DEG_TO_RAD = Math.PI / 180;
+  static readonly RAD_TO_DEG = 180 / Math.PI;
 }

@@ -1,9 +1,9 @@
 import * as THREE from "three";
+import type { KiteState } from "@mytypes/PhysicsTypes";
 
 import { CONFIG } from "../config/SimulationConfig";
 import { DebugRenderer } from "../rendering/DebugRenderer";
 import { KiteGeometry } from "../config/KiteGeometry";
-import type { KiteState } from "@mytypes/PhysicsTypes";
 
 export interface BridleLengths {
   nez: number;

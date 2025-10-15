@@ -18,7 +18,7 @@
  *   - Damping interne (dissipation d'énergie)
  *
  * Relation avec les autres modules :
- *   - Opère sur des objets Line
+ *   - Opère sur des LineComponent (ECS)
  *   - Appelé par LineSystem pour calculer forces
  *   - Pas de dépendance sur la scène 3D
  *
@@ -26,17 +26,13 @@
  *   - Pure function : Entrées → Sorties, pas d'effet de bord
  *   - Testable unitairement (pas de mock Three.js requis)
  *   - Single Responsibility : Calculs physiques uniquement
- *
- * Voir aussi :
- *   - src/objects/mechanical/Line.ts (entité métier)
- *   - docs/LINE_PHYSICS_AUDIT_2025-10-01.md (références physiques)
  */
 
 import { Vector3 } from 'three';
+import { LineConfig } from '@components/LineComponent';
 
 import { PhysicsConstants } from '../config/PhysicsConstants';
-
-import { Line } from '@objects/Line';
+import { CONFIG } from '@config/SimulationConfig';
 
 
 /**
@@ -76,7 +72,7 @@ export interface TensionResult {
  */
 export class LinePhysics {
   /** Constante gravitationnelle (m/s²) */
-  private static readonly GRAVITY = 9.81;
+  private static readonly GRAVITY = CONFIG.physics.gravity;
 
   /** Epsilon fin pour calculs de précision (réutilise PhysicsConstants) */
   private static readonly EPSILON = PhysicsConstants.EPSILON_FINE;
@@ -89,14 +85,14 @@ export class LinePhysics {
    * - k×Δx : Composante élastique (si ligne tendue)
    * - c×v_radial : Damping (dissipation d'énergie)
    *
-   * @param line - Ligne à analyser
+   * @param lineConfig - Configuration de la ligne à analyser
    * @param startPos - Position point d'attache départ (kite ou barre)
    * @param endPos - Position point d'attache arrivée (barre ou kite)
    * @param relativeVelocity - Vitesse relative entre les deux points (pour damping)
    * @returns Résultat du calcul (force, tension, extension)
    */
   calculateTensionForce(
-    line: Line,
+    lineConfig: LineConfig,
     startPos: Vector3,
     endPos: Vector3,
     relativeVelocity: Vector3 = new Vector3()
@@ -117,7 +113,7 @@ export class LinePhysics {
     }
 
     const lineDir = lineVector.clone().normalize();
-    const restLength = line.config.length;
+    const restLength = lineConfig.length;
 
     // 1. Composante élastique : F_elastic = F₀ + k×Δx
     let elasticTension: number;
@@ -127,23 +123,23 @@ export class LinePhysics {
     if (currentLength > restLength) {
       // Ligne tendue : ajouter force élastique à la pré-tension
       extension = currentLength - restLength;
-      elasticTension = line.config.preTension + line.config.stiffness * extension;
+      elasticTension = lineConfig.preTension + lineConfig.stiffness * extension;
       isTaut = true;
     } else {
       // Ligne molle : maintenir pré-tension minimale
       extension = 0;
-      elasticTension = line.config.preTension;
+      elasticTension = lineConfig.preTension;
       isTaut = false;
     }
 
     // 2. Composante de damping : F_damp = -c × v_along_line
     const velocityAlongLine = relativeVelocity.dot(lineDir);
-    const dampingTension = -line.config.dampingCoeff * velocityAlongLine;
+    const dampingTension = -lineConfig.dampingCoeff * velocityAlongLine;
 
     // 3. Tension totale (limitée par maxTension)
     const totalTension = Math.min(
       Math.max(elasticTension + dampingTension, 0), // Jamais négative
-      line.config.maxTension
+      lineConfig.maxTension
     );
 
     // 4. Force vectorielle
@@ -174,17 +170,17 @@ export class LinePhysics {
    *
    * @example
    * ```typescript
-   * const sag = physics.calculateCatenarySag(line, 100);
+   * const sag = physics.calculateCatenarySag(lineConfig, 100);
    * console.log(`Sag: ${sag * 1000}mm`); // ~1.4mm pour Dyneema 15m @ 100N
    * ```
    */
-  calculateCatenarySag(line: Line, tension: number): number {
+  calculateCatenarySag(lineConfig: LineConfig, tension: number): number {
     if (tension < LinePhysics.EPSILON) {
       return 0; // Pas de tension = pas d'affaissement défini
     }
 
-    const rho = line.config.linearMassDensity;
-    const L = line.config.length;
+    const rho = lineConfig.linearMass;
+    const L = lineConfig.length;
 
     // Formule caténaire simplifiée (ligne horizontale)
     const sag = (rho * LinePhysics.GRAVITY * L * L) / (8 * tension);
@@ -198,7 +194,7 @@ export class LinePhysics {
    * Équation complète : y(x) = a × cosh(x/a) - a
    * où a = T / (ρ × g)
    *
-   * @param line - Ligne à analyser
+   * @param lineConfig - Configuration de la ligne à analyser
    * @param startPos - Position départ
    * @param endPos - Position arrivée
    * @param tension - Tension actuelle (N)
@@ -210,25 +206,25 @@ export class LinePhysics {
    * Pour lignes molles (T < 50N), l'affaissement devient visible
    */
   calculateCatenaryPoints(
-    line: Line,
+    lineConfig: LineConfig,
     startPos: Vector3,
     endPos: Vector3,
     tension: number,
-    segments: number = 10
+    segments: number = PhysicsConstants.CATENARY_SEGMENTS
   ): Vector3[] {
     const directDistance = startPos.distanceTo(endPos);
 
     // Si ligne tendue ou très courte, approximation linéaire suffit
-    if (directDistance >= line.config.length * 0.98 || tension > 100) {
+    if (directDistance >= lineConfig.length * 0.98 || tension > 100) {
       return [startPos.clone(), endPos.clone()];
     }
 
     // Paramètre de la caténaire : a = T / (ρ × g)
-    const rho = line.config.linearMassDensity;
+    const rho = lineConfig.linearMass;
     tension / (rho * LinePhysics.GRAVITY);
 
     // Calcul sag maximal
-    const sag = this.calculateCatenarySag(line, tension);
+    const sag = this.calculateCatenarySag(lineConfig, tension);
 
     const points: Vector3[] = [];
 
@@ -253,12 +249,12 @@ export class LinePhysics {
    *
    * E = ½ × k × Δx²
    *
-   * @param line - Ligne à analyser
+   * @param lineConfig - Configuration de la ligne à analyser
+   * @param extension - Extension actuelle (m)
    * @returns Énergie en Joules
    */
-  calculateElasticEnergy(line: Line): number {
-    const extension = line.getExtension();
-    return 0.5 * line.config.stiffness * extension * extension;
+  calculateElasticEnergy(lineConfig: LineConfig, extension: number): number {
+    return 0.5 * lineConfig.stiffness * extension * extension;
   }
 
   /**
@@ -266,42 +262,43 @@ export class LinePhysics {
    *
    * f ≈ (1/2π) × √(k/m_effective)
    *
-   * @param line - Ligne à analyser
+   * @param lineConfig - Configuration de la ligne à analyser
    * @param attachedMass - Masse attachée au bout (kg)
    * @returns Fréquence en Hz
    */
-  calculateNaturalFrequency(line: Line, attachedMass: number): number {
+  calculateNaturalFrequency(
+    lineConfig: LineConfig,
+    attachedMass: number
+  ): number {
     if (attachedMass < LinePhysics.EPSILON) {
       return 0;
     }
 
     // Masse effective de la ligne (1/3 de la masse totale)
-    const lineMass = line.config.linearMassDensity * line.config.length;
+    const lineMass = lineConfig.linearMass * lineConfig.length;
     const effectiveMass = attachedMass + lineMass / 3;
 
-    const omega = Math.sqrt(line.config.stiffness / effectiveMass);
+    const omega = Math.sqrt(lineConfig.stiffness / effectiveMass);
     const frequency = omega / (2 * Math.PI);
 
     return frequency;
   }
 
   /**
-   * Vérifie si la ligne est dans un état physique valide
+   * Vérifie si la configuration de ligne est dans un état physique valide
    *
-   * @param line - Ligne à valider
+   * @param lineConfig - Configuration à valider
    * @returns true si valide, false sinon
    */
-  validateLine(line: Line): boolean {
-    const config = line.config;
-
+  validateLine(lineConfig: LineConfig): boolean {
     return (
-      config.length > 0 &&
-      config.stiffness > 0 &&
-      config.preTension >= 0 &&
-      config.maxTension > config.preTension &&
-      config.dampingCoeff >= 0 &&
-      config.dampingCoeff <= 1 &&
-      config.linearMassDensity > 0
+      lineConfig.length > 0 &&
+      lineConfig.stiffness > 0 &&
+      lineConfig.preTension >= 0 &&
+      lineConfig.maxTension > lineConfig.preTension &&
+      lineConfig.dampingCoeff >= 0 &&
+      lineConfig.dampingCoeff <= 1 &&
+      lineConfig.linearMass > 0
     );
   }
 }

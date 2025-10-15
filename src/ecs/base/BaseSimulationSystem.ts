@@ -15,13 +15,13 @@ export interface SimulationContext {
 }
 
 export abstract class BaseSimulationSystem {
-  protected name: string;
+  readonly name: string;
+  readonly order: number; // Renommé de 'priority' pour plus de clarté
   protected enabled: boolean = true;
-  protected priority: number = 0; // Ordre d'exécution (plus petit = plus prioritaire)
 
-  constructor(name: string, priority: number = 0) {
+  constructor(name: string, order: number = 0) {
     this.name = name;
-    this.priority = priority;
+    this.order = order;
   }
 
   /**
@@ -59,8 +59,8 @@ export abstract class BaseSimulationSystem {
     return this.name;
   }
 
-  getPriority(): number {
-    return this.priority;
+  getOrder(): number {
+    return this.order;
   }
 
   /**

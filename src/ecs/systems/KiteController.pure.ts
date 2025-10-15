@@ -16,7 +16,7 @@ import { MeshComponent } from '@components/MeshComponent';
 import { CONFIG } from '@config/SimulationConfig';
 import { PhysicsConstants } from '@config/PhysicsConstants';
 import { KiteState, HandlePositions } from '@mytypes/PhysicsTypes';
-import { ConstraintSolver } from '@systems/ConstraintSolver';
+import { PureConstraintSolver } from '@systems/ConstraintSolver.pure';
 
 /**
  * Contrôleur physique ECS pur pour le cerf-volant
@@ -90,15 +90,23 @@ export class PureKiteController {
 
     // Résolution itérative des contraintes PBD
     for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
-      // TODO: Adapter ConstraintSolver pour travailler avec des entités ECS
-      // Pour l'instant, on applique directement la nouvelle position
-      // Les contraintes seront réintégrées dans une version ECS pure de ConstraintSolver
-    }
+      // Appliquer les contraintes de lignes (PBD)
+      PureConstraintSolver.enforceLineConstraints(
+        this.kiteEntity,
+        newPosition,
+        {
+          velocity: physics.velocity,
+          angularVelocity: physics.angularVelocity
+        },
+        handles
+      );
 
-    // Collision avec le sol
-    if (newPosition.y < 0) {
-      newPosition.y = 0;
-      physics.velocity.y = Math.max(0, physics.velocity.y);
+      // Appliquer la collision au sol DANS la boucle PBD pour éviter que le kite passe en dessous
+      PureConstraintSolver.handleGroundCollision(
+        this.kiteEntity,
+        newPosition,
+        physics.velocity
+      );
     }
 
     // Valider et appliquer la position

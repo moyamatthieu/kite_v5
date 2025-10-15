@@ -20,6 +20,7 @@
  *   - src/simulation/types/WindTypes.ts
  */
 import * as THREE from "three";
+
 import { WindParams } from './WindTypes';
 
 // Ré-exporter WindParams pour que d'autres modules puissent l'importer depuis PhysicsTypes

@@ -10,8 +10,7 @@
  *   - Met à jour la position basée sur la position de la barre de contrôle
  */
 
-import * as THREE from 'three';
-
+import * as THREE from "three";
 import { BaseSimulationSystem, SimulationContext } from '@ecs/base/BaseSimulationSystem';
 import { Entity } from '@base/Entity';
 import { TransformComponent } from '@ecs/components/TransformComponent';
@@ -29,18 +28,15 @@ export class PilotSystem extends BaseSimulationSystem {
   }
 
   async initialize(): Promise<void> {
-    // Initialiser la position du pilote à (0, 0, 0)
+    this.logger.info("PilotSystem initialized", "PilotSystem");
+    
+    // Synchroniser la position initiale du pilote avec le mesh Three.js
     if (this.pilotEntity) {
-      // Mettre à jour la position via le TransformComponent
       const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
-      if (transform) {
-        transform.position.set(0, 0, 0); // Exemple de mise à jour de la position
-      }
-
-      // Synchroniser avec le mesh Three.js
       const mesh = this.pilotEntity.getComponent<MeshComponent>('mesh');
 
       if (mesh && transform) {
+        this.logger.debug(`  Syncing pilot position: (${transform.position.x}, ${transform.position.y}, ${transform.position.z})`, "PilotSystem");
         mesh.syncToObject3D({
           position: transform.position,
           quaternion: transform.quaternion,

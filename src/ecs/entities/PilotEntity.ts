@@ -6,12 +6,12 @@
  */
 
 import * as THREE from 'three';
-
 import { CONFIG } from '@config/SimulationConfig';
+import { Entity } from '@base/Entity';
+
 import { TransformComponent } from '../components/TransformComponent';
 import { MeshComponent } from '../components/MeshComponent';
 
-import { Entity } from '@base/Entity';
 
 export class PilotEntity extends Entity {
   constructor() {
@@ -23,17 +23,25 @@ export class PilotEntity extends Entity {
       CONFIG.pilot.height,
       CONFIG.pilot.depth
     );
+    
+    // Translater la géométrie vers le haut pour que l'origine soit aux pieds
+    // Par défaut BoxGeometry est centrée, on la monte de height/2
+    pilotGeometry.translate(0, CONFIG.pilot.height / 2, 0);
+    
     const pilotMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a4a4a,
-      roughness: 0.8
+      color: 0x2196F3, // Bleu (plus visible que le gris foncé)
+      roughness: 0.7,
+      metalness: 0.1
     });
 
     const pilotMesh = new THREE.Mesh(pilotGeometry, pilotMaterial);
     pilotMesh.name = 'Pilot';
     pilotMesh.castShadow = true;
+    pilotMesh.receiveShadow = true;
+    // Note: La position sera synchronisée depuis TransformComponent par PilotSystem
 
-    // Ajouter le composant Transform
-    // Position initiale à (0, 0, 0) - sera mise à jour par PilotSystem
+    // Position initiale : pieds au sol (Y=0)
+    // Grâce à la translation de la géométrie, le mesh positionné à (0,0,0) aura ses pieds au sol
     const transform = new TransformComponent({
       position: new THREE.Vector3(0, 0, 0),
       rotation: 0,

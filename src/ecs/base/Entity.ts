@@ -41,6 +41,27 @@ export class Entity {
   }
 
   /**
+   * Récupère tous les composants de l'entité
+   */
+  getAllComponents(): Component[] {
+    return Array.from(this.components.values());
+  }
+
+  /**
+   * Récupère tous les types de composants de l'entité
+   */
+  getComponentTypes(): ComponentType[] {
+    return Array.from(this.components.keys());
+  }
+
+  /**
+   * Vérifie si l'entité possède un composant donné
+   */
+  hasComponent(type: ComponentType): boolean {
+    return this.components.has(type);
+  }
+
+  /**
    * Supprime un composant
    */
   removeComponent(type: ComponentType): void {

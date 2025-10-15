@@ -18,7 +18,8 @@ import * as THREE from "three";
 import { KiteGeometry } from "../config/KiteGeometry";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
-import { SurfaceForce } from "../types/PhysicsTypes";
+import { SurfaceForce } from '../types/PhysicsTypes';
+import { Logger } from '@utils/Logging';
 
 /**
  * Calculateur de forces aérodynamiques amélioré
@@ -28,7 +29,8 @@ import { SurfaceForce } from "../types/PhysicsTypes";
 export class AerodynamicsCalculator {
   // Constantes de calculs aérodynamiques
   private static readonly HALF_AIR_DENSITY = 0.5 * CONFIG.physics.airDensity;
-  private static readonly MIN_WIND_SPEED = 0.01; // m/s - seuil minimal pour calculs aéro
+  private static readonly MIN_WIND_SPEED = 0.1; // m/s - seuil minimal pour calculs aéro
+  private static logger = Logger.getInstance();
 
   // Utiliser désormais les coefficients issus de CONFIG (évite magic numbers)
 
@@ -96,7 +98,7 @@ export class AerodynamicsCalculator {
    * (dynamicCP supprimé pour un modèle purement émergent et plus simple à régler)
    */
   private static calculateCenterOfPressure(
-    _surface: any,
+    _surface: unknown,
     _alpha: number,
     centroid: THREE.Vector3
   ): THREE.Vector3 {
@@ -156,13 +158,13 @@ export class AerodynamicsCalculator {
     surfaceForces: SurfaceForce[];
   } {
     const windSpeed = apparentWind.length();
-    if (windSpeed < 0.1) {
+    if (windSpeed < AerodynamicsCalculator.MIN_WIND_SPEED) {
       return {
         lift: new THREE.Vector3(),
         drag: new THREE.Vector3(),
-        gravity: new THREE.Vector3(),  // Pas de gravité si vent nul
+        gravity: new THREE.Vector3(), // Pas de gravité si vent nul
         torque: new THREE.Vector3(),
-        surfaceForces: [],
+        surfaceForces: []
       };
     }
 
@@ -187,14 +189,14 @@ export class AerodynamicsCalculator {
     // Collection des forces par surface pour le debug
     const surfaceForces: SurfaceForce[] = [];
 
-  // Modèle physique :
-  // - Les forces aérodynamiques (portance, traînée) sont calculées et appliquées pour chaque surface triangulaire
-  // - La masse de chaque surface est proportionnelle à son aire
-  // - Les forces sont appliquées au centre géométrique du triangle (barycentre)
-  // - Les couples émergent naturellement de la distribution spatiale des forces
-  // - Voir PHYSICS_MODEL.md §4.2 pour les équations et principes
-  // On examine chaque triangle du cerf-volant un par un
-  // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
+    // Modèle physique :
+    // - Les forces aérodynamiques (portance, traînée) sont calculées et appliquées pour chaque surface triangulaire
+    // - La masse de chaque surface est proportionnelle à son aire
+    // - Les forces sont appliquées au centre géométrique du triangle (barycentre)
+    // - Les couples émergent naturellement de la distribution spatiale des forces
+    // - Voir PHYSICS_MODEL.md §4.2 pour les équations et principes
+    // On examine chaque triangle du cerf-volant un par un
+    // C'est comme vérifier comment le vent frappe chaque panneau d'un parasol
     KiteGeometry.SUBDIVIDED_SURFACES.forEach((surface, surfaceIndex) => {
       // 🔴 MAILLAGE FIN : Distribuer la masse proportionnellement à l'aire
       // Trouver quelle surface originale contient ce sous-triangle
@@ -214,14 +216,15 @@ export class AerodynamicsCalculator {
       // Utiliser le vent apparent GLOBAL pour toutes les surfaces
       const localApparentWind = apparentWind.clone();
       const localWindSpeed = localApparentWind.length();
-      
-      if (localWindSpeed < 0.1) {
+
+      if (localWindSpeed < AerodynamicsCalculator.MIN_WIND_SPEED) {
         return; // Pas de vent sur cette surface
       }
-      
+
       const localWindDir = localApparentWind.clone().normalize();
-      const localDynamicPressure = 0.5 * CONFIG.physics.airDensity * localWindSpeed * localWindSpeed;
-      
+      const localDynamicPressure =
+        0.5 * CONFIG.physics.airDensity * localWindSpeed * localWindSpeed;
+
       // Pour comprendre comment le vent frappe ce triangle,
       // on doit savoir dans quelle direction il "regarde"
       // (comme l'orientation d'un panneau solaire)
@@ -246,17 +249,19 @@ export class AerodynamicsCalculator {
 
       // 🎯 NOUVEAUX COEFFICIENTS AÉRODYNAMIQUES RÉALISTES
       // Au lieu des formules simplifiées, utiliser des coefficients expérimentaux
-      const { CL, CD } = AerodynamicsCalculator.calculateAerodynamicCoefficients(alpha);
-      
+      const { CL, CD } =
+        AerodynamicsCalculator.calculateAerodynamicCoefficients(alpha);
+
       // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
       // if (surfaceIndex === 0) {
       //   const alphaDeg = Math.asin(sinAlpha) * 180 / Math.PI;
-
+      //   this.logger.debug(`Surface 0: alpha=${alphaDeg.toFixed(1)}°, CL=${CL.toFixed(2)}, CD=${CD.toFixed(2)}`);
       // }
-      
+
       // Direction : normale à la surface, orientée face au vent
-      const windFacingNormal = windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
-      
+      const windFacingNormal =
+        windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
+
       // DIRECTION LIFT : Perpendiculaire au vent, dans le plan (vent, normale)
       // Méthode : liftDir = normalize(windFacingNormal - (windFacingNormal·windDir)×windDir)
       const liftDir = windFacingNormal.clone()
@@ -468,8 +473,9 @@ export class AerodynamicsCalculator {
     ) {
       const eff = weightedNormal.normalize();
       const dot = Math.max(-1, Math.min(1, eff.dot(windDir)));
-      const phiDeg = (Math.acos(dot) * 180) / Math.PI;
-      aoaDeg = Math.max(0, 90 - phiDeg);
+      const phi = Math.acos(dot); // en radians
+      const aoaRad = Math.max(0, Math.PI / 2 - phi);
+      aoaDeg = aoaRad * PhysicsConstants.RAD_TO_DEG;
     }
 
     return { apparentSpeed: windSpeed, liftMag, dragMag, lOverD, aoaDeg };
@@ -481,8 +487,8 @@ export class AerodynamicsCalculator {
    */
   static calculateForcesFromComponents(
     apparentWind: THREE.Vector3,
-    transform: any, // TransformComponent
-    aeroComponent: any, // AerodynamicsComponent
+    transform: { quaternion: THREE.Quaternion }, // TransformComponent
+    aeroComponent: { surfaces: { normal: THREE.Vector3; area: number; centroid: THREE.Vector3 }[], totalArea: number }, // AerodynamicsComponent
     _kiteVelocity: THREE.Vector3,
     _angularVelocity: THREE.Vector3
   ): {
@@ -492,7 +498,7 @@ export class AerodynamicsCalculator {
     torque: THREE.Vector3;
   } {
     const windSpeed = apparentWind.length();
-    if (windSpeed < 0.1) {
+    if (windSpeed < AerodynamicsCalculator.MIN_WIND_SPEED) {
       return {
         lift: new THREE.Vector3(),
         drag: new THREE.Vector3(),
@@ -510,7 +516,7 @@ export class AerodynamicsCalculator {
     const totalTorque = new THREE.Vector3();
 
     // Itérer sur les surfaces du composant
-    aeroComponent.surfaces.forEach((surface: any) => {
+    aeroComponent.surfaces.forEach((surface) => {
       // Transformer normale en coordonnées monde
       const normal = surface.normal.clone().applyQuaternion(transform.quaternion);
 
@@ -554,7 +560,10 @@ export class AerodynamicsCalculator {
       // Couple
       const centroid = surface.centroid.clone().applyQuaternion(transform.quaternion);
       const aeroForce = liftForce.clone().add(dragForce);
-      const torque = this.calculateTorque(centroid, aeroForce.add(gravity));
+      const torque = this.calculateTorque(
+        centroid,
+        aeroForce.add(gravity)
+      );
       totalTorque.add(torque);
     });
 

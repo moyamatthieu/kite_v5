@@ -13,17 +13,19 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      '@core': resolve(__dirname, 'src/core'),
-      '@base': resolve(__dirname, 'src/base'),
+      '@base': resolve(__dirname, 'src/ecs/base'),
+      '@core': resolve(__dirname, 'src/ecs/core'),
       '@factories': resolve(__dirname, 'src/ecs/factories'),
       '@types': resolve(__dirname, 'src/ecs/types'),
+      '@mytypes': resolve(__dirname, 'src/ecs/types'),
       '@utils': resolve(__dirname, 'src/ecs/utils'),
       '@config': resolve(__dirname, 'src/ecs/config'),
       '@systems': resolve(__dirname, 'src/ecs/systems'),
       '@entities': resolve(__dirname, 'src/ecs/entities'),
       '@components': resolve(__dirname, 'src/ecs/components'),
       '@ecs': resolve(__dirname, 'src/ecs'),
-      '@ui': resolve(__dirname, 'src/ecs/ui')
+      '@ui': resolve(__dirname, 'src/ecs/ui'),
+      '@rendering': resolve(__dirname, 'src/ecs/rendering')
     }
   }
 });

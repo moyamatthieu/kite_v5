@@ -29,9 +29,10 @@
  *   - src/simulation/config/PhysicsConstants.ts
  *   - src/simulation/config/KiteGeometry.ts
  */
-import * as THREE from "three";
+import * as THREE from 'three';
 
-import { KiteGeometry } from "./KiteGeometry";
+import { KiteGeometry } from './KiteGeometry';
+import { PhysicsConstants } from './PhysicsConstants';
 
 /**
  * Configuration centralisée de la simulation Kite
@@ -50,13 +51,14 @@ export const PILOT_CONFIG = {
 
 // Configuration de la barre de contrôle
 export const CONTROL_BAR_CONFIG = {
-  width: 0.6, // m - Largeur de la barre
-  offsetY: 1.2, // m - Hauteur de la barre par rapport au pilote (au niveau des mains)
+  width: 0.6, // m - Largeur de la barre (60cm)
+  offsetY: 1.0, // m - Hauteur de la barre par rapport au sol (au niveau des mains)
   offsetZ: -0.5, // m - Décalage en z (devant le pilote en z négatif)
-  barRadius: 0.02, // m - Rayon du cylindre de la barre
+  barRadius: 0.015, // m - Rayon du cylindre de la barre (15mm)
   barRotation: Math.PI / 2, // rad - Rotation pour orientation horizontale
-  handleRadius: 0.03, // m - Rayon des poignées
-  handleLength: 0.15, // m - Longueur des poignées
+  handleRadius: 0.025, // m - Rayon des poignées (25mm)
+  handleLength: 0.12, // m - Longueur des poignées (12cm)
+  handleOffset: 0.25, // m - Distance des poignées depuis le centre de la barre
 };
 
 /**
@@ -69,11 +71,11 @@ export const CONFIG = {
   physics: {
     gravity: 9.81, // La gravité terrestre (fait tomber les objets)
     airDensity: 1.225, // Densité de l'air (l'air épais pousse plus fort)
-    deltaTimeMax: 0.016, // Mise à jour max 60 fois par seconde (pour rester fluide)
+    deltaTimeMax: 1 / 60, // Mise à jour max 60 fois par seconde (pour rester fluide)
     controlDeadzone: 0.01, // m - Petite zone de tolérance pour la tension des lignes
     // Amortissement réaliste pour un cerf-volant
     linearDampingCoeff: 2, // Amortissement linéaire modéré pour stabilité
-    angularDragFactor: 2, // Amortissement angulaire pour éviter les oscillations
+    angularDragFactor: 2 // Amortissement angulaire pour éviter les oscillations
   },
   aero: {
     // Forces aérodynamiques réalistes pour un cerf-volant delta
@@ -85,18 +87,18 @@ export const CONFIG = {
         a0: 0.0,
         a1: 0.1,
         a2: 0.0,
-        a3: -0.005,
+        a3: -0.005
       },
       drag: {
         b0: 0.01,
         b1: 0.0,
         b2: 0.05,
-        b3: 0.002,
+        b3: 0.002
       },
-      alphaStall: Math.PI / 6, // 30°
-      alphaMax: Math.PI / 3,   // 60°
+      alphaStall: 30 * PhysicsConstants.DEG_TO_RAD, // 30°
+      alphaMax: 60 * PhysicsConstants.DEG_TO_RAD, // 60°
       clMax: 1.2,
-      cdMax: 2.0,
+      cdMax: 2.0
     },
     // Centre de pression: simplifié → toujours le centroïde géométrique (dynamicCP supprimé)
   },
@@ -110,16 +112,16 @@ export const CONFIG = {
     mass: KiteGeometry.TOTAL_MASS, // kg - Calculée automatiquement (~0.31 kg après correction)
     area: KiteGeometry.TOTAL_AREA, // m² - Surface totale (calculée automatiquement)
     inertia: KiteGeometry.INERTIA, // kg·m² - Moment d'inertie (I ≈ m·r², calculé automatiquement)
-    minHeight: 0, // m - Altitude minimale (plus haut pour éviter le sol)
+    minHeight: 0.5, // m - Altitude minimale pour éviter collision avec le sol (marge de sécurité)
     // 🔧 MAILLAGE FIN PARAMÉTRABLE (défaut = niveau 1 = 16 triangles)
-    defaultMeshSubdivisionLevel: 0, // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
+    defaultMeshSubdivisionLevel: 0 // Niveau par défaut (0=4, 1=16, 2=64, 3=256 triangles)
   },
   bridle: {
     defaultLengths: Object.freeze({
-      nez: 0.70,
-      inter: 0.65,
-      centre: 0.65,
-    }),
+      nez: 0.65,    // m - Longueur bride NEZ → CTRL (alignée avec inter et centre)
+      inter: 0.65,  // m - Longueur bride INTER → CTRL
+      centre: 0.65  // m - Longueur bride CENTRE → CTRL
+    })
   },
   lines: {
     defaultLength: 15, // m - Longueur réaliste pour cerf-volant sport
@@ -127,7 +129,7 @@ export const CONFIG = {
     preTension: 80, // N - Pré-tension réaliste
     maxTension: 1200, // N - Tension max avant rupture
     dampingCoeff: 0.08, // Coefficient d'amortissement réaliste
-    linearMassDensity: 0.0006, // kg/m - Masse linéique réaliste
+    linearMassDensity: 0.0006 // kg/m - Masse linéique réaliste
   },
   wind: {
     defaultSpeed: 20, // km/h - Vitesse idéale pour cerf-volant sport
@@ -138,7 +140,7 @@ export const CONFIG = {
     turbulenceFreqY: 0.3,
     turbulenceFreqZ: 0.3,
     turbulenceIntensityXZ: 0.2,
-    turbulenceIntensityY: 0.2,
+    turbulenceIntensityY: 0.2
   },
   debugVectors: true, // Active ou désactive l'affichage des vecteurs de debug
   pilot: PILOT_CONFIG,
@@ -148,9 +150,14 @@ export const CONFIG = {
     initialDistanceFactor: 0.98, // Sans unité - Lignes presque tendues au départ (98% de la longueur)
     initialKiteZ: null, // m - Position Z calculée automatiquement pour lignes tendues (null = calcul auto)
   },
-  visualization: {
+  rendering: {
+    shadowMapSize: 2048, // Augmenté pour des ombres plus nettes
+    antialias: true,
+    shadows: true, // Activer/désactiver les ombres
+    fogStart: 100,
+    fogEnd: 1000,
     lineWidth: 2, // pixels - Largeur des lignes de contrôle
-    surfaceVectorOffset: 0.02, // m - Décalage des flèches de forces par face le long de la normale (visibilité)
+    surfaceVectorOffset: 0.02, // m - Décalage des flèches de forces
   },
   debug: {
     // Seuils de tension des brides pour couleurs visuelles
@@ -159,24 +166,24 @@ export const CONFIG = {
     bridleTensionHigh: 100, // N - Seuil tension élevée (rouge)
     // Seuils pour vecteurs debug
     minVectorLength: 0.01, // m - Longueur minimale pour afficher un vecteur
-    minVelocityDisplay: 0.01, // m/s - Vitesse minimale pour afficher vecteur vitesse
+    minVelocityDisplay: 0.01 // m/s - Vitesse minimale pour afficher vecteur vitesse
   },
   input: {
     rotationSpeed: 0.5, // rad/s - Vitesse de rotation de la barre (input utilisateur)
     returnSpeed: 3.0, // rad/s - Vitesse de retour au centre de la barre
-    maxRotation: Math.PI / 3, // rad - Rotation maximale de la barre (°)
+    maxRotation: 60 * PhysicsConstants.DEG_TO_RAD // rad - Rotation maximale de la barre (60°)
   },
   kiteInertia: {
     gyrationDivisor: Math.sqrt(2), // Sans unité - Diviseur pour rayon de giration (wingspan / √2)
-    inertiaFactor: 1, // Sans unité - Facteur ajustement inertie (compromis stabilité/réactivité)
+    inertiaFactor: 1 // Sans unité - Facteur ajustement inertie (compromis stabilité/réactivité)
   },
 
   // Constantes de conversion et calculs fréquents
   conversions: {
-    kmhToMs: 1 / 3.6, // Conversion km/h vers m/s
-    radToDeg: 180 / Math.PI, // Conversion radians vers degrés
-    degToRad: Math.PI / 180, // Conversion degrés vers radians
-    gravityFactor: 9.81, // Accélération gravitationnelle standard
+    kmhToMs: PhysicsConstants.KMH_TO_MS, // Conversion km/h vers m/s
+    radToDeg: PhysicsConstants.RAD_TO_DEG, // Conversion radians vers degrés
+    degToRad: PhysicsConstants.DEG_TO_RAD, // Conversion degrés vers radians
+    gravityFactor: 9.81 // Accélération gravitationnelle standard
   },
 
   // Valeurs par défaut pour les calculs
@@ -187,7 +194,7 @@ export const CONFIG = {
     catenarySagFactor: 0.02, // Facteur de flèche pour les caténaires (2%)
     smoothingFactor: 0.15, // Facteur de lissage pour les animations
     restitutionFactor: 0.3, // Coefficient de restitution pour les collisions
-    groundFriction: 0.85, // Friction du sol
+    groundFriction: 0.85 // Friction du sol
   },
 
   // Couleurs fréquemment utilisées
@@ -202,7 +209,7 @@ export const CONFIG = {
     debugRed: 0xff0000, // Rouge pour le debug
     debugGreen: 0x00ff00, // Vert pour le debug
     debugBlue: 0x0000ff, // Bleu pour le debug
-    debugYellow: 0xffff00, // Jaune pour le debug
+    debugYellow: 0xffff00 // Jaune pour le debug
   },
 
   // Seuils et limites fréquemment utilisés
@@ -212,7 +219,7 @@ export const CONFIG = {
     maxLineSegments: 50, // Nombre maximum de segments pour les lignes
     epsilon: 1e-6, // Seuil numérique général
     epsilonFine: 1e-8, // Seuil fin pour calculs précis
-    controlDeadzone: 0.001, // Zone morte pour les contrôles
+    controlDeadzone: 0.001 // Zone morte pour les contrôles
   },
 
   // Constantes géométriques fréquentes
@@ -224,37 +231,11 @@ export const CONFIG = {
     threeQuarters: 0.75, // Trois quarts
     fullCircle: 2 * Math.PI, // Cercle complet en radians
     halfCircle: Math.PI, // Demi-cercle en radians
-    quarterCircle: Math.PI / 2, // Quart de cercle en radians
+    quarterCircle: Math.PI / 2 // Quart de cercle en radians
   },
 
-  // Constantes de couleurs hexadécimales
-  hexColors: {
-    red: 0xff0000,
-    green: 0x00ff00,
-    blue: 0x0000ff,
-    yellow: 0xffff00,
-    white: 0xffffff,
-    black: 0x000000,
-    gray: 0x808080,
-    lightGray: 0xcccccc,
-    darkGray: 0x333333,
-  },
-
-  // Constantes trigonométriques pré-calculées
-  trig: {
-    degToRad: Math.PI / 180, // Conversion degrés vers radians
-    radToDeg: 180 / Math.PI, // Conversion radians vers degrés
-    sqrt2: Math.sqrt(2), // Racine carrée de 2
-    sqrt3: Math.sqrt(3), // Racine carrée de 3
-    goldenRatio: (1 + Math.sqrt(5)) / 2, // Ratio d'or
-  },
-
-  // Paramètres de rendu
-  rendering: {
-    shadowMapSize: 2048,
-    antialias: true,
-    fogStart: 100,
-    fogEnd: 1000,
-    lineWidth: 2, // pixels - Largeur des lignes de contrôle
-  },
+  // Configuration du logging
+  logging: {
+    kiteStateInterval: 120 // frames - Intervalle de log de l'état du kite (120 frames ≈ 2s à 60 FPS)
+  }
 };

@@ -9,8 +9,8 @@
  */
 
 import * as THREE from 'three';
-
 import { Entity } from '@base/Entity';
+
 import { CONFIG } from '../config/SimulationConfig';
 
 import { EntityBuilder } from './EntityBuilder';
@@ -54,11 +54,12 @@ export class ControlBarEntityFactory {
     // Créer la géométrie Three.js
     const controlBarGroup = this.createGeometry();
     
-    // Position (par défaut : relative au pilote)
+    // Position (par défaut : devant le pilote à hauteur des mains)
+    // La barre est positionnée dans le monde, pas relative au pilote
     const position = params.position || new THREE.Vector3(
-      0, // Même X que le pilote
-      CONFIG.controlBar.offsetY, // Au-dessus du pilote
-      CONFIG.controlBar.offsetZ  // Devant le pilote
+      0, // Même X que le pilote (centré)
+      CONFIG.controlBar.offsetY, // 1m du sol (hauteur des mains)
+      CONFIG.controlBar.offsetZ  // -0.5m en Z (devant le pilote)
     );
     controlBarGroup.position.copy(position);
     
@@ -145,12 +146,14 @@ export class ControlBarEntityFactory {
     
     // Poignée gauche
     const left = new THREE.Mesh(geometry, material);
+    left.name = 'LEFT_HANDLE'; // Nom pour identification (point d'attache des lignes)
     left.position.set(-halfWidth, 0, 0);
     left.rotation.z = Math.PI / 2; // Même orientation que la barre (horizontal)
     left.castShadow = true;
     
     // Poignée droite
     const right = new THREE.Mesh(geometry, material);
+    right.name = 'RIGHT_HANDLE'; // Nom pour identification (point d'attache des lignes)
     right.position.set(halfWidth, 0, 0);
     right.rotation.z = Math.PI / 2; // Même orientation que la barre (horizontal)
     right.castShadow = true;

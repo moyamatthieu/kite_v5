@@ -1,10 +1,12 @@
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 
 export class SystemManager {
-  private systems: any[] = [];
+  private systems: BaseSimulationSystem[] = [];
 
-  addSystem(system: any): void {
+  addSystem(system: BaseSimulationSystem): void {
     this.systems.push(system);
+    // Sort systems by order
+    this.systems.sort((a, b) => (a.order || 0) - (b.order || 0));
   }
 
   async initializeAll(): Promise<void> {
@@ -39,7 +41,11 @@ export class SystemManager {
     });
   }
 
-  getSystems(): any[] {
+  getSystems(): BaseSimulationSystem[] {
     return [...this.systems];
+  }
+
+  getSystem<T extends BaseSimulationSystem>(type: new (...args: any[]) => T): T | undefined {
+    return this.systems.find(system => system instanceof type) as T;
   }
 }

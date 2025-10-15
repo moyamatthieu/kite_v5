@@ -9,8 +9,8 @@
  */
 
 import * as THREE from 'three';
-
 import { Entity } from '@base/Entity';
+
 import { TransformComponent, MeshComponent } from '../components';
 
 /**

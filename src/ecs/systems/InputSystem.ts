@@ -3,8 +3,7 @@
  */
 
 import * as THREE from 'three';
-
-import { BaseSystem } from '@base/BaseSystem';
+import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { Entity } from '@base/Entity';
 
 export interface InputState {
@@ -26,7 +25,7 @@ export interface InputConfig {
   mouseEnabled: boolean;
 }
 
-export class InputSystem extends BaseSystem {
+export class InputSystem extends BaseSimulationSystem {
   private inputState: InputState = {
     barPosition: 0,
     barVelocity: 0,
@@ -62,13 +61,33 @@ export class InputSystem extends BaseSystem {
     return Promise.resolve();
   }
 
-  update(entities: Entity[], deltaTime: number): void {
+  reset(): void {
+    this.inputState = {
+      barPosition: 0,
+      barVelocity: 0,
+      resetPressed: false,
+      debugTogglePressed: false,
+    };
+    this.keyStates.clear();
+    this.mouseButtons.clear();
+  }
+
+  dispose(): void {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keyup', this.onKeyUp.bind(this));
+    window.removeEventListener('mousemove', this.onMouseMove.bind(this));
+    window.removeEventListener('mousedown', this.onMouseDown.bind(this));
+    window.removeEventListener('mouseup', this.onMouseUp.bind(this));
+  }
+
+  update(_context: SimulationContext): void {
     // Mettre à jour l'état des entrées
     this.updateKeyboardInput();
     this.updateMouseInput();
 
     // Calculer la position de la barre avec lissage
-    this.updateBarPosition(deltaTime);
+    this.updateBarPosition(_context.deltaTime);
 
     // Mettre à jour les états des boutons (pulse)
     this.updateButtonStates();
@@ -215,28 +234,6 @@ export class InputSystem extends BaseSystem {
    */
   getConfig(): Readonly<InputConfig> {
     return this.config;
-  }
-
-  reset(): void {
-    this.inputState.barPosition = 0;
-    this.inputState.barVelocity = 0;
-    this.inputState.resetPressed = false;
-    this.inputState.debugTogglePressed = false;
-
-    // Réinitialiser les états des touches
-    this.keyStates.clear();
-    this.mouseButtons.clear();
-  }
-
-  dispose(): void {
-    // Supprimer les écouteurs d'événements
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('keydown', this.onKeyDown.bind(this));
-      window.removeEventListener('keyup', this.onKeyUp.bind(this));
-      window.removeEventListener('mousemove', this.onMouseMove.bind(this));
-      window.removeEventListener('mousedown', this.onMouseDown.bind(this));
-      window.removeEventListener('mouseup', this.onMouseUp.bind(this));
-    }
   }
 
   getRotationInput(): number {

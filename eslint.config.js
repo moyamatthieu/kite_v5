@@ -72,7 +72,8 @@ export default [
       'tsconfig*.json',
       'tests/',
       '*.test.ts',
-      '*.spec.ts'
+      '*.spec.ts',
+      'src/ecs/.legacy/**'
     ]
   }
 ];

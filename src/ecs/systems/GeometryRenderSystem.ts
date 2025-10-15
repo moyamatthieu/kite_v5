@@ -11,44 +11,136 @@
 
 import * as THREE from 'three';
 import { Entity } from '@base/Entity';
+import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
+import { EntityManager } from '@entities/EntityManager';
+
 import { GeometryComponent } from '../components/GeometryComponent';
 import { VisualComponent } from '../components/VisualComponent';
-import { BridleComponent } from '../components/BridleComponent';
+import { BridleComponent, type BridleTensions } from '../components/BridleComponent';
 import { MeshComponent } from '../components/MeshComponent';
 import { TransformComponent } from '../components/TransformComponent';
+import { Logger } from '@utils/Logging';
+
+import { RenderSystem } from './RenderSystem';
 
 /**
  * Système qui construit la géométrie Three.js depuis les composants
  */
-export class GeometryRenderSystem {
-  private scene: THREE.Scene;
+export class GeometryRenderSystem extends BaseSimulationSystem {
+  private entityManager: EntityManager;
+  private renderSystem: RenderSystem;
+  private logger = Logger.getInstance();
+  private initializedEntities = new Set<string>();
 
-  constructor(scene: THREE.Scene) {
-    this.scene = scene;
+  constructor(entityManager: EntityManager, renderSystem: RenderSystem) {
+    super('GeometryRenderSystem', 4); // Exécuté après la physique, avant le rendu
+    this.entityManager = entityManager;
+    this.renderSystem = renderSystem;
+  }
+
+  initialize(): Promise<void> {
+    this.logger.info('GeometryRenderSystem initialized', 'GeometryRenderSystem');
+    return Promise.resolve();
+  }
+
+  reset(): void {
+    this.initializedEntities.clear();
+  }
+
+  dispose(): void {
+    this.reset();
+  }
+
+  update(_context: SimulationContext): void {
+    const entities = this.entityManager.getAllEntities();
+    for (const entity of entities) {
+      if (!this.initializedEntities.has(entity.id)) {
+        this.initializeEntity(entity);
+      } else {
+        // Mettre à jour les entités déjà initialisées
+        this.updateEntity(entity);
+      }
+    }
+  }
+
+  /**
+   * Met à jour une entité existante (géométrie dynamique)
+   */
+  private updateEntity(entity: Entity): void {
+    const bridle = entity.getComponent<BridleComponent>('bridle');
+    
+    // Mettre à jour les brides (positions et tensions)
+    if (bridle) {
+      // D'abord calculer et stocker les tensions dans le BridleComponent
+      const tensions = this.calculateBridleTensionsFromGeometry(entity);
+      if (tensions) {
+        bridle.tensions = tensions;
+      }
+      
+      // Puis mettre à jour la géométrie et les couleurs
+      this.updateBridleGeometry(entity);
+      this.updateBridleTensions(entity);
+    }
+  }
+
+  /**
+   * Calcule les tensions des brides à partir de la géométrie
+   */
+  private calculateBridleTensionsFromGeometry(entity: Entity): BridleTensions | null {
+    const geometry = entity.getComponent<GeometryComponent>('geometry');
+    const transform = entity.getComponent<TransformComponent>('transform');
+    const bridle = entity.getComponent<BridleComponent>('bridle');
+
+    if (!geometry || !transform || !bridle) return null;
+
+    // Helper : convertir point local en coordonnées monde
+    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
+      return localPoint.clone()
+        .applyQuaternion(transform.quaternion)
+        .add(transform.position);
+    };
+
+    // Calculer tension pour une bride
+    const calculateTension = (startName: string, endName: string, targetLength: number): number => {
+      const startLocal = geometry.getPoint(startName);
+      const endLocal = geometry.getPoint(endName);
+
+      if (!startLocal || !endLocal) return 0;
+
+      const startWorld = toWorldCoordinates(startLocal);
+      const endWorld = toWorldCoordinates(endLocal);
+      const currentLength = startWorld.distanceTo(endWorld);
+
+      // Tension proportionnelle à l'élongation
+      const strain = (currentLength - targetLength) / targetLength;
+      return Math.max(0, strain * 100); // Facteur pour visualisation
+    };
+
+    return {
+      leftNez: calculateTension('NEZ', 'CTRL_GAUCHE', bridle.lengths.nez),
+      leftInter: calculateTension('INTER_GAUCHE', 'CTRL_GAUCHE', bridle.lengths.inter),
+      leftCentre: calculateTension('CENTRE', 'CTRL_GAUCHE', bridle.lengths.centre),
+      rightNez: calculateTension('NEZ', 'CTRL_DROIT', bridle.lengths.nez),
+      rightInter: calculateTension('INTER_DROIT', 'CTRL_DROIT', bridle.lengths.inter),
+      rightCentre: calculateTension('CENTRE', 'CTRL_DROIT', bridle.lengths.centre)
+    };
   }
 
   /**
    * Initialise le rendu d'une entité (crée la géométrie Three.js)
    */
   initializeEntity(entity: Entity): void {
-    console.log(`🎨 GeometryRenderSystem: Initializing entity ${entity.id}`);
-    
-    // Debug: liste tous les composants de l'entité
-    const allComponents = (entity as any).components;
-    if (allComponents instanceof Map) {
-      console.log(`  📦 Components on ${entity.id}:`, Array.from(allComponents.keys()));
-    }
-    
     const geometry = entity.getComponent<GeometryComponent>('geometry');
     const visual = entity.getComponent<VisualComponent>('visual');
 
     if (!geometry || !visual) {
-      console.warn(`  ⚠️ Entity ${entity.id} nécessite GeometryComponent et VisualComponent`);
-      console.warn(`    geometry=${!!geometry}, visual=${!!visual}`);
       return;
     }
 
-    console.log(`🎨 GeometryRenderSystem: Creating 3D objects for ${entity.id}...`);
+    // Ignorer les entités de lignes - elles sont gérées par LinesRenderSystem
+    if (entity.id.includes('Line')) {
+      return;
+    }
 
     // Créer le group Three.js principal
     const group = new THREE.Group();
@@ -56,53 +148,24 @@ export class GeometryRenderSystem {
 
     // 1. Créer les frames (connexions)
     this.createFrames(group, geometry, visual);
-    console.log(`  ✅ Frames created: ${group.children.length} objects`);
 
     // 2. Créer les surfaces
     this.createSurfaces(group, geometry, visual);
-    console.log(`  ✅ Surfaces created: ${group.children.length} objects total`);
 
     // 3. Créer les brides (si présent)
     const bridle = entity.getComponent<BridleComponent>('bridle');
     if (bridle) {
       this.createBridles(group, geometry, bridle, visual);
-      console.log(`  ✅ Bridles created`);
     }
 
-    // 4. Créer les marqueurs de debug (si activé)
-    if (visual.showDebugMarkers) {
-      this.createDebugMarkers(group, geometry, visual);
-      console.log(`  ✅ Debug markers created`);
-    }
+    // Ajouter le groupe à un MeshComponent
+    entity.addComponent(new MeshComponent(group));
 
-    // 5. Créer ou mettre à jour le MeshComponent
-    let meshComp = entity.getComponent<MeshComponent>('mesh');
-    if (meshComp) {
-      // Remplacer l'ancien objet
-      if (meshComp.object3D.parent) {
-        meshComp.object3D.parent.remove(meshComp.object3D);
-      }
-      meshComp.object3D = group;
-    } else {
-      meshComp = new MeshComponent(group);
-      entity.addComponent(meshComp);
-    }
+    // Ajouter l'objet à la scène
+    this.renderSystem.addToScene(group);
 
-    // 6. Synchroniser position/rotation depuis Transform
-    const transform = entity.getComponent<TransformComponent>('transform');
-    if (transform) {
-      meshComp.syncToObject3D({
-        position: transform.position,
-        quaternion: transform.quaternion,
-        scale: transform.scale
-      });
-      console.log(`  ✅ Transform synced: position ${transform.position.toArray()}`);
-    }
-
-    // 7. Ajouter à la scène
-    this.scene.add(group);
-    console.log(`✅ GeometryRenderSystem: Entity ${entity.id} added to scene (${group.children.length} children)`);
-    console.log(`✅ Scene now has ${this.scene.children.length} children total`);
+    // Marquer comme initialisé
+    this.initializedEntities.add(entity.id);
   }
 
   /**
@@ -123,13 +186,18 @@ export class GeometryRenderSystem {
 
       if (!p1 || !p2) return;
 
-      // Déterminer si c'est un whisker ou un frame principal
-      const isWhisker = conn.from.includes('WHISKER') || conn.to.includes('WHISKER');
-      const material = isWhisker && visual.whiskerMaterial
+      // Déterminer si c'est un whisker/handle vertical (poignée) ou un frame principal
+      // Les poignées sont détectées par la présence de _TOP et _BOTTOM dans le même lien
+      const isWhiskerOrHandle = 
+        conn.from.includes('WHISKER') || conn.to.includes('WHISKER') ||
+        (conn.from.includes('_TOP') && conn.to.includes('_BOTTOM')) ||
+        (conn.from.includes('_BOTTOM') && conn.to.includes('_TOP'));
+        
+      const material = isWhiskerOrHandle && visual.whiskerMaterial
         ? new THREE.MeshStandardMaterial({ color: visual.whiskerMaterial.color })
         : mainFrameMaterial;
 
-      const diameter = isWhisker && visual.whiskerMaterial
+      const diameter = isWhiskerOrHandle && visual.whiskerMaterial
         ? visual.whiskerMaterial.diameter
         : visual.frameMaterial.diameter;
 
@@ -333,6 +401,41 @@ export class GeometryRenderSystem {
         material.color.setRGB(1, g / 255, 0); // Jaune -> Rouge
         material.opacity = 0.8 + t * 0.2;
       }
+    });
+  }
+
+  /**
+   * Met à jour la géométrie des brides (positions)
+   */
+  private updateBridleGeometry(entity: Entity): void {
+    const geometry = entity.getComponent<GeometryComponent>('geometry');
+    const meshComp = entity.getComponent<MeshComponent>('mesh');
+    const bridle = entity.getComponent<BridleComponent>('bridle');
+
+    if (!geometry || !meshComp || !bridle) return;
+
+    const bridleGroup = meshComp.object3D.getObjectByName('bridles') as THREE.Group;
+    if (!bridleGroup) return;
+
+    // Mettre à jour la position de chaque ligne de bride
+    bridleGroup.children.forEach(child => {
+      if (!(child instanceof THREE.Line)) return;
+
+      const conn = child.userData.connection;
+      if (!conn) return;
+
+      const p1 = geometry.getPoint(conn.from);
+      const p2 = geometry.getPoint(conn.to);
+
+      if (!p1 || !p2) return;
+
+      // Mettre à jour la géométrie de la ligne
+      const positions = new Float32Array([
+        p1.x, p1.y, p1.z,
+        p2.x, p2.y, p2.z
+      ]);
+      child.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      child.geometry.attributes.position.needsUpdate = true;
     });
   }
 

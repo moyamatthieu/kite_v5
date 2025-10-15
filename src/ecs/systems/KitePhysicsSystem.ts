@@ -10,8 +10,7 @@
  * - KiteController (intégration)
  */
 
-import * as THREE from 'three';
-
+import * as THREE from "three";
 import { BaseSimulationSystem, SimulationContext } from '@ecs/base/BaseSimulationSystem';
 import { Logger } from '@ecs/utils/Logging';
 import { MathUtils } from '@ecs/utils/MathUtils';
@@ -19,14 +18,12 @@ import { CONFIG } from '@ecs/config/SimulationConfig';
 import { PhysicsConstants } from '@ecs/config/PhysicsConstants';
 import { KiteState, WindState, SurfaceForce, WindParams, HandlePositions} from '@mytypes/PhysicsTypes';
 import { WindSimulator } from '@ecs/systems/WindSimulator';
-import { LineSystem } from '@ecs/systems/LineSystem';
-import { BridleSystem } from '@ecs/systems/BridleSystem';
+import { PureLineSystem } from "@ecs/systems/LineSystem.pure";
+import { PureBridleSystem } from "@ecs/systems/BridleSystem.pure";
 import { AerodynamicsCalculator } from '@ecs/systems/AerodynamicsCalculator';
-import { FlightSphere } from '@ecs/systems/ConstraintSolver';
-
+import { FlightSphere } from "@ecs/systems/ConstraintSolver.pure";
 import { PureKiteController } from '@ecs/systems/KiteController.pure';
 import { EntityManager } from '@entities/EntityManager';
-import { BridleComponent } from '@components/BridleComponent';
 import { Entity } from "@base/Entity";
 import { KiteComponent } from "@components/KiteComponent";
 import { TransformComponent } from "@components/TransformComponent";
@@ -58,8 +55,8 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
 
   // Composants physiques
   private windSimulator!: WindSimulator;
-  private lineSystem!: LineSystem;
-  private bridleSystem!: BridleSystem;
+  private lineSystem!: PureLineSystem;
+  private bridleSystem!: PureBridleSystem;
   private kiteController!: PureKiteController;
 
   // État de rotation de la barre
@@ -74,7 +71,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   private lastSurfaceForces: SurfaceForce[] = []; // Ajout pour stocker les forces par surface
 
   private lastLogTime: number = 0;
-  private readonly LOG_INTERVAL: number = CONFIG.conversions.gravityFactor * 1000; // Log toutes les secondes
+  private readonly LOG_INTERVAL: number = 1000; // Log toutes les secondes
   private startTime: number = Date.now();
   private frameCount: number = 0;
 
@@ -88,8 +85,14 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   private kiteEntity: Entity | null = null;
   private kiteComponent: KiteComponent | null = null;
 
-  constructor(config: Partial<KitePhysicsConfig> = {}, entityManager: EntityManager) {
-    super('KitePhysicsSystem', 10);
+  // Ajout pour stocker les tensions des lignes pour le debug
+  private lineTensions: { left: number; right: number } = { left: 0, right: 0 };
+
+  constructor(
+    config: Partial<KitePhysicsConfig> = {},
+    entityManager: EntityManager
+  ) {
+    super("KitePhysicsSystem", 10);
 
     this.logger = Logger.getInstance();
     this.entityManager = entityManager;
@@ -98,13 +101,17 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       windDirection: CONFIG.wind.defaultDirection, // degrés
       turbulence: CONFIG.wind.defaultTurbulence, // 0-100
       lineLength: CONFIG.lines.defaultLength,
-      pilotPosition: new THREE.Vector3(CONFIG.pilot.position.x, CONFIG.pilot.position.y + CONFIG.controlBar.offsetY, CONFIG.pilot.position.z + CONFIG.controlBar.offsetZ),
+      pilotPosition: new THREE.Vector3(
+        CONFIG.pilot.position.x,
+        CONFIG.pilot.position.y + CONFIG.controlBar.offsetY,
+        CONFIG.pilot.position.z + CONFIG.controlBar.offsetZ
+      ),
       enableConstraints: true,
       enableAerodynamics: true,
       enableGravity: true,
       linearDampingCoeff: CONFIG.physics.linearDampingCoeff, // Utiliser CONFIG
       angularDragFactor: CONFIG.physics.angularDragFactor, // Utiliser CONFIG
-      ...config
+      ...config,
     };
   }
 
@@ -112,7 +119,10 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Initialise le système (sans le kite, qui est passé via setKite)
    */
   async initialize(): Promise<void> {
-    this.logger.info('KitePhysicsSystem initialized', 'KitePhysicsSystem');
+    this.logger.info(
+      "KitePhysicsSystem initialized (waiting for kite entity)",
+      "KitePhysicsSystem"
+    );
     // Le kite sera défini via setKite() avant le premier update
   }
 
@@ -120,39 +130,44 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Initialise tous les composants physiques
    */
   private async initializeComponents(): Promise<void> {
-    // Créer WindSimulator
+    // Créer le WindSimulator comme composant interne
     this.windSimulator = new WindSimulator();
+    await this.windSimulator.initialize();
+
     this.windSimulator.setParams({
       speed: this.config.windSpeed,
       direction: this.config.windDirection,
-      turbulence: this.config.turbulence
+      turbulence: this.config.turbulence,
     });
 
-    // Instancier LineSystem
-    this.lineSystem = new LineSystem();
+    // Instancier PureLineSystem (ECS)
+    this.lineSystem = new PureLineSystem(this.entityManager);
 
     // Configurer LineSystem avec les entités ECS
-    const leftLine = this.entityManager.getEntity('leftLine');
-    const rightLine = this.entityManager.getEntity('rightLine');
-    if (!leftLine || !rightLine) {
-      throw new Error('Line entities not found');
+    const leftLine = this.entityManager.getEntity("line-left");
+    const rightLine = this.entityManager.getEntity("line-right");
+    if (leftLine && rightLine) {
+      this.lineSystem.setLineEntities(leftLine, rightLine);
+    } else {
+      this.logger.warn(
+        "Line entities not found - system will initialize them",
+        "KitePhysicsSystem"
+      );
     }
-    this.lineSystem.setLineEntities(leftLine, rightLine);
 
-    // Instancier BridleSystem avec les longueurs par défaut
-    this.bridleSystem = new BridleSystem(CONFIG.bridle.defaultLengths);
+    // Instancier PureBridleSystem (ECS)
+    this.bridleSystem = new PureBridleSystem(this.entityManager);
 
     // Configurer BridleSystem avec l'entité kite
-    const kiteEntity = this.entityManager.getEntity('kite');
-    if (!kiteEntity) {
-      throw new Error('Kite entity not found');
+    const kiteEntity = this.entityManager.getEntity("kite");
+    if (kiteEntity) {
+      this.bridleSystem.setKiteEntity(kiteEntity);
+
+      // Instancier PureKiteController avec l'entité kite
+      this.kiteController = new PureKiteController(kiteEntity);
+    } else {
+      throw new Error("Kite entity not found - cannot initialize physics");
     }
-    this.bridleSystem.setKiteEntity(kiteEntity);
-
-    // Instancier PureKiteController avec l'entité kite
-    this.kiteController = new PureKiteController(kiteEntity);
-
-    this.logger.info('All physics components initialized with ECS entities', 'KitePhysicsSystem');
   }
 
   /**
@@ -166,7 +181,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Met à jour le kite (doit être appelé avant le premier update)
    */
   setKiteEntity(kiteEntity: Entity): void {
-  const kiteComponent = kiteEntity.getComponent('kite') as KiteComponent;
+    const kiteComponent = kiteEntity.getComponent("kite") as KiteComponent;
     if (!kiteComponent) {
       throw new Error("L'entité fournie n'a pas de KiteComponent.");
     }
@@ -193,6 +208,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       return;
     }
 
+    // DEBUG: Vérifier la position du kite au début de chaque update
+    const initialKiteStateForDebug = this.kiteController.getState();
+    if (isNaN(initialKiteStateForDebug.position.x)) {
+      this.logger.error('Kite position is NaN at the beginning of update!', 'KitePhysicsSystem', { state: initialKiteStateForDebug });
+      return; // Arrêter la mise à jour si l'état est déjà corrompu
+    }
+
     const deltaTime = Math.min(context.deltaTime, CONFIG.physics.deltaTimeMax);
 
     // 1. Obtenir l'état actuel du kite
@@ -211,7 +233,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     );
 
     // 4. Calculer les forces aérodynamiques
-    let aeroForces: { lift: THREE.Vector3; drag: THREE.Vector3; gravity: THREE.Vector3; torque: THREE.Vector3; surfaceForces: SurfaceForce[] };
+    let aeroForces: {
+      lift: THREE.Vector3;
+      drag: THREE.Vector3;
+      gravity: THREE.Vector3;
+      torque: THREE.Vector3;
+      surfaceForces: SurfaceForce[];
+    };
 
     if (this.config.enableAerodynamics) {
       aeroForces = AerodynamicsCalculator.calculateForces(
@@ -230,7 +258,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
         drag: new THREE.Vector3(),
         gravity: new THREE.Vector3(),
         torque: new THREE.Vector3(),
-        surfaceForces: []
+        surfaceForces: [],
       };
       this.lastLiftForce.set(0, 0, 0);
       this.lastDragForce.set(0, 0, 0);
@@ -238,12 +266,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     }
 
     // 5. Combiner toutes les forces
-    const totalForce = new THREE.Vector3()
-      .add(aeroForces.lift)
-      .add(aeroForces.drag);
+    const totalForce = new THREE.Vector3();
+    if (this.config.enableAerodynamics) {
+      totalForce.add(aeroForces.lift).add(aeroForces.drag);
+    }
 
     // Ajouter la gravité si activée
-    if (this.config.enableGravity && aeroForces.gravity) {
+    if (this.config.enableGravity) {
       totalForce.add(aeroForces.gravity);
     }
 
@@ -257,17 +286,20 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     }
 
     // 7. Calculer les tensions des brides (pour visualisation)
-    const bridleTensions = this.kiteEntity ? this.bridleSystem.calculateBridleTensions(this.kiteEntity) : null;
+    const bridleTensions = this.kiteEntity
+      ? this.bridleSystem.calculateBridleTensions(this.kiteEntity)
+      : null;
     if (bridleTensions) {
-      this.logger.info('Bridle tensions calculated', JSON.stringify(bridleTensions));
+      // this.logger.info('Bridle tensions calculated', 'KitePhysicsSystem', bridleTensions);
     }
 
     // Capturer les tensions pour instrumentation avant intégration
     const lineTensions = this.lineSystem.getTensions();
-    this.logger.info('Line tensions calculated', JSON.stringify(lineTensions));
+    this.lineTensions = lineTensions; // Stocker pour getDebugInfo
+    // this.logger.info('Line tensions calculated', 'KitePhysicsSystem', lineTensions);
 
     // 9. Mettre à jour le contrôleur du kite
-    // Note: Le KiteController intègre automatiquement les contraintes via ConstraintSolver
+    // Note: Le KiteController intègre automatiquement les contraintes (lignes + sol) via ConstraintSolver
     this.kiteController.update(
       totalForce,
       aeroForces.torque,
@@ -278,9 +310,6 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     // 10. Mettre à jour les lignes de bridage visuelles (après que les points aient bougé)
     // TODO: Implémenter la mise à jour des lignes de bridage via ECS
     // this.kite.updateBridleLines();
-
-    // 11. Gérer la collision au sol (spécifique au kite)
-    this.handleGroundCollision(deltaTime);
 
     // 📊 LOG COMPLET toutes les secondes
     this.frameCount++;
@@ -296,10 +325,17 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
           drag: aeroForces.drag,
           gravity: aeroForces.gravity,
           total: totalForce,
-          torque: aeroForces.torque
+          torque: aeroForces.torque,
         },
-        lineTensions || {left:0, right:0},
-        bridleTensions || {leftNez:0, leftInter:0, leftCentre:0, rightNez:0, rightInter:0, rightCentre:0},
+        lineTensions || { left: 0, right: 0 },
+        bridleTensions || {
+          leftNez: 0,
+          leftInter: 0,
+          leftCentre: 0,
+          rightNez: 0,
+          rightInter: 0,
+          rightCentre: 0,
+        },
         deltaTime,
         currentTime
       );
@@ -318,116 +354,81 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       torque: THREE.Vector3;
     },
     lineTensions: { left: number; right: number },
-    bridleTensions: ReturnType<BridleSystem['calculateBridleTensions']>,
+    bridleTensions: ReturnType<PureBridleSystem['calculateBridleTensions']>,
     deltaTime: number,
     currentTime: number
   ): void {
-    if (!this.config.enableAerodynamics) {
+    if (!this.config.enableAerodynamics || !kiteEntity) {
       return;
     }
 
-    const elapsedTime = (currentTime - this.startTime) / (CONFIG.conversions.gravityFactor * 1000);
-    const safeDelta = Math.max(deltaTime, CONFIG.thresholds.epsilonFine);
-    const fps = 1 / safeDelta;
-
-    const euler = new THREE.Euler().setFromQuaternion(kiteState.orientation || new THREE.Quaternion(), 'XYZ');
-    const pitch = euler.x * CONFIG.conversions.radToDeg;
-    const roll = euler.z * CONFIG.conversions.radToDeg;
-    const yaw = euler.y * CONFIG.conversions.radToDeg;
+    const euler = new THREE.Euler().setFromQuaternion(
+      kiteState.orientation || new THREE.Quaternion(),
+      'XYZ'
+    );
+    const pitch = euler.x * PhysicsConstants.RAD_TO_DEG;
+    const roll = euler.z * PhysicsConstants.RAD_TO_DEG;
+    const yaw = euler.y * PhysicsConstants.RAD_TO_DEG;
 
     const liftMag = forces.lift.length();
     const dragMag = forces.drag.length();
-    forces.gravity.length();
-    const totalForceMag = forces.total.length();
-    forces.torque.length();
-
-    forces.total.clone().divideScalar(CONFIG.kite.mass);
-    dragMag > PhysicsConstants.EPSILON ? liftMag / dragMag : 0;
+    const ldRatio = dragMag > PhysicsConstants.EPSILON ? liftMag / dragMag : 0;
 
     const leftTension = lineTensions.left;
     const rightTension = lineTensions.right;
     const tensionDelta = leftTension - rightTension;
-    const dominantTension = Math.max(Math.abs(leftTension), Math.abs(rightTension), PhysicsConstants.EPSILON);
-    (tensionDelta / dominantTension) * 100;
+    const dominantTension = Math.max(
+      Math.abs(leftTension),
+      Math.abs(rightTension),
+      PhysicsConstants.EPSILON
+    );
+    const tensionAsym = (tensionDelta / dominantTension) * 100;
 
-    this.logger.debug(`Kite Physics State - Frame #${this.frameCount}:
-      Time: ${elapsedTime.toFixed(3)}s | Δt: ${(safeDelta * 1000).toFixed(2)}ms | FPS: ${fps.toFixed(1)}
-      Position: (${kiteState.position.x.toFixed(2)}, ${kiteState.position.y.toFixed(2)}, ${kiteState.position.z.toFixed(2)}) m | Dist: ${kiteState.position.length().toFixed(2)} m
-      Angles: Pitch ${pitch.toFixed(1)}° | Roll ${roll.toFixed(1)}° | Yaw ${yaw.toFixed(1)}°
-      Velocity: (${kiteState.velocity.x.toFixed(2)}, ${kiteState.velocity.y.toFixed(2)}, ${kiteState.velocity.z.toFixed(2)}) m/s | Mag: ${kiteState.velocity.length().toFixed(2)} m/s
-      Wind: (${apparentWind.x.toFixed(2)}, ${apparentWind.y.toFixed(2)}, ${apparentWind.z.toFixed(2)}) m/s | Mag: ${apparentWind.length().toFixed(2)} m/s
-      Forces - Lift: ${liftMag.toFixed(2)}N, Drag: ${dragMag.toFixed(2)}N, Total: ${totalForceMag.toFixed(2)}N
-      Tensions - Lines: L:${leftTension.toFixed(2)}N R:${rightTension.toFixed(2)}N | Brides: NEZ ${bridleTensions.leftNez.toFixed(1)}/${bridleTensions.rightNez.toFixed(1)}N`, 'KitePhysicsSystem');
-  }
+    // Log d'état compact toutes les secondes
+    this.logger.debug(
+      `Kite State | ` +
+        `Pos: [${kiteState.position.x.toFixed(1)}, ${kiteState.position.y.toFixed(
+          1
+        )}, ${kiteState.position.z.toFixed(1)}] | ` +
+        `Vel: ${kiteState.velocity.length().toFixed(1)} m/s | ` +
+        `Att: [P:${pitch.toFixed(0)}°, R:${roll.toFixed(0)}°, Y:${yaw.toFixed(
+          0
+        )}°] | ` +
+        `Aero: L/D=${ldRatio.toFixed(2)} (L:${liftMag.toFixed(
+          1
+        )}N, D:${dragMag.toFixed(1)}N) | ` +
+        `Tension: Asym ${tensionAsym.toFixed(0)}% (L:${leftTension.toFixed(
+          0
+        )}N, R:${rightTension.toFixed(0)}N)`,
+      'KitePhysicsSystem'
+    );
 
-  /**
-   * Gère la collision du kite avec le sol
-   * Utilise les points anatomiques du kite pour une détection plus précise
-   */
-  private handleGroundCollision(deltaTime: number): void {
-    const groundY = CONFIG.kite.minHeight;
-    const restitution = CONFIG.defaults.restitutionFactor;
-    const frictionCoeff = CONFIG.defaults.groundFriction;
-
-    const kiteState = this.kiteController.getState();
-    const kitePosition = kiteState.position.clone();
-    const kiteVelocity = kiteState.velocity.clone();
-    const kiteAngularVelocity = kiteState.angularVelocity.clone();
-
-    let hasCollision = false;
-    const contactPoints: THREE.Vector3[] = [];
-
-    // Vérifier les points anatomiques clés du kite pour la collision
-    // On peut choisir des points comme les extrémités des lattes, le nez, la queue, etc.
-    const pointsToCheck = [
-      this.kiteComponent?.points.get('NEZ'),
-      this.kiteComponent?.points.get('SPINE_BAS'),
-      this.kiteComponent?.points.get('BORD_GAUCHE'), // Utiliser BORD_GAUCHE et BORD_DROIT
-      this.kiteComponent?.points.get('BORD_DROIT'),
-      this.kiteComponent?.points.get('WHISKER_GAUCHE'),
-      this.kiteComponent?.points.get('WHISKER_DROIT'),
-    ].filter(p => p !== undefined) as THREE.Vector3[];
-
-    for (const localPoint of pointsToCheck) {
-      const worldPoint = localPoint.clone().applyQuaternion(kiteState.orientation || new THREE.Quaternion()).add(kitePosition);
-
-      if (worldPoint.y <= groundY) {
-        hasCollision = true;
-        contactPoints.push(worldPoint);
-
-        // Ajuster la position pour qu'elle soit sur le sol
-        const penetrationDepth = groundY - worldPoint.y;
-        kitePosition.y += penetrationDepth; // Pousse le kite hors du sol
-
-        // Calculer la vitesse du point de contact
-        const r = worldPoint.clone().sub(kitePosition); // Vecteur du centre de masse au point de contact
-        const pointVelocity = kiteVelocity.clone().add(kiteAngularVelocity.clone().cross(r));
-
-        // Appliquer la force de réaction normale (rebond)
-        if (pointVelocity.y < 0) {
-          const normalImpulse = -pointVelocity.y * (1 + restitution);
-          kiteVelocity.y += normalImpulse; // Applique l'impulsion au centre de masse
-        }
-
-        // Appliquer la force de friction
-        const horizontalVelocity = new THREE.Vector3(pointVelocity.x, 0, pointVelocity.z);
-        if (horizontalVelocity.lengthSq() > PhysicsConstants.EPSILON) {
-          const frictionForce = horizontalVelocity.clone().normalize().multiplyScalar(-frictionCoeff * horizontalVelocity.length());
-          kiteVelocity.add(frictionForce.multiplyScalar(deltaTime)); // Applique la friction au centre de masse
-        }
-      }
+    // Vérification des instabilités physiques
+    const warnings = this.kiteController.getWarnings();
+    if (warnings.accel || warnings.velocity || warnings.angular) {
+      this.logger.warn(
+        `Physics Instability Detected! ` +
+          `| Accel: ${warnings.accelValue.toFixed(1)} m/s² (Max: ${
+            PhysicsConstants.MAX_ACCELERATION
+          }) ` +
+          `| Velocity: ${warnings.velocityValue.toFixed(1)} m/s (Max: ${
+            PhysicsConstants.MAX_VELOCITY
+          })`,
+        'KitePhysicsSystem'
+      );
     }
 
-    if (hasCollision) {
-      // Mettre à jour l'état du kite avec les nouvelles vitesses et position
-      this.kiteController.getState().position.copy(kitePosition);
-      this.kiteController.getState().velocity.copy(kiteVelocity);
-      this.kiteController.getState().angularVelocity.copy(kiteAngularVelocity);
-
-      // Si la vitesse verticale est très faible, l'annuler pour éviter les micro-rebonds
-      if (Math.abs(kiteVelocity.y) < PhysicsConstants.EPSILON) {
-        this.kiteController.getState().velocity.y = 0;
-      }
+    // Vérification des valeurs NaN qui pourraient faire planter la simulation
+    if (
+      isNaN(kiteState.position.x) ||
+      isNaN(kiteState.velocity.x) ||
+      (kiteState.orientation && isNaN(kiteState.orientation.x))
+    ) {
+      this.logger.error(
+        'NaN value detected in kite state! Simulation is unstable.',
+        'KitePhysicsSystem',
+        { kiteState }
+      );
     }
   }
 
@@ -436,17 +437,28 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    */
   getWindState(): WindState {
     if (!this.windSimulator) {
-      return { baseSpeed: 0, baseDirection: new THREE.Vector3(), turbulence: 0, gustFrequency: 0, gustAmplitude: 0, time: 0 };
+      return {
+        baseSpeed: 0,
+        baseDirection: new THREE.Vector3(),
+        turbulence: 0,
+        gustFrequency: 0,
+        gustAmplitude: 0,
+        time: 0,
+      };
     }
 
     const windParams = this.windSimulator.getParams();
     return {
-      baseSpeed: windParams.speed / 3.6, // Convertir km/h en m/s pour affichage
-      baseDirection: new THREE.Vector3(Math.sin((windParams.direction * Math.PI) / 180), 0, -Math.cos((windParams.direction * Math.PI) / 180)),
+      baseSpeed: windParams.speed * PhysicsConstants.KMH_TO_MS, // Convertir km/h en m/s pour affichage
+      baseDirection: new THREE.Vector3(
+        Math.sin(windParams.direction * PhysicsConstants.DEG_TO_RAD),
+        0,
+        -Math.cos(windParams.direction * PhysicsConstants.DEG_TO_RAD)
+      ),
       turbulence: windParams.turbulence,
       gustFrequency: 0, // Non exposé par WindSimulator.getParams()
       gustAmplitude: 0, // Non exposé par WindSimulator.getParams()
-      time: 0 // Non exposé par WindSimulator.getParams()
+      time: 0, // Non exposé par WindSimulator.getParams()
     };
   }
 
@@ -454,12 +466,14 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Obtient l'état du kite
    */
   getKiteState(): KiteState {
-    return this.kiteController ? this.kiteController.getState() : {
-      position: new THREE.Vector3(),
-      velocity: new THREE.Vector3(),
-      angularVelocity: new THREE.Vector3(),
-      orientation: new THREE.Quaternion() // Ajouté orientation
-    };
+    return this.kiteController
+      ? this.kiteController.getState()
+      : {
+          position: new THREE.Vector3(),
+          velocity: new THREE.Vector3(),
+          angularVelocity: new THREE.Vector3(),
+          orientation: new THREE.Quaternion(), // Ajouté orientation
+        };
   }
 
   /**
@@ -503,22 +517,22 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   /**
    * Met à jour les longueurs des brides
    */
-  setBridleLengths(lengths: { nez: number; inter: number; centre: number }): void {
-    // TODO: Mettre à jour les longueurs des brides via les composants ECS
-    // if (this.kite) {
-    //   this.kite.setBridleLengths(lengths);
-    //   // Recréer le BridleSystem avec les nouvelles longueurs
-    //   this.bridleSystem = new BridleSystem(lengths);
-    // }
-    // Recréer le BridleSystem avec les nouvelles longueurs
-    this.bridleSystem = new BridleSystem(lengths);
+  setBridleLengths(lengths: {
+    nez: number;
+    inter: number;
+    centre: number;
+  }): void {
+    // Mettre à jour les longueurs des brides via le système ECS pur
+    this.bridleSystem.setBridleLengths(lengths);
   }
 
   /**
    * Obtient les longueurs actuelles des brides
    */
   getBridleLengths(): { nez: number; inter: number; centre: number } {
-    return this.bridleSystem ? this.bridleSystem.getBridleLengths() : { nez: 0, inter: 0, centre: 0 };
+    return this.bridleSystem
+      ? this.bridleSystem.getBridleLengths()
+      : { nez: 0, inter: 0, centre: 0 };
   }
 
   /**
@@ -535,13 +549,15 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Obtient le lissage des forces actuel
    */
   getForceSmoothing(): number {
-    return this.kiteController ? this.kiteController.getForceSmoothing() : this.config.linearDampingCoeff;
+    return this.kiteController
+      ? this.kiteController.getForceSmoothing()
+      : this.config.linearDampingCoeff;
   }
 
   /**
    * Obtient les statistiques du système
    */
-  getStats(): any {
+  getStats(): unknown {
     const kiteState = this.getKiteState();
     const windState = this.getWindState();
 
@@ -554,7 +570,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       bridleTensions: this.bridleSystem.getStats(),
       kiteWarnings: this.kiteController.getWarnings(),
       lastLiftForce: this.lastLiftForce.clone(),
-      lastDragForce: this.lastDragForce.clone()
+      lastDragForce: this.lastDragForce.clone(),
     };
   }
 
@@ -565,11 +581,11 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     return this.kiteController;
   }
 
-  getLineSystem(): LineSystem {
+  getLineSystem(): PureLineSystem {
     return this.lineSystem;
   }
 
-  getBridleSystem(): BridleSystem {
+  getBridleSystem(): PureBridleSystem {
     return this.bridleSystem;
   }
 
@@ -580,7 +596,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   getAerodynamicForces(): { lift: THREE.Vector3; drag: THREE.Vector3 } {
     return {
       lift: this.lastLiftForce.clone(),
-      drag: this.lastDragForce.clone()
+      drag: this.lastDragForce.clone(),
     };
   }
 
@@ -604,11 +620,14 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     leftTension: number;
     rightTension: number;
   } | null {
-    if (!this.lineSystem) return null;
+    if (!this.lineSystem || !this.kiteEntity) return null;
 
-    const distances = this.lineSystem.getDistances();
+    const handles = this.handlesProvider?.getHandlePositions();
+    if (!handles) return null;
+
+    const distances = this.lineSystem.getDistances(this.kiteEntity, handles);
     const tensions = this.lineSystem.getTensions();
-    const states = this.lineSystem.getLineStates();
+    const states = this.lineSystem.getLineStates(this.kiteEntity, handles);
 
     return {
       lineLength: this.config.lineLength,
@@ -617,7 +636,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       leftTaut: states.leftTaut,
       rightTaut: states.rightTaut,
       leftTension: tensions.left,
-      rightTension: tensions.right
+      rightTension: tensions.right,
     };
   }
 
@@ -646,12 +665,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       );
 
       // TODO: Réinitialiser la position et l'orientation via les composants ECS
-      // const transform = this.kiteEntity.getComponent<TransformComponent>('transform');
-      // if (transform) {
-      //   transform.position.copy(initialPos);
-      //   transform.rotation.set(0, 0, 0);
-      //   transform.quaternion.identity();
-      // }
+      const transform =
+        this.kiteEntity.getComponent<TransformComponent>("transform");
+      if (transform) {
+        transform.position.copy(initialPos);
+        // transform.rotation.set(0, 0, 0); // rotation is deprecated
+        transform.quaternion.identity();
+      }
     }
 
     // Réinitialiser la rotation de la barre
@@ -660,13 +680,13 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     // Réinitialiser les sous-systèmes
     if (this.windSimulator) {
       const simulator = this.windSimulator as unknown as { reset?: () => void };
-      if (typeof simulator.reset === 'function') {
+      if (typeof simulator.reset === "function") {
         simulator.reset();
       }
       this.windSimulator.setParams({
         speed: this.config.windSpeed,
         direction: this.config.windDirection,
-        turbulence: this.config.turbulence
+        turbulence: this.config.turbulence,
       });
     }
     if (this.lineSystem) {
@@ -683,26 +703,29 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     this.startTime = Date.now();
     this.lastLogTime = 0;
 
-    this.logger.info('KitePhysicsSystem reset', 'KitePhysicsSystem');
+    this.logger.info("KitePhysicsSystem reset", "KitePhysicsSystem");
   }
 
   /**
    * Retourne les informations de debug
    */
-  getDebugInfo(): any {
+  getDebugInfo(): { lineTensions: { left: number; right: number } } {
     return {
-      kitePosition: this.kiteEntity?.getComponent<TransformComponent>('transform')?.position?.clone(),
-      kiteVelocity: this.kiteController?.getState()?.velocity?.clone(),
-      windSpeed: this.windSimulator?.getParams()?.speed,
-      liftForce: this.lastLiftForce.clone(),
-      dragForce: this.lastDragForce.clone(),
-      lineTensions: this.lineSystem?.getTensions(),
-      bridleLengths: null //this.kite?.getBridleLengths()
+      lineTensions: this.lineTensions,
     };
   }
 
   dispose(): void {
-    // Pas de ressources spécifiques à disposer pour l'instant
-    this.logger.info('KitePhysicsSystem disposed', 'KitePhysicsSystem');
+    this.logger.info("Disposing KitePhysicsSystem", "KitePhysicsSystem");
+    this.kiteEntity = null;
+    this.kiteComponent = null;
+    this.handlesProvider = null;
+
+    if (this.lineSystem) {
+      this.lineSystem.dispose();
+    }
+    if (this.bridleSystem) {
+      this.bridleSystem.dispose();
+    }
   }
 }

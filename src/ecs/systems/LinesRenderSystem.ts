@@ -14,17 +14,20 @@
 
 // External libraries
 import * as THREE from 'three';
-
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { Logger } from '@utils/Logging';
 import { CONFIG } from '@config/SimulationConfig';
-import { Kite } from '@objects/Kite';
 import { MeshComponent } from '@components/MeshComponent';
+import { GeometryComponent } from '@components/GeometryComponent';
+import { TransformComponent } from '@components/TransformComponent';
+import { LineComponent } from '@components/LineComponent';
+import { PhysicsComponent } from '@components/PhysicsComponent';
 import { Entity } from '@base/Entity';
 import { LineEntity } from '@entities/LineEntity';
 
-import { ControlBarSystem } from '@/ecs/systems/ControlBarSystem';
 import { KitePhysicsSystem } from './KitePhysicsSystem';
+
+import { ControlBarSystem } from '@/ecs/systems/ControlBarSystem';
 
 /**
  * Composant spécifique aux lignes pour stocker leurs paramètres
@@ -34,12 +37,26 @@ export interface LineComponentData {
   color: number;
   linewidth: number;
   side: 'left' | 'right';
+  maxLength?: number;
+}
+
+type LineRenderData = Omit<LineComponentData, 'maxLength'> & { maxLength: number };
+
+interface LineGeometryData {
+  geometry: THREE.TubeGeometry;
+  points: THREE.Vector3[];
+  clamped: boolean;
+  effectiveLength: number;
+  slack: number;
 }
 
 export class LinesRenderSystem extends BaseSimulationSystem {
   private logger: Logger;
+  private scene: THREE.Scene | null = null;
   private lineEntities: Map<string, Entity> = new Map();
-  private kite: Kite | null = null;
+  private lineRenderData: Map<string, LineRenderData> = new Map();
+  private clampedLines: Set<string> = new Set();
+  private kiteEntity: Entity | null = null;
   private controlBarSystem: ControlBarSystem | null = null;
   private kitePhysicsSystem: KitePhysicsSystem | null = null;
   private hasLoggedWarning: boolean = false;
@@ -49,32 +66,85 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     this.logger = Logger.getInstance();
   }
 
+  reset(): void {
+    this.lineEntities.forEach((entity, id) => {
+      const meshComp = entity.getComponent<MeshComponent>('mesh');
+      if (meshComp && meshComp.object3D.parent) {
+        meshComp.object3D.parent.remove(meshComp.object3D);
+      }
+    });
+    this.lineEntities.clear();
+    this.lineRenderData.clear();
+    this.clampedLines.clear();
+    this.hasLoggedWarning = false;
+  }
+
+  dispose(): void {
+    this.reset();
+    this.logger.info('LinesRenderSystem disposed', 'LinesRenderSystem');
+  }
+
+  /**
+   * Définit la scène Three.js
+   */
+  setScene(scene: THREE.Scene): void {
+    this.scene = scene;
+  }
+
+  private logInitialization(): void {
+    this.logger.info('LinesRenderSystem initialized with the following configuration:', 'LinesRenderSystem', {
+      lineEntitiesCount: this.lineEntities.size,
+      clampedLinesCount: this.clampedLines.size,
+      kiteEntityAssigned: !!this.kiteEntity,
+      controlBarSystemAssigned: !!this.controlBarSystem
+    });
+  }
+
+  private logWarnings(): void {
+    if (!this.kiteEntity) {
+      this.logger.warn('Kite entity is not assigned to LinesRenderSystem.', 'LinesRenderSystem');
+    }
+    if (!this.controlBarSystem) {
+      this.logger.warn('ControlBarSystem is not assigned to LinesRenderSystem.', 'LinesRenderSystem');
+    }
+  }
+
   async initialize(): Promise<void> {
-    this.logger.info('LinesRenderSystem initialized', 'LinesRenderSystem');
+    this.logInitialization();
+    this.logWarnings();
   }
 
   /**
    * Enregistre une entité de ligne
    */
   registerLineEntity(id: string, entity: Entity, data: LineComponentData): void {
-    if (!entity.getComponent('mesh')) {
-      throw new Error('LineEntity must have a Mesh component');
-    }
+    const lineComponent = entity.getComponent<LineComponent>('line');
+    const baseLength = lineComponent?.getCurrentLength() ?? lineComponent?.config.length ?? CONFIG.lines.defaultLength;
+    const sanitizedSegments = Math.max(4, Math.min(data.segments, CONFIG.thresholds.maxLineSegments));
 
-    // Stocker les données de ligne dans l'entité
-    entity.addComponent({
-      type: 'line',
-      ...data
-    });
+    const renderData: LineRenderData = {
+      ...data,
+      segments: sanitizedSegments,
+      maxLength: data.maxLength ?? baseLength
+    };
 
     this.lineEntities.set(id, entity);
+    this.lineRenderData.set(id, renderData);
   }
 
   /**
-   * Définit la référence au kite (temporaire)
+   * Définit la référence au kite (version ECS)
    */
-  setKite(kite: Kite): void {
-    this.kite = kite;
+  setKite(kiteEntity: Entity): void {
+    this.kiteEntity = kiteEntity;
+  }
+
+  /**
+   * Définit la référence au kite (compatibilité legacy)
+   * @deprecated Utiliser setKite(kiteEntity: Entity) à la place
+   */
+  setKiteLegacy(_kite: unknown): void {
+    this.logger.warn('LinesRenderSystem.setKiteLegacy() is deprecated');
   }
 
   /**
@@ -91,11 +161,50 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     this.kitePhysicsSystem = system;
   }
 
-  update(_context: SimulationContext): void {
-    if (!this.kite || !this.controlBarSystem) {
-      // Log seulement une fois au lieu de polluer la console
+  private logKiteState(): void {
+    if (!this.kiteEntity) {
+      this.logger.warn('Cannot log kite state: kiteEntity is not assigned.', 'LinesRenderSystem');
+      return;
+    }
+
+    const transform = this.kiteEntity.getComponent<TransformComponent>('transform');
+    const physics = this.kiteEntity.getComponent<PhysicsComponent>('physics');
+
+    if (!transform || !physics) {
+      this.logger.warn('Cannot log kite state: Missing transform or physics component.', 'LinesRenderSystem');
+      return;
+    }
+
+    this.logger.info('Kite State:', 'LinesRenderSystem', {
+      position: transform.position,
+      velocity: physics.velocity,
+      mass: physics.mass
+    });
+  }
+
+  update(context: SimulationContext): void {
+    if (!this.kiteEntity || !this.controlBarSystem) {
       if (!this.hasLoggedWarning) {
-        console.warn('🔴 LinesRenderSystem: kite ou controlBarSystem manquant');
+        this.logger.warn(
+          '🔴 LinesRenderSystem: kiteEntity ou controlBarSystem manquant',
+          'LinesRenderSystem'
+        );
+        this.hasLoggedWarning = true;
+      }
+      return;
+    }
+
+    // Récupérer les composants du kite
+    const kiteGeometry = this.kiteEntity.getComponent<GeometryComponent>('geometry');
+    const kiteTransform =
+      this.kiteEntity.getComponent<TransformComponent>('transform');
+
+    if (!kiteGeometry || !kiteTransform) {
+      if (!this.hasLoggedWarning) {
+        this.logger.warn(
+          '🔴 LinesRenderSystem: kite manque geometry ou transform component',
+          'LinesRenderSystem'
+        );
         this.hasLoggedWarning = true;
       }
       return;
@@ -104,109 +213,327 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     // Récupérer les positions des poignées
     const handles = this.controlBarSystem.getHandlePositions();
     if (!handles) {
-      console.warn('🔴 LinesRenderSystem: handles manquants');
       return;
     }
 
-    // Récupérer les points de contrôle du kite
-    const ctrlLeft = this.kite.getPoint('CTRL_GAUCHE');
-    const ctrlRight = this.kite.getPoint('CTRL_DROIT');
+    // Récupérer les points de contrôle du kite (coordonnées locales)
+    const ctrlLeft = kiteGeometry.getPoint('CTRL_GAUCHE');
+    const ctrlRight = kiteGeometry.getPoint('CTRL_DROIT');
 
     if (!ctrlLeft || !ctrlRight) {
-      console.warn('🔴 LinesRenderSystem: points de contrôle kite manquants');
+      if (!this.hasLoggedWarning) {
+        this.logger.warn(
+          '🔴 LinesRenderSystem: points de contrôle kite manquants',
+          'LinesRenderSystem'
+        );
+        this.hasLoggedWarning = true;
+      }
       return;
     }
 
-    const ctrlLeftWorld = this.kite.toWorldCoordinates(ctrlLeft);
-    const ctrlRightWorld = this.kite.toWorldCoordinates(ctrlRight);
+    // Convertir en coordonnées monde
+    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
+      return localPoint
+        .clone()
+        .applyQuaternion(kiteTransform.quaternion)
+        .add(kiteTransform.position);
+    };
 
-    // 🔍 DEBUG : Log une fois toutes les 60 frames (1 fois par seconde à 60fps)
-    if (_context.totalTime % 1 < 0.016) {
-      console.log('✅ LinesRenderSystem update:', {
-        lineCount: this.lineEntities.size,
-        handleLeft: handles.left.toArray(),
-        handleRight: handles.right.toArray(),
-        ctrlLeft: ctrlLeftWorld.toArray(),
-        ctrlRight: ctrlRightWorld.toArray()
-      });
+    const ctrlLeftWorld = toWorldCoordinates(ctrlLeft);
+    const ctrlRightWorld = toWorldCoordinates(ctrlRight);
+
+    this.lineEntities.forEach((entity, id) => {
+      const baseRenderData = this.lineRenderData.get(id);
+      if (!baseRenderData) {
+        this.logger.warn(
+          `🔴 LinesRenderSystem: aucune donnée de rendu pour ${id}`,
+          'LinesRenderSystem'
+        );
+        return;
+      }
+
+      const lineComponent = entity.getComponent<LineComponent>('line');
+      const dynamicLength = lineComponent
+        ? lineComponent.getCurrentLength()
+        : baseRenderData.maxLength;
+      const renderData: LineRenderData = {
+        ...baseRenderData,
+        maxLength: dynamicLength
+      };
+
+      const start = renderData.side === 'left' ? handles.left : handles.right;
+      const end = renderData.side === 'left' ? ctrlLeftWorld : ctrlRightWorld;
+
+      const geometryData = this.computeLineGeometry(start, end, renderData);
+
+      let meshComp = entity.getComponent<MeshComponent>('mesh');
+      if (!meshComp || !(meshComp.object3D instanceof THREE.Mesh)) {
+        this.createLineMesh(entity, renderData, geometryData, id);
+        meshComp = entity.getComponent<MeshComponent>('mesh');
+      } else {
+        this.applyLineGeometry(
+          entity,
+          meshComp.object3D as THREE.Mesh,
+          geometryData,
+          renderData,
+          id
+        );
+      }
+
+      const meshObject = meshComp?.object3D;
+      if (meshObject instanceof THREE.Mesh) {
+        this.updateLineColorFromTension(meshObject, renderData.side);
+        meshObject.userData.effectiveLength = geometryData.effectiveLength;
+        meshObject.userData.slack = geometryData.slack;
+      }
+    });
+
+    // Periodic logging of kite state
+    if (context.frameCount % CONFIG.logging.kiteStateInterval === 0) {
+      this.logKiteState();
+    }
+  }
+
+  private computeLineGeometry(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    data: LineRenderData
+  ): LineGeometryData {
+    const segments = Math.max(4, Math.min(data.segments, CONFIG.thresholds.maxLineSegments));
+    const pointData = this.computeLinePoints(start, end, data.maxLength, segments);
+    const geometry = this.createTubeGeometry(pointData.points, segments, data.linewidth);
+
+    return {
+      geometry,
+      points: pointData.points,
+      clamped: pointData.clamped,
+      effectiveLength: pointData.effectiveLength,
+      slack: pointData.slack
+    };
+  }
+
+  private createLineMesh(
+    entity: Entity,
+    data: LineRenderData,
+    geometryData: LineGeometryData,
+    id: string
+  ): void {
+    const material = this.createLineMaterial(data);
+    const lineMesh = new THREE.Mesh(geometryData.geometry, material);
+    lineMesh.name = `line_${id}`;
+    lineMesh.castShadow = true;
+    lineMesh.receiveShadow = false;
+    lineMesh.userData.side = data.side;
+    lineMesh.userData.maxLength = data.maxLength;
+    lineMesh.userData.effectiveLength = geometryData.effectiveLength;
+    lineMesh.userData.slack = geometryData.slack;
+
+    const existingMeshComponent = entity.getComponent<MeshComponent>('mesh');
+    if (existingMeshComponent) {
+      const previousObject = existingMeshComponent.object3D;
+      if (previousObject.parent) {
+        previousObject.parent.remove(previousObject);
+      }
+      if (previousObject instanceof THREE.Mesh) {
+        if (previousObject.geometry) {
+          previousObject.geometry.dispose();
+        }
+        const material = previousObject.material;
+        if (Array.isArray(material)) {
+          material.forEach(mat => {
+            if (typeof mat.dispose === 'function') {
+              mat.dispose();
+            }
+          });
+        } else if (material && typeof material.dispose === 'function') {
+          material.dispose();
+        }
+      }
+      existingMeshComponent.object3D = lineMesh;
+    } else {
+      entity.addComponent(new MeshComponent(lineMesh));
     }
 
-    // Mettre à jour chaque ligne
-    this.lineEntities.forEach((entity) => {
-      const lineData = entity.getComponent<any>('line');
-      const mesh = entity.getComponent<MeshComponent>('mesh');
+    if (this.scene) {
+      this.scene.add(lineMesh);
+    }
 
-      if (!lineData || !mesh) return;
+    this.updateLineComponentSegments(entity, geometryData.points);
+    this.handleClampLogging(id, geometryData.clamped, data.maxLength, geometryData.effectiveLength);
+  }
 
-      // Déterminer les points de départ et d'arrivée selon le côté
-      // Les lignes partent de la barre de contrôle vers le kite
-      const start = lineData.side === 'left' ? handles.left : handles.right;
-      const end = lineData.side === 'left' ? ctrlLeftWorld : ctrlRightWorld;
+  private applyLineGeometry(
+    entity: Entity,
+    mesh: THREE.Mesh,
+    geometryData: LineGeometryData,
+    data: LineRenderData,
+    id: string
+  ): void {
+    if (mesh.geometry) {
+      mesh.geometry.dispose();
+    }
 
-      // Mettre à jour la géométrie
-      this.updateLineGeometry(
-        mesh.object3D as THREE.Mesh,
-        start,
-        end,
-        lineData.segments
-      );
+    mesh.geometry = geometryData.geometry;
+    mesh.userData.maxLength = data.maxLength;
+    mesh.userData.effectiveLength = geometryData.effectiveLength;
+    mesh.userData.slack = geometryData.slack;
+  mesh.userData.side = data.side;
 
-      // Mettre à jour la couleur basée sur les tensions physiques émergentes
-      this.updateLineColorFromTension(mesh.object3D as THREE.Mesh, lineData.side);
+    this.updateLineComponentSegments(entity, geometryData.points);
+    this.handleClampLogging(id, geometryData.clamped, data.maxLength, geometryData.effectiveLength);
+  }
+
+  private createLineMaterial(data: LineRenderData): THREE.MeshStandardMaterial {
+    const emissiveColor = new THREE.Color(data.color).multiplyScalar(0.35);
+    return new THREE.MeshStandardMaterial({
+      color: data.color,
+      roughness: 0.65,
+      metalness: 0.05,
+      emissive: emissiveColor,
+      emissiveIntensity: 0.6
     });
   }
 
-  /**
-   * Met à jour la géométrie d'une ligne avec une courbe réaliste
-   */
-  private updateLineGeometry(
-    line: THREE.Mesh,
+  private computeLinePoints(
     start: THREE.Vector3,
     end: THREE.Vector3,
+    maxLength: number,
     segments: number
-  ): void {
-    const tubeMesh = line as THREE.Mesh;
+  ): { points: THREE.Vector3[]; clamped: boolean; effectiveLength: number; slack: number } {
+    const startPoint = start.clone();
+    const endPoint = end.clone();
+    const spanVector = new THREE.Vector3().subVectors(endPoint, startPoint);
+    let spanLength = spanVector.length();
+    const epsilon = CONFIG.thresholds.epsilon;
 
-    // Créer une nouvelle courbe pour le tube
-    const points: THREE.Vector3[] = [];
-
-    // Calculer la distance et la direction
-    const direction = new THREE.Vector3().subVectors(end, start);
-    const distance = direction.length();
-
-    // Facteur de courbure (simule la gravité et la tension)
-    const sag = distance * CONFIG.defaults.catenarySagFactor;
-
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-
-      // Interpolation linéaire de base
-      const x = start.x + direction.x * t;
-      const y = start.y + direction.y * t;
-      const z = start.z + direction.z * t;
-
-      // Ajouter une courbure parabolique (caténaire simplifiée)
-      // Maximum au milieu (t = 0.5)
-      const curvature = -sag * 4 * t * (1 - t);
-
-      points.push(new THREE.Vector3(x, y + curvature, z));
+    if (spanLength <= epsilon) {
+      const repeatedPoints = Array.from({ length: segments + 1 }, () => startPoint.clone());
+      return {
+        points: repeatedPoints,
+        clamped: false,
+        effectiveLength: 0,
+        slack: Math.max(0, maxLength)
+      };
     }
 
-    // Créer une nouvelle courbe et géométrie de tube
+    let clamped = false;
+    if (spanLength > maxLength) {
+      spanVector.normalize().multiplyScalar(maxLength);
+      spanLength = maxLength;
+      clamped = true;
+    }
+
+    const segmentsCount = Math.max(4, segments);
+    const targetLength = clamped ? spanLength : maxLength;
+    let sag = spanLength * CONFIG.defaults.catenarySagFactor;
+    if (!clamped) {
+      const slackLength = Math.max(0, maxLength - spanLength);
+      sag += slackLength * 0.65;
+    }
+    sag = Math.min(sag, maxLength * 0.6);
+    sag = Math.max(0, sag);
+
+    let points = this.generatePointsWithSag(startPoint, spanVector, segmentsCount, sag);
+    let curveLength = this.approximateCurveLength(points);
+
+    if (segmentsCount >= 2) {
+      for (let iteration = 0; iteration < 5; iteration += 1) {
+        const diff = targetLength - curveLength;
+        if (Math.abs(diff) <= 0.05) {
+          break;
+        }
+        const adjustment = diff / Math.max(targetLength, epsilon);
+        sag *= 1 + adjustment * 0.5;
+        sag = Math.min(Math.max(0, sag), maxLength * 0.6);
+        points = this.generatePointsWithSag(startPoint, spanVector, segmentsCount, sag);
+        curveLength = this.approximateCurveLength(points);
+      }
+    }
+
+    return {
+      points,
+      clamped,
+      effectiveLength: curveLength,
+      slack: Math.max(0, targetLength - curveLength)
+    };
+  }
+
+  private generatePointsWithSag(
+    start: THREE.Vector3,
+    spanVector: THREE.Vector3,
+    segments: number,
+    sag: number
+  ): THREE.Vector3[] {
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i += 1) {
+      const t = i / segments;
+      const point = new THREE.Vector3(
+        start.x + spanVector.x * t,
+        start.y + spanVector.y * t,
+        start.z + spanVector.z * t
+      );
+      if (segments >= 2 && sag !== 0) {
+        const curvature = -sag * 4 * t * (1 - t);
+        point.y += curvature;
+      }
+      points.push(point);
+    }
+    return points;
+  }
+
+  private approximateCurveLength(points: THREE.Vector3[]): number {
+    let total = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      total += points[i].distanceTo(points[i - 1]);
+    }
+    return total;
+  }
+
+  private createTubeGeometry(
+    points: THREE.Vector3[],
+    segments: number,
+    linewidth: number
+  ): THREE.TubeGeometry {
     const curve = new THREE.CatmullRomCurve3(points);
-    const newTubeGeometry = new THREE.TubeGeometry(
+    const tubularSegments = Math.min(
+      CONFIG.thresholds.maxLineSegments,
+      Math.max(segments * 4, CONFIG.defaults.meshSegments)
+    );
+    const radius = Math.max(CONFIG.defaults.tubeRadius, linewidth * 0.001);
+    return new THREE.TubeGeometry(
       curve,
-      segments,
-      CONFIG.defaults.tubeRadius, // Utilise la valeur de config (0.015)
+      tubularSegments,
+      radius,
       CONFIG.defaults.tubeRadialSegments,
       false
     );
+  }
 
-    // Remplacer la géométrie
-    if (tubeMesh.geometry) {
-      tubeMesh.geometry.dispose();
+  private updateLineComponentSegments(entity: Entity, points: THREE.Vector3[]): void {
+    const lineComponent = entity.getComponent<LineComponent>('line');
+    if (!lineComponent) {
+      return;
     }
-    tubeMesh.geometry = newTubeGeometry;
+    lineComponent.segments = points.map(point => point.clone());
+  }
+
+  private handleClampLogging(
+    id: string,
+    clamped: boolean,
+    maxLength: number,
+    effectiveLength: number
+  ): void {
+    if (effectiveLength > maxLength) {
+      if (!this.clampedLines.has(id)) {
+        this.logger.warn(
+          `Line ${id} reached max length (${effectiveLength.toFixed(1)}m/${maxLength.toFixed(1)}m)`,
+          'LinesRenderSystem'
+        );
+        this.clampedLines.add(id);
+      }
+    } else if (this.clampedLines.delete(id)) {
+      // Ligne revenue dans les limites (log silencieux)
+    }
   }
 
   /**
@@ -230,6 +557,7 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     const material = line.material as THREE.MeshStandardMaterial;
     if (material && material.color) {
       material.color.setHex(color);
+      material.emissive.setHex(color).multiplyScalar(0.35);
     }
   }
 
@@ -279,7 +607,7 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       scene.add(mesh.object3D);
       const tubeMesh = mesh.object3D as THREE.Mesh;
       const material = tubeMesh.material as THREE.MeshStandardMaterial;
-      console.log(`✅ Ligne ${side} ajoutée à la scène:`, {
+      this.logger.info(`✅ Ligne ${side} ajoutée à la scène:`, 'LinesRenderSystem', {
         id,
         position: mesh.object3D.position.toArray(),
         visible: mesh.object3D.visible,
@@ -288,7 +616,7 @@ export class LinesRenderSystem extends BaseSimulationSystem {
         color: material.color.getHexString()
       });
     } else {
-      console.error(`🔴 Ligne ${side}: mesh component manquant!`);
+      this.logger.error(`🔴 Ligne ${side}: mesh component manquant!`, 'LinesRenderSystem');
     }
 
     // Enregistrer l'entité
@@ -310,32 +638,11 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     if (!entity) return;
 
     const mesh = entity.getComponent<MeshComponent>('mesh');
-    if (mesh) {
+    if (mesh && mesh.object3D.parent) {
       scene.remove(mesh.object3D);
-      mesh.dispose();
     }
-
     this.lineEntities.delete(id);
-  }
-
-  reset(): void {
-    // Les lignes n'ont pas d'état à réinitialiser
-    // La géométrie sera recalculée au prochain update
-    this.logger.info('LinesRenderSystem reset', 'LinesRenderSystem');
-  }
-
-  dispose(): void {
-    this.lineEntities.forEach((entity) => {
-      const mesh = entity.getComponent<MeshComponent>('mesh');
-      if (mesh) {
-        mesh.dispose();
-      }
-    });
-
-    this.lineEntities.clear();
-    this.kite = null;
-    this.controlBarSystem = null;
-
-    this.logger.info('LinesRenderSystem disposed', 'LinesRenderSystem');
+    this.lineRenderData.delete(id);
+    this.clampedLines.delete(id);
   }
 }

@@ -22,22 +22,31 @@
  *   - src/simulation/config/SimulationConfig.ts
  */
 import * as THREE from "three";
-
 import { WindParams } from "@mytypes/PhysicsTypes";
+
 import { CONFIG } from "../config/SimulationConfig";
+
+import {
+  BaseSimulationSystem,
+  SimulationContext,
+} from "@base/BaseSimulationSystem";
+import { Logger } from "@utils/Logging";
 
 /**
  * Simulateur de vent et turbulences
  *
  * Gère le vent et ses variations pour créer des conditions réalistes
  */
-export class WindSimulator {
+export class WindSimulator extends BaseSimulationSystem {
   private params: WindParams;
   private time: number = 0; // Compteur de temps pour faire varier les turbulences
   private windSpeedMs: number = 0;
   private windRad: number = 0;
+  private logger = Logger.getInstance();
 
   constructor() {
+    super("WindSimulator", 1); // Exécuté au début du cycle de physique
+
     // On démarre avec les réglages par défaut du vent
     this.params = {
       speed: CONFIG.wind.defaultSpeed,
@@ -45,6 +54,23 @@ export class WindSimulator {
       turbulence: CONFIG.wind.defaultTurbulence,
     };
     this.updateWindInternals();
+  }
+
+  initialize(): Promise<void> {
+    this.logger.info("WindSimulator initialized", "WindSimulator");
+    return Promise.resolve();
+  }
+
+  update(context: SimulationContext): void {
+    this.time += context.deltaTime;
+  }
+
+  reset(): void {
+    this.time = 0;
+  }
+
+  dispose(): void {
+    // Rien à nettoyer
   }
 
   private updateWindInternals(): void {
@@ -70,11 +96,6 @@ export class WindSimulator {
     // Utiliser des sinus pour créer des variations douces et naturelles
     turbulenceVector.x +=
       Math.sin(this.time * freq) *
-      this.windSpeedMs *
-      turbIntensity *
-      CONFIG.wind.turbulenceIntensityXZ;
-    turbulenceVector.y +=
-      Math.sin(this.time * freq * CONFIG.wind.turbulenceFreqY) *
       this.windSpeedMs *
       turbIntensity *
       CONFIG.wind.turbulenceIntensityY;

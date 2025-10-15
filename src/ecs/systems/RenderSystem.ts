@@ -4,13 +4,13 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { Logger } from '@utils/Logging';
 
 export interface RenderState {
   scene: THREE.Scene;
   camera: THREE.Camera;
+  kiteCamera: THREE.PerspectiveCamera; // Caméra isométrique centrée sur le kite (mini-vue)
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
   controls: OrbitControls;
@@ -18,6 +18,7 @@ export interface RenderState {
   frameCount: number;
   fps: number;
   lastFrameTime: number;
+  showMiniView: boolean; // Active/désactive la mini-vue du kite
 }
 
 export interface RenderConfig {
@@ -57,8 +58,6 @@ export class RenderSystem extends BaseSimulationSystem {
   }
 
   async initialize(): Promise<void> {
-    this.logger.info('RenderSystem initializing...', 'RenderSystem');
-
     // Mettre à jour pixelRatio maintenant que window est disponible
     if (typeof window !== 'undefined') {
       this.config.pixelRatio = Math.min(window.devicePixelRatio, 2);
@@ -66,7 +65,7 @@ export class RenderSystem extends BaseSimulationSystem {
 
     try {
       await this.initializeRenderer();
-      this.logger.info('RenderSystem initialized successfully', 'RenderSystem');
+      this.logger.info('RenderSystem initialized', 'RenderSystem');
     } catch (error) {
       this.logger.error(`RenderSystem initialization failed: ${error}`, 'RenderSystem');
       throw error;
@@ -145,8 +144,6 @@ export class RenderSystem extends BaseSimulationSystem {
       directionalLight.shadow.camera.far = 500;
     }
     scene.add(directionalLight);
-
-    this.logger.info('Scene lights created', 'RenderSystem');
   }
 
   /**
@@ -170,17 +167,27 @@ export class RenderSystem extends BaseSimulationSystem {
     const gridHelper = new THREE.GridHelper(100, 50, 0x888888, 0x444444);
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
-
-    this.logger.info('Ground plane and grid created', 'RenderSystem');
   }
 
   /**
-   * Crée et configure la caméra
+   * Crée et configure la caméra principale
    */
   private createCamera(): THREE.PerspectiveCamera {
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 3, 5);
-    camera.lookAt(0, 5, -15);
+    // Position de la caméra : vue de côté pour voir pilote + barre + kite
+    camera.position.set(8, 5, 5);
+    camera.lookAt(0, 5, -8);
+    return camera;
+  }
+
+  /**
+   * Crée et configure la caméra isométrique centrée sur le kite
+   */
+  private createKiteCamera(): THREE.PerspectiveCamera {
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    // Position isométrique : vue à 45° de côté et légèrement au-dessus
+    camera.position.set(3, 3, 3);
+    camera.lookAt(0, 0, 0);
     return camera;
   }
 
@@ -194,10 +201,10 @@ export class RenderSystem extends BaseSimulationSystem {
     controls.minDistance = 2;
     controls.maxDistance = 100;
     controls.maxPolarAngle = Math.PI / 2;
-    controls.target.set(0, 5, -10);
+    // Target au milieu de la scène (entre pilote et kite)
+    controls.target.set(0, 5, -8);
     controls.update();
 
-    this.logger.info('OrbitControls created', 'RenderSystem');
     return controls;
   }
 
@@ -207,9 +214,6 @@ export class RenderSystem extends BaseSimulationSystem {
   private setupCanvasInDOM(canvas: HTMLCanvasElement): void {
     const container = document.getElementById('app') || document.body;
     container.appendChild(canvas);
-
-    this.logger.info(`Canvas created and added to container: ${container.id || 'body'}`, 'RenderSystem');
-    this.logger.info(`Canvas dimensions: ${canvas.width}x${canvas.height}`, 'RenderSystem');
 
     // Écouteur de redimensionnement
     window.addEventListener('resize', this.onResize.bind(this));
@@ -230,21 +234,24 @@ export class RenderSystem extends BaseSimulationSystem {
     this.setupLighting(scene);
     this.setupGroundAndGrid(scene);
 
-    // Création de la caméra et contrôles
+    // Création des caméras et contrôles
     const camera = this.createCamera();
+    const kiteCamera = this.createKiteCamera();
     const controls = this.createCameraControls(camera, canvas);
 
     // Initialisation de l'état
     this.renderState = {
       scene,
       camera,
+      kiteCamera,
       renderer,
       canvas,
       controls,
       isRendering: false,
       frameCount: 0,
       fps: 0,
-      lastFrameTime: performance.now()
+      lastFrameTime: performance.now(),
+      showMiniView: true // Activer la mini-vue par défaut
     };
 
     // Configuration finale
@@ -260,13 +267,68 @@ export class RenderSystem extends BaseSimulationSystem {
     // Mettre à jour les contrôles de caméra
     this.renderState.controls.update();
 
+    // Mettre à jour la position de la caméra kite pour suivre le kite
+    this.updateKiteCameraPosition();
+
     // Calculer le FPS
     this.updateFPS();
 
-    // Rendre la scène
-    this.renderState.renderer.render(this.renderState.scene, this.renderState.camera);
+    // Rendre la scène principale (plein écran)
+    const renderer = this.renderState.renderer;
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
+    renderer.setScissorTest(false);
+    renderer.render(this.renderState.scene, this.renderState.camera);
+
+    // Rendre la mini-vue du kite (en bas à droite)
+    if (this.renderState.showMiniView) {
+      this.renderMiniView();
+    }
 
     this.renderState.frameCount++;
+  }
+
+  /**
+   * Met à jour la position de la caméra kite pour qu'elle suive le kite
+   */
+  private updateKiteCameraPosition(): void {
+    if (!this.renderState) return;
+
+    // Chercher l'entité kite dans la scène
+    const kiteObject = this.renderState.scene.getObjectByName('kite');
+    if (kiteObject) {
+      // Positionner la caméra en vue isométrique autour du kite
+      const offset = new THREE.Vector3(2, 2, 2);
+      this.renderState.kiteCamera.position.copy(kiteObject.position).add(offset);
+      this.renderState.kiteCamera.lookAt(kiteObject.position);
+    }
+  }
+
+  /**
+   * Rend la mini-vue du kite en bas à droite
+   */
+  private renderMiniView(): void {
+    if (!this.renderState) return;
+
+    const renderer = this.renderState.renderer;
+    const miniViewWidth = 300;  // pixels
+    const miniViewHeight = 300; // pixels
+    const margin = 10;          // pixels de marge
+
+    // Position en bas à droite
+    const miniViewX = window.innerWidth - miniViewWidth - margin;
+    const miniViewY = margin; // En bas (coordonnées WebGL)
+
+    // Configurer le viewport et le scissor pour la mini-vue
+    renderer.setViewport(miniViewX, miniViewY, miniViewWidth, miniViewHeight);
+    renderer.setScissor(miniViewX, miniViewY, miniViewWidth, miniViewHeight);
+    renderer.setScissorTest(true);
+
+    // Rendre la scène avec la caméra kite
+    renderer.render(this.renderState.scene, this.renderState.kiteCamera);
+
+    // Désactiver le scissor test
+    renderer.setScissorTest(false);
   }
 
   /**
@@ -310,20 +372,7 @@ export class RenderSystem extends BaseSimulationSystem {
   startRendering(): void {
     if (this.renderState) {
       this.renderState.isRendering = true;
-      this.logger.info('✅ Rendering started', 'RenderSystem');
-      this.logger.info(`  Canvas: ${this.renderState.canvas.id}`, 'RenderSystem');
-      this.logger.info(`  Canvas size: ${this.renderState.canvas.width}x${this.renderState.canvas.height}`, 'RenderSystem');
-      this.logger.info(`  Scene children: ${this.renderState.scene.children.length}`, 'RenderSystem');
-      this.logger.info(`  Camera position: ${this.renderState.camera.position.toArray()}`, 'RenderSystem');
-      
-      // Lister tous les objets de la scène
-      this.renderState.scene.children.forEach((child, index) => {
-        this.logger.debug(`    [${index}] ${child.type} "${child.name}" at ${child.position.toArray()}`, 'RenderSystem');
-      });
-      
-      // Forcer un rendu immédiat pour tester
       this.renderState.renderer.render(this.renderState.scene, this.renderState.camera);
-      this.logger.info('  First frame rendered', 'RenderSystem');
     } else {
       this.logger.error('❌ Cannot start rendering - renderState is null', 'RenderSystem');
     }
