@@ -458,8 +458,11 @@ export class SimulationApp {
         }
       },
       setLineLength: (length: number) => {
+        console.log('🚀 SimulationApp.setLineLength called with:', length);
         if (this.kitePhysicsSystem) {
           this.kitePhysicsSystem.setLineLength(length);
+        } else {
+          console.warn('  ⚠️ KitePhysicsSystem not initialized!');
         }
       },
       setWindParams: (params: {

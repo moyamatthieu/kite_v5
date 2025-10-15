@@ -504,13 +504,17 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Met à jour la longueur des lignes
    */
   setLineLength(length: number): void {
+    console.log('🎯 KitePhysicsSystem.setLineLength called with:', length);
     this.config.lineLength = length;
     // TODO: Mettre à jour la longueur des lignes via les composants ECS
     // if (this.kite) {
     //   this.kite.userData.lineLength = length;
     // }
     if (this.lineSystem) {
+      console.log('  ➡️ Delegating to LineSystem...');
       this.lineSystem.setLineLength(length);
+    } else {
+      console.warn('  ⚠️ LineSystem not initialized!');
     }
   }
 

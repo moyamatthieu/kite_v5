@@ -44,11 +44,13 @@ export class PureLineSystem extends BaseSimulationSystem {
     // Trouver les entités de lignes via EntityManager
     const allEntities = this.entityManager.getAllEntities();
 
-    this.leftLineEntity = allEntities.find(e => e.id === 'line-left') || null;
-    this.rightLineEntity = allEntities.find(e => e.id === 'line-right') || null;
+    this.leftLineEntity = allEntities.find(e => e.id === 'leftLine') || null;
+    this.rightLineEntity = allEntities.find(e => e.id === 'rightLine') || null;
 
     if (!this.leftLineEntity || !this.rightLineEntity) {
       this.logger.warn('Line entities not found in EntityManager', 'PureLineSystem');
+    } else {
+      this.logger.info(`Line entities found: ${this.leftLineEntity.id}, ${this.rightLineEntity.id}`, 'PureLineSystem');
     }
   }
 
@@ -332,14 +334,32 @@ export class PureLineSystem extends BaseSimulationSystem {
    * Modifie la longueur des lignes
    */
   setLineLength(length: number): void {
+    console.log('🔧 LineSystem.setLineLength called with:', length);
+    
     if (this.leftLineEntity) {
       const leftLine = this.leftLineEntity.getComponent<LineComponent>('line');
-      if (leftLine) leftLine.config.length = length;
+      if (leftLine) {
+        console.log('  📏 Old left line length:', leftLine.config.length);
+        leftLine.config.length = length;
+        console.log('  ✅ New left line length:', leftLine.config.length);
+      } else {
+        console.warn('  ⚠️ Left line component not found!');
+      }
+    } else {
+      console.warn('  ⚠️ leftLineEntity not assigned!');
     }
 
     if (this.rightLineEntity) {
       const rightLine = this.rightLineEntity.getComponent<LineComponent>('line');
-      if (rightLine) rightLine.config.length = length;
+      if (rightLine) {
+        console.log('  📏 Old right line length:', rightLine.config.length);
+        rightLine.config.length = length;
+        console.log('  ✅ New right line length:', rightLine.config.length);
+      } else {
+        console.warn('  ⚠️ Right line component not found!');
+      }
+    } else {
+      console.warn('  ⚠️ rightLineEntity not assigned!');
     }
   }
 }
