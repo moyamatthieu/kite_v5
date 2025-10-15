@@ -17,6 +17,7 @@ import { GeometryComponent } from "@components/GeometryComponent";
 import { TransformComponent } from "@components/TransformComponent";
 import { BridleComponent } from "@components/BridleComponent";
 import { LineComponent } from "@components/LineComponent";
+import { PhysicsComponent } from "@components/PhysicsComponent";
 import { HandlePositions } from "@mytypes/PhysicsTypes";
 
 import { BridleLengths } from "../types/BridleTypes";
@@ -509,4 +510,214 @@ export class PureConstraintSolver {
       }
     }
   }
+
+  /**
+   * Résout la position d'un point de contrôle par quadrilatération (intersection de 4 sphères)
+   * 
+   * Le point CTRL est contraint par :
+   * - 3 brides depuis le kite (NEZ, INTER, CENTRE)
+   * - 1 ligne vers la poignée
+   * 
+   * C'est une trilatération 3D étendue à 4 contraintes pour sur-détermination.
+   * 
+   * @param kiteEntity - Entité du kite (pour récupérer points d'attache)
+   * @param handlePosition - Position de la poignée
+   * @param bridleLengths - Longueurs des 3 brides
+   * @param lineLength - Longueur de la ligne de contrôle
+   * @param attachments - Noms des points d'attache (NEZ, INTER, CENTRE)
+   * @returns Position résolue du point CTRL
+   */
+  static solveControlPointPosition(
+    kiteEntity: Entity,
+    handlePosition: THREE.Vector3,
+    bridleLengths: { nez: number; inter: number; centre: number },
+    lineLength: number,
+    attachments: { nez: string; inter: string; centre: string }
+  ): THREE.Vector3 {
+    const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    const transform = kiteEntity.getComponent<TransformComponent>('transform');
+
+    if (!geometry || !transform) {
+      console.warn('⚠️ Kite entity missing geometry or transform');
+      return handlePosition.clone();
+    }
+
+    // Helper : convertir point local en coordonnées monde
+    const toWorldCoordinates = (
+      localPoint: THREE.Vector3,
+      position: THREE.Vector3,
+      quaternion: THREE.Quaternion
+    ): THREE.Vector3 => {
+      return localPoint.clone().applyQuaternion(quaternion).add(position);
+    };
+
+    // Récupérer les 3 points d'attache sur le kite (coordonnées monde)
+    const nezLocal = geometry.getPoint(attachments.nez);
+    const interLocal = geometry.getPoint(attachments.inter);
+    const centreLocal = geometry.getPoint(attachments.centre);
+
+    if (!nezLocal || !interLocal || !centreLocal) {
+      console.warn('⚠️ Attachment points not found:', attachments);
+      return handlePosition.clone();
+    }
+
+    const nezWorld = toWorldCoordinates(nezLocal, transform.position, transform.quaternion);
+    const interWorld = toWorldCoordinates(interLocal, transform.position, transform.quaternion);
+    const centreWorld = toWorldCoordinates(centreLocal, transform.position, transform.quaternion);
+
+    // Trilatération 3D pour résoudre position CTRL
+    // Basé sur les 3 brides (on ignore la ligne pour l'instant, elle sera appliquée après comme contrainte)
+    const ctrlPosition = this.trilaterate3D(
+      nezWorld,
+      bridleLengths.nez,
+      interWorld,
+      bridleLengths.inter,
+      centreWorld,
+      bridleLengths.centre
+    );
+
+    // Appliquer contrainte de la ligne (projection sur sphère centrée sur poignée)
+    const toHandle = ctrlPosition.clone().sub(handlePosition);
+    const distToHandle = toHandle.length();
+
+    if (distToHandle > lineLength) {
+      // Si trop loin, projeter sur la sphère de rayon lineLength
+      const direction = toHandle.normalize();
+      ctrlPosition.copy(handlePosition).add(direction.multiplyScalar(lineLength));
+    }
+
+    return ctrlPosition;
+  }
+
+  /**
+   * Trilatération 3D : trouve le point d'intersection de 3 sphères
+   * 
+   * Méthode analytique basée sur géométrie vectorielle
+   * Référence : https://en.wikipedia.org/wiki/Trilateration
+   * 
+   * @param p1 - Centre sphère 1
+   * @param r1 - Rayon sphère 1
+   * @param p2 - Centre sphère 2
+   * @param r2 - Rayon sphère 2
+   * @param p3 - Centre sphère 3
+   * @param r3 - Rayon sphère 3
+   * @returns Point d'intersection (ou approximation si pas de solution exacte)
+   */
+  private static trilaterate3D(
+    p1: THREE.Vector3,
+    r1: number,
+    p2: THREE.Vector3,
+    r2: number,
+    p3: THREE.Vector3,
+    r3: number
+  ): THREE.Vector3 {
+    // Créer repère local avec p1 comme origine
+    const ex = p2.clone().sub(p1).normalize();
+    const d = p2.distanceTo(p1);
+
+    // Vecteur p1->p3 dans le repère local
+    const p3ToP1 = p3.clone().sub(p1);
+    const i = ex.dot(p3ToP1);
+
+    // Deuxième axe (perpendiculaire à ex, dans le plan p1-p2-p3)
+    const eyTemp = p3ToP1.clone().addScaledVector(ex, -i);
+    const ey = eyTemp.normalize();
+
+    // Troisième axe (perpendiculaire aux deux premiers)
+    const ez = new THREE.Vector3().crossVectors(ex, ey);
+
+    const j = ey.dot(p3ToP1);
+
+    // Résolution du système d'équations
+    // x² + y² + z² = r1²
+    // (x-d)² + y² + z² = r2²
+    // (x-i)² + (y-j)² + z² = r3²
+
+    const x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
+
+    // Calcul de z (deux solutions possibles, on prend celle vers l'arrière du kite)
+    const zSquared = r1 * r1 - x * x - y * y;
+    const z = zSquared > 0 ? -Math.sqrt(zSquared) : 0; // Solution négative (vers l'arrière)
+
+    // Retour dans le repère monde
+    const result = p1.clone();
+    result.add(ex.clone().multiplyScalar(x));
+    result.add(ey.clone().multiplyScalar(y));
+    result.add(ez.clone().multiplyScalar(z));
+
+    return result;
+  }
+
+  /**
+   * Applique les forces de bride sur le kite depuis un point de contrôle
+   * 
+   * Les 3 brides tirent sur leurs points d'attache respectifs avec une force
+   * proportionnelle à leur tension (calculée depuis la différence de longueur).
+   * 
+   * @param kiteEntity - Entité du kite
+   * @param ctrlPosition - Position actuelle du point CTRL
+   * @param bridleLengths - Longueurs au repos des brides
+   * @param attachments - Points d'attache sur le kite
+   * @param bridleStiffness - Raideur des brides (N/m)
+   */
+  static applyBridleForces(
+    kiteEntity: Entity,
+    ctrlPosition: THREE.Vector3,
+    bridleLengths: { nez: number; inter: number; centre: number },
+    attachments: { nez: string; inter: string; centre: string },
+    bridleStiffness: number = 5000 // N/m - raideur typique pour brides Dyneema
+  ): void {
+    const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    const transform = kiteEntity.getComponent<TransformComponent>('transform');
+    const physics = kiteEntity.getComponent<PhysicsComponent>('physics');
+
+    if (!geometry || !transform || !physics) {
+      return;
+    }
+
+    // Helper : convertir point local en coordonnées monde
+    const toWorldCoordinates = (
+      localPoint: THREE.Vector3,
+      position: THREE.Vector3,
+      quaternion: THREE.Quaternion
+    ): THREE.Vector3 => {
+      return localPoint.clone().applyQuaternion(quaternion).add(position);
+    };
+
+    // Pour chaque bride, calculer et appliquer la force
+    const applyBridleForce = (pointName: string, restLength: number) => {
+      const pointLocal = geometry.getPoint(pointName);
+      if (!pointLocal) return;
+
+      const pointWorld = toWorldCoordinates(pointLocal, transform.position, transform.quaternion);
+      
+      // Vecteur du point d'attache vers CTRL
+      const direction = ctrlPosition.clone().sub(pointWorld);
+      const currentLength = direction.length();
+      
+      // Extension de la bride
+      const extension = currentLength - restLength;
+      
+      // Force de tension (loi de Hooke: F = k·Δx)
+      // Seulement si bride tendue (extension > 0)
+      if (extension > 0) {
+        const forceMagnitude = bridleStiffness * extension;
+        const force = direction.normalize().multiplyScalar(forceMagnitude);
+        
+        // Appliquer la force au point d'attache
+        // Le bras de levier crée un couple
+        const lever = pointWorld.clone().sub(transform.position);
+        const torque = new THREE.Vector3().crossVectors(lever, force);
+        
+        physics.addForce(force);
+        physics.addTorque(torque);
+      }
+    };
+
+    applyBridleForce(attachments.nez, bridleLengths.nez);
+    applyBridleForce(attachments.inter, bridleLengths.inter);
+    applyBridleForce(attachments.centre, bridleLengths.centre);
+  }
 }
+

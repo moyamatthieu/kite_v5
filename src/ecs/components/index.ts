@@ -13,3 +13,4 @@ export { AerodynamicsComponent } from './AerodynamicsComponent';
 export { LineComponent, type LineConfig, type LineAttachments, type LineState } from './LineComponent';
 export { StructureComponent, type PointConnection } from './StructureComponent';
 export { SurfaceComponent } from './SurfaceComponent';
+export { ControlPointComponent, type ControlPointConfig, type BridleAttachments } from './ControlPointComponent';
