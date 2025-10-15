@@ -11,7 +11,8 @@
 import * as THREE from 'three';
 import { Entity } from '@base/Entity';
 
-import { TransformComponent, MeshComponent } from '../components';
+import { TransformComponent } from '@components/TransformComponent';
+import { MeshComponent } from '@components/MeshComponent';
 
 /**
  * Options pour créer un TransformComponent

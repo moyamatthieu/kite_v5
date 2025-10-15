@@ -17,6 +17,13 @@ export class DebugRenderer {
   private arrowHelpers: THREE.ArrowHelper[] = [];
   private arrowGroup: THREE.Group | null = null;
 
+  // Facteurs d'échelle centralisés pour visualisation
+  // Note: Les forces sont déjà multipliées par liftScale/dragScale dans AerodynamicsCalculator
+  // Ici on ajuste juste la longueur visuelle des flèches (1N = Xm de flèche)
+  private readonly LIFT_SCALE = 0.1;  // 1N = 10cm de flèche
+  private readonly DRAG_SCALE = 0.1;  // 1N = 10cm de flèche
+  private readonly WIND_SCALE = 0.05;  // 1 m/s = 5cm
+
   constructor(options: DebugRendererOptions) {
     this.options = options;
     this.debugMode = false;
@@ -53,10 +60,19 @@ export class DebugRenderer {
     // Nettoyer les anciennes flèches
     this.clearArrows();
 
-    // Facteur d'échelle pour la visualisation (ajustable)
-    const liftScale = 0.02;  // 1N = 2cm
-    const dragScale = 0.02;  // 1N = 2cm
-    const windScale = 0.05;  // 1 m/s = 5cm
+    // Utilisation des facteurs d'échelle centralisés
+    const liftScale = this.LIFT_SCALE;
+    const dragScale = this.DRAG_SCALE;
+    const windScale = this.WIND_SCALE;
+
+    // Log de debug pour vérifier les forces (première surface seulement)
+    if (surfaceForces.length > 0) {
+      const firstSurface = surfaceForces[0];
+      this.logger.debug(
+        `Surface 0: Lift=${firstSurface.lift.length().toFixed(3)}N, Drag=${firstSurface.drag.length().toFixed(3)}N, Wind=${apparentWind.length().toFixed(2)}m/s`,
+        'DebugRenderer'
+      );
+    }
 
     // Créer les flèches pour chaque surface
     surfaceForces.forEach((surface) => {
@@ -64,30 +80,30 @@ export class DebugRenderer {
       
       const center = surface.center;
 
-      // Vecteur de portance (VERT)
+      // Vecteur de portance (VERT FONCÉ)
       if (surface.lift.length() > 0.01) {
         const liftArrow = new THREE.ArrowHelper(
           surface.lift.clone().normalize(),
           center,
           surface.lift.length() * liftScale,
-          0x00ff00, // Vert
-          0.05,     // Longueur tête
-          0.03      // Largeur tête
+          0x008000, // Vert foncé
+          0.10,     // Longueur tête
+          0.06      // Largeur tête
         );
         liftArrow.name = 'lift-vector';
         this.arrowGroup.add(liftArrow);
         this.arrowHelpers.push(liftArrow);
       }
 
-      // Vecteur de traînée (ROUGE)
+      // Vecteur de traînée (ROUGE FONCÉ)
       if (surface.drag.length() > 0.01) {
         const dragArrow = new THREE.ArrowHelper(
           surface.drag.clone().normalize(),
           center,
           surface.drag.length() * dragScale,
-          0xff0000, // Rouge
-          0.05,
-          0.03
+          0x800000, // Rouge foncé
+          0.10,
+          0.06
         );
         dragArrow.name = 'drag-vector';
         this.arrowGroup.add(dragArrow);

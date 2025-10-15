@@ -18,7 +18,7 @@ import * as THREE from "three";
 import { KiteGeometry } from "../config/KiteGeometry";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
-import { SurfaceForce } from '../types/PhysicsTypes';
+import { SurfaceForce } from 'src/ecs/types/PhysicsTypes';
 import { Logger } from '@utils/Logging';
 
 /**

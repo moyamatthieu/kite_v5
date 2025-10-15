@@ -9,8 +9,8 @@ import * as THREE from 'three';
 import { CONFIG } from '@config/SimulationConfig';
 import { Entity } from '@base/Entity';
 
-import { TransformComponent } from '../components/TransformComponent';
-import { MeshComponent } from '../components/MeshComponent';
+import { TransformComponent } from '@components/TransformComponent';
+import { MeshComponent } from '@components/MeshComponent';
 
 
 export class PilotEntity extends Entity {

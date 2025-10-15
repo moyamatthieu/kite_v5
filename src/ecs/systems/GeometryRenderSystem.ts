@@ -14,11 +14,11 @@ import { Entity } from '@base/Entity';
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { EntityManager } from '@entities/EntityManager';
 
-import { GeometryComponent } from '../components/GeometryComponent';
-import { VisualComponent } from '../components/VisualComponent';
-import { BridleComponent, type BridleTensions } from '../components/BridleComponent';
-import { MeshComponent } from '../components/MeshComponent';
-import { TransformComponent } from '../components/TransformComponent';
+import { GeometryComponent } from '@components/GeometryComponent';
+import { VisualComponent } from '@components/VisualComponent';
+import { BridleComponent, type BridleTensions } from '@components/BridleComponent';
+import { MeshComponent } from '@components/MeshComponent';
+import { TransformComponent } from '@components/TransformComponent';
 import { Logger } from '@utils/Logging';
 
 import { RenderSystem } from './RenderSystem';

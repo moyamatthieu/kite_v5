@@ -25,7 +25,7 @@ import {
   PhysicsComponent
 } from '@components/index';
 
-import { CONFIG } from '../config/SimulationConfig';
+import { CONFIG } from '@config/SimulationConfig';
 
 export interface KiteFactoryParams {
   position?: THREE.Vector3;

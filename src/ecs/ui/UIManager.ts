@@ -104,26 +104,27 @@ export class UIManager {
       debugBtn.textContent = this.debugRenderer.isDebugMode() ? "🔍 Debug ON" : "🔍 Debug OFF";
       debugBtn.classList.toggle("active", this.debugRenderer.isDebugMode());
 
-      debugBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        this.debugRenderer.toggleDebugMode();
-        
-        // Mettre à jour l'affichage du bouton après le toggle
-        debugBtn.textContent = this.debugRenderer.isDebugMode() ? "🔍 Debug ON" : "🔍 Debug OFF";
-        debugBtn.classList.toggle("active", this.debugRenderer.isDebugMode());
-        
-        // Afficher/cacher le panneau de debug
-        const debugPanel = document.getElementById("debug-panel");
-        if (debugPanel) {
-          debugPanel.style.display = this.debugRenderer.isDebugMode() ? "block" : "none";
-        }
-        
-        if (this.debugRenderer.isDebugMode()) {
-          document.body.classList.add("debug-mode");
-        } else {
-          document.body.classList.remove("debug-mode");
-        }
-      });
+      // Guard : éviter d'ajouter plusieurs fois l'écouteur
+      if (!debugBtn.dataset.listenerAdded) {
+        debugBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.debugRenderer.toggleDebugMode();
+          // Mettre à jour l'affichage du bouton après le toggle
+          debugBtn.textContent = this.debugRenderer.isDebugMode() ? "🔍 Debug ON" : "🔍 Debug OFF";
+          debugBtn.classList.toggle("active", this.debugRenderer.isDebugMode());
+          // Afficher/cacher le panneau de debug
+          const debugPanel = document.getElementById("debug-panel");
+          if (debugPanel) {
+            debugPanel.style.display = this.debugRenderer.isDebugMode() ? "block" : "none";
+          }
+          if (this.debugRenderer.isDebugMode()) {
+            document.body.classList.add("debug-mode");
+          } else {
+            document.body.classList.remove("debug-mode");
+          }
+        });
+        debugBtn.dataset.listenerAdded = "true";
+      }
     }
 
     if (this.debugRenderer.isDebugMode()) {

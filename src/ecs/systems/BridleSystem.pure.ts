@@ -22,7 +22,7 @@ import { TransformComponent } from '@components/TransformComponent';
 import { BridleComponent } from '@components/BridleComponent';
 import { Logger } from '@utils/Logging';
 
-import { BridleTensions } from '../types/BridleTypes';
+import { BridleTensions } from 'src/ecs/types/BridleTypes';
 
 /**
  * Système ECS pur de gestion des brides
