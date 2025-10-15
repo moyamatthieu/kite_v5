@@ -81,7 +81,8 @@ export class SimulationApp {
   private loggingSystem!: LoggingSystem;
 
   // === ENTITÉS PRINCIPALES ===
-  // Supprimées - utilisation exclusive d'EntityManager
+  // Référence au kite pour accès direct aux composants (UI, etc.)
+  private kiteEntity?: Entity;
 
   // === INTERFACE ===
   private uiManager?: UIManager;
@@ -253,6 +254,9 @@ export class SimulationApp {
     );
     const kiteEntity = KiteEntityFactory.create(controlBarPosition);
     this.entityManager.registerEntity(kiteEntity);
+    
+    // Stocker la référence pour accès direct aux composants
+    this.kiteEntity = kiteEntity;
 
     // Créer l'entité barre de contrôle via la factory
     const controlBarEntity = ControlBarEntityFactory.create();
@@ -422,12 +426,22 @@ export class SimulationApp {
    */
   private createSimulationControls(): SimulationControls {
     return {
-      getBridleLengths: () =>
-        this.kitePhysicsSystem?.getBridleLengths() || {
+      getBridleLengths: () => {
+        // Lire directement depuis le BridleComponent du kite (plus fiable que via les systèmes)
+        if (this.kiteEntity) {
+          const bridleComponent = this.kiteEntity.getComponent<BridleComponent>('bridle');
+          if (bridleComponent) {
+            return { ...bridleComponent.lengths };
+          }
+        }
+        
+        // Fallback : valeurs par défaut
+        return {
           nez: 0.65,
           inter: 0.65,
           centre: 0.65,
-        },
+        };
+      },
       setBridleLength: (type: "nez" | "inter" | "centre", length: number) => {
         if (this.kitePhysicsSystem) {
           const currentLengths = this.kitePhysicsSystem.getBridleLengths();
