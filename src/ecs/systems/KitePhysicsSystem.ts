@@ -144,10 +144,11 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     this.lineSystem = new PureLineSystem(this.entityManager);
 
     // Configurer LineSystem avec les entités ECS
-    const leftLine = this.entityManager.getEntity("line-left");
-    const rightLine = this.entityManager.getEntity("line-right");
+    const leftLine = this.entityManager.getEntity("leftLine");
+    const rightLine = this.entityManager.getEntity("rightLine");
     if (leftLine && rightLine) {
       this.lineSystem.setLineEntities(leftLine, rightLine);
+      this.logger.info(`LineSystem configured with entities: ${leftLine.id}, ${rightLine.id}`, "KitePhysicsSystem");
     } else {
       this.logger.warn(
         "Line entities not found - system will initialize them",
