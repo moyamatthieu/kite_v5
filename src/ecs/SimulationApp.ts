@@ -134,9 +134,6 @@ export class SimulationApp {
       // Initialiser tous les systèmes
       await this.systemManager.initializeAll();
 
-      // Créer l'interface
-      this.createInterface();
-
       // Configurer le rendu (crée les meshes)
       this.setupRendering();
 
@@ -145,6 +142,9 @@ export class SimulationApp {
 
       // Configurer les systèmes avec les entités complètes (après création des meshes)
       this.configureSystems();
+
+      // Créer l'interface (APRÈS configureSystems pour avoir les bonnes valeurs de brides)
+      this.createInterface();
 
       // Configurer le niveau de log pour afficher les messages
       this.logger.setLogLevel(LogLevel.DEBUG);
