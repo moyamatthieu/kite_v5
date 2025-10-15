@@ -166,6 +166,9 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
 
       // Instancier PureKiteController avec l'entité kite
       this.kiteController = new PureKiteController(kiteEntity);
+      
+      // Configurer le KiteController avec les entités de lignes pour lire la longueur réelle
+      this.kiteController.setLineEntities(leftLine || null, rightLine || null);
     } else {
       throw new Error("Kite entity not found - cannot initialize physics");
     }

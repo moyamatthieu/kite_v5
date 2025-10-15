@@ -142,7 +142,6 @@ export class UIManager {
 
     slider.oninput = () => {
       const value = parseFloat(slider.value);
-      console.log(`📊 Slider ${config.id} changed to:`, value);
       config.onInput(value);
 
       valueElement.textContent = config.formatter

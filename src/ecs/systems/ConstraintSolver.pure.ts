@@ -16,6 +16,7 @@ import { Entity } from "@base/Entity";
 import { GeometryComponent } from "@components/GeometryComponent";
 import { TransformComponent } from "@components/TransformComponent";
 import { BridleComponent } from "@components/BridleComponent";
+import { LineComponent } from "@components/LineComponent";
 import { HandlePositions } from "@mytypes/PhysicsTypes";
 
 import { BridleLengths } from "../types/BridleTypes";
@@ -52,11 +53,14 @@ export class PureConstraintSolver {
    * R = longueur_lignes + longueur_bridles
    *
    * Version ECS pure : travaille avec Entity + Components
+   * 
+   * @param leftLineEntity - Entité de la ligne gauche (pour lire la longueur réelle)
    */
   static calculateFlightSphere(
     kiteEntity: Entity,
     pilotPosition: THREE.Vector3,
-    windDirection?: THREE.Vector3
+    windDirection?: THREE.Vector3,
+    leftLineEntity?: Entity | null
   ): FlightSphere {
     const transform = kiteEntity.getComponent<TransformComponent>('transform');
     const bridle = kiteEntity.getComponent<BridleComponent>('bridle');
@@ -65,7 +69,15 @@ export class PureConstraintSolver {
       throw new Error('Kite entity missing required components (transform, bridle)');
     }
 
-    const lineLength = CONFIG.lines.defaultLength;
+    // Lire la longueur depuis LineComponent si disponible, sinon fallback sur CONFIG
+    let lineLength = CONFIG.lines.defaultLength;
+    
+    if (leftLineEntity) {
+      const lineComponent = leftLineEntity.getComponent<LineComponent>('line');
+      if (lineComponent) {
+        lineLength = lineComponent.config.length;
+      }
+    }
 
     // Calculer la longueur moyenne des brides
     const avgBridleLength = (
@@ -177,12 +189,17 @@ export class PureConstraintSolver {
    *
    * Convertit points locaux (GeometryComponent) en coordonnées monde
    * en utilisant TransformComponent (position + quaternion)
+   * 
+   * @param leftLineEntity - Entité de la ligne gauche (pour lire la longueur réelle)
+   * @param rightLineEntity - Entité de la ligne droite (pour lire la longueur réelle)
    */
   static enforceLineConstraints(
     kiteEntity: Entity,
     predictedPosition: THREE.Vector3,
     state: { velocity: THREE.Vector3; angularVelocity: THREE.Vector3 },
-    handles: HandlePositions
+    handles: HandlePositions,
+    leftLineEntity?: Entity | null,
+    rightLineEntity?: Entity | null
   ): void {
     const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
     const transform = kiteEntity.getComponent<TransformComponent>('transform');
@@ -192,7 +209,16 @@ export class PureConstraintSolver {
       return;
     }
 
-    const lineLength = CONFIG.lines.defaultLength;
+    // Lire la longueur depuis LineComponent si disponible, sinon fallback sur CONFIG
+    let lineLength = CONFIG.lines.defaultLength;
+    
+    // Essayer de lire depuis leftLineEntity (les deux lignes ont la même longueur)
+    if (leftLineEntity) {
+      const lineComponent = leftLineEntity.getComponent<LineComponent>('line');
+      if (lineComponent) {
+        lineLength = lineComponent.config.length;
+      }
+    }
 
     const ctrlLeft = geometry.getPoint("CTRL_GAUCHE");
     const ctrlRight = geometry.getPoint("CTRL_DROIT");

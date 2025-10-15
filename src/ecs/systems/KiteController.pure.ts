@@ -24,6 +24,10 @@ import { PureConstraintSolver } from '@systems/ConstraintSolver.pure';
 export class PureKiteController {
   private kiteEntity: Entity;
   private previousPosition: THREE.Vector3;
+  
+  // Références aux entités de lignes pour lire la longueur réelle
+  private leftLineEntity: Entity | null = null;
+  private rightLineEntity: Entity | null = null;
 
   // États pour les warnings
   private hasExcessiveAccel: boolean = false;
@@ -59,6 +63,14 @@ export class PureKiteController {
   }
 
   /**
+   * Configure les entités de lignes pour lecture de la longueur réelle
+   */
+  setLineEntities(leftLine: Entity | null, rightLine: Entity | null): void {
+    this.leftLineEntity = leftLine;
+    this.rightLineEntity = rightLine;
+  }
+
+  /**
    * Met à jour la position et l'orientation du cerf-volant
    */
   update(
@@ -90,7 +102,7 @@ export class PureKiteController {
 
     // Résolution itérative des contraintes PBD
     for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
-      // Appliquer les contraintes de lignes (PBD)
+      // Appliquer les contraintes de lignes (PBD) - passe les entités pour lire la longueur réelle
       PureConstraintSolver.enforceLineConstraints(
         this.kiteEntity,
         newPosition,
@@ -98,7 +110,9 @@ export class PureKiteController {
           velocity: physics.velocity,
           angularVelocity: physics.angularVelocity
         },
-        handles
+        handles,
+        this.leftLineEntity,
+        this.rightLineEntity
       );
 
       // Appliquer la collision au sol DANS la boucle PBD pour éviter que le kite passe en dessous
