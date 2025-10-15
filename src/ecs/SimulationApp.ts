@@ -81,8 +81,10 @@ export class SimulationApp {
   private loggingSystem!: LoggingSystem;
 
   // === ENTITÉS PRINCIPALES ===
-  // Référence au kite pour accès direct aux composants (UI, etc.)
+  // Références pour accès direct aux composants (UI, etc.)
   private kiteEntity?: Entity;
+  private leftLineEntity?: Entity;
+  private rightLineEntity?: Entity;
 
   // === INTERFACE ===
   private uiManager?: UIManager;
@@ -273,6 +275,10 @@ export class SimulationApp {
     });
     this.entityManager.registerEntity(leftLineEntity);
     this.entityManager.registerEntity(rightLineEntity);
+    
+    // Stocker les références pour accès direct aux composants
+    this.leftLineEntity = leftLineEntity;
+    this.rightLineEntity = rightLineEntity;
   }
 
   /**
@@ -493,7 +499,18 @@ export class SimulationApp {
               turbulence: 0,
             };
       },
-      getLineLength: () => CONFIG.lines.defaultLength,
+      getLineLength: () => {
+        // Lire directement depuis le LineComponent (les deux lignes ont la même longueur)
+        if (this.leftLineEntity) {
+          const lineComponent = this.leftLineEntity.getComponent<LineComponent>('line');
+          if (lineComponent) {
+            return lineComponent.config.length;
+          }
+        }
+        
+        // Fallback : valeur par défaut
+        return CONFIG.lines.defaultLength;
+      },
       getControlLineDiagnostics: () => {
         // TODO: Implement in PureKitePhysicsSystem
         return null; // this.kitePhysicsSystem?.getControlLineDiagnostics() || null;

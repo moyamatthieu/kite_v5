@@ -56,8 +56,8 @@ export interface LineState {
 export class LineComponent implements Component {
   readonly type = 'line';
 
-  // Configuration physique (readonly)
-  public readonly config: LineConfig;
+  // Configuration physique (modifiable pour ajustements dynamiques)
+  public config: LineConfig;
 
   // Points d'attache
   public attachments: LineAttachments;
