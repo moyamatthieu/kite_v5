@@ -31,6 +31,7 @@ import { LinesRenderSystem } from '@/ecs/systems/LinesRenderSystem';
 import { PilotSystem } from '@/ecs/systems/PilotSystem';
 import { GeometryRenderSystem } from '@/ecs/systems/GeometryRenderSystem';
 import { LoggingSystem } from "@/ecs/systems/LoggingSystem";
+import { AeroVectorsDebugSystem } from "@/ecs/systems/AeroVectorsDebugSystem";
 import { Entity } from '@/ecs/base/Entity';
 import { EntityBuilder } from '@/ecs/entities/EntityBuilder';
 import {
@@ -79,6 +80,7 @@ export class SimulationApp {
   private pilotSystem!: PilotSystem;
   private geometryRenderSystem!: GeometryRenderSystem;
   private loggingSystem!: LoggingSystem;
+  private aeroVectorsDebugSystem!: AeroVectorsDebugSystem;
 
   // === ENTITÉS PRINCIPALES ===
   // Références pour accès direct aux composants (UI, etc.)
@@ -228,6 +230,10 @@ export class SimulationApp {
         this.entityManager
       );
       this.systemManager.addSystem(this.kitePhysicsSystem);
+      
+      // Système de visualisation des vecteurs aérodynamiques (debug)
+      this.aeroVectorsDebugSystem = new AeroVectorsDebugSystem();
+      this.systemManager.addSystem(this.aeroVectorsDebugSystem);
     }
 
     // Le système de rendu de géométrie est créé avec le système de rendu
@@ -387,6 +393,18 @@ export class SimulationApp {
     // Configurer ControlBarSystem
     this.controlBarSystem.setControlBarEntity(controlBarEntity);
     this.controlBarSystem.setInputSystem(this.inputSystem);
+    
+    // Configurer AeroVectorsDebugSystem
+    if (this.aeroVectorsDebugSystem && this.kitePhysicsSystem) {
+      this.aeroVectorsDebugSystem.setKitePhysicsSystem(this.kitePhysicsSystem);
+      
+      if (this.renderSystem) {
+        const scene = this.renderSystem.getScene();
+        if (scene) {
+          this.aeroVectorsDebugSystem.setScene(scene);
+        }
+      }
+    }
   }
 
   /**
@@ -520,6 +538,22 @@ export class SimulationApp {
       },
       getAerodynamicForces: () => {
         return this.kitePhysicsSystem?.getAerodynamicForces() || null;
+      },
+      // Contrôles pour les vecteurs aérodynamiques debug
+      setAeroVectorsEnabled: (enabled: boolean) => {
+        if (this.aeroVectorsDebugSystem) {
+          this.aeroVectorsDebugSystem.setDebugEnabled(enabled);
+        }
+      },
+      setVectorTypeEnabled: (type: 'lift' | 'drag' | 'apparentWind', enabled: boolean) => {
+        if (this.aeroVectorsDebugSystem) {
+          this.aeroVectorsDebugSystem.setVectorEnabled(type, enabled);
+        }
+      },
+      setVectorScale: (type: 'lift' | 'drag' | 'apparentWind', scale: number) => {
+        if (this.aeroVectorsDebugSystem) {
+          this.aeroVectorsDebugSystem.setVectorScale(type, scale);
+        }
       }
     };
   }
@@ -663,13 +697,12 @@ export class SimulationApp {
         this.kitePhysicsSystem &&
         this.debugRenderer.isDebugMode()
       ) {
-        const kiteEntity = this.entityManager.getEntity("kite");
-        if (kiteEntity) {
-          const kiteMesh = kiteEntity.getComponent<MeshComponent>("mesh");
-          if (kiteMesh && kiteMesh.object3D) {
-            // TODO: Update debugRenderer to work with ECS entities
-            // Récupérer l'objet Kite depuis le MeshComponent
-          }
+        // Récupérer les forces par surface et le vent apparent
+        const surfaceForces = this.kitePhysicsSystem.getSurfaceForces();
+        const aeroForces = this.kitePhysicsSystem.getAerodynamicForces();
+        
+        if (surfaceForces && aeroForces && aeroForces.apparentWind) {
+          this.debugRenderer.updateDebugVectors(surfaceForces, aeroForces.apparentWind);
         }
       }
     } catch (error) {

@@ -356,6 +356,7 @@ export class AerodynamicsCalculator {
         center: centreMonde,
         normal: normaleMonde.clone(),
         area: surface.area,
+        apparentWind: localApparentWind.clone(), // Stocker le vent apparent pour visualisation debug
       });
 
       // Le couple, c'est ce qui fait tourner le kite

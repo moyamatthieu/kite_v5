@@ -68,7 +68,8 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   // Forces aérodynamiques pour le log et l'UI
   private lastLiftForce: THREE.Vector3 = new THREE.Vector3();
   private lastDragForce: THREE.Vector3 = new THREE.Vector3();
-  private lastSurfaceForces: SurfaceForce[] = []; // Ajout pour stocker les forces par surface
+  private lastSurfaceForces: SurfaceForce[] = []; // Stocker les forces par surface
+  private lastApparentWind: THREE.Vector3 = new THREE.Vector3(); // Stocker le vent apparent
 
   private lastLogTime: number = 0;
   private readonly LOG_INTERVAL: number = 1000; // Log toutes les secondes
@@ -235,6 +236,9 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       kiteState.velocity,
       deltaTime
     );
+    
+    // Stocker le vent apparent pour le debug
+    this.lastApparentWind.copy(apparentWind);
 
     // 4. Calculer les forces aérodynamiques
     let aeroForces: {
@@ -601,10 +605,11 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Retourne les forces aérodynamiques actuelles (lift et drag)
    * @returns Objet contenant les vecteurs de force de portance et de traînée
    */
-  getAerodynamicForces(): { lift: THREE.Vector3; drag: THREE.Vector3 } {
+  getAerodynamicForces(): { lift: THREE.Vector3; drag: THREE.Vector3; apparentWind: THREE.Vector3 } {
     return {
       lift: this.lastLiftForce.clone(),
       drag: this.lastDragForce.clone(),
+      apparentWind: this.lastApparentWind.clone(),
     };
   }
 

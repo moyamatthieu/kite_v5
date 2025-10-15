@@ -79,4 +79,6 @@ export interface SurfaceForce {
   normal: THREE.Vector3;
   /** Surface en m² */
   area: number;
+  /** Vent apparent au centre de cette surface (m/s) - pour visualisation debug */
+  apparentWind?: THREE.Vector3;
 }

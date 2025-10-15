@@ -209,6 +209,51 @@
                 </div>
             </div>
 
+            <!-- Contrôles de visualisation des vecteurs aérodynamiques -->
+            <div class="control-group">
+                <label>🎨 Vecteurs Aéro (Debug)</label>
+                <div class="button-group">
+                    <button class="ui-button" id="toggle-aero-vectors">📊 Vecteurs OFF</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="vector-controls" style="display: none;">
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-lift-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ff00;">🟢 Portance (Lift)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-drag-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #ff0000;">🔴 Traînée (Drag)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-wind-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ffff;">🔵 Vent Apparent</span>
+                    </label>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Portance/Traînée</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-lift" min="0.01" max="1.0" value="0.2" step="0.01">
+                        <span class="slider-value" id="vector-scale-lift-value">0.20</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Vent Apparent</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-wind" min="0.01" max="0.5" value="0.05" step="0.01">
+                        <span class="slider-value" id="vector-scale-wind-value">0.05</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Contrôles des lignes -->
             <div class="control-group">
                 <label>📏 Longueur des lignes</label>
