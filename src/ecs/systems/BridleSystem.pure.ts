@@ -221,17 +221,86 @@ export class PureBridleSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Modifie les longueurs des brides
+   * Modifie les longueurs des brides et recalcule les points de contrôle
    */
   setBridleLengths(lengths: { nez?: number; inter?: number; centre?: number }): void {
     if (!this.kiteEntity) return;
 
     const bridle = this.kiteEntity.getComponent<BridleComponent>('bridle');
-    if (!bridle) return;
+    const geometry = this.kiteEntity.getComponent<GeometryComponent>('geometry');
+    if (!bridle || !geometry) return;
 
+    // Mettre à jour les longueurs
     if (lengths.nez !== undefined) bridle.lengths.nez = lengths.nez;
     if (lengths.inter !== undefined) bridle.lengths.inter = lengths.inter;
     if (lengths.centre !== undefined) bridle.lengths.centre = lengths.centre;
+
+    // Recalculer les points de contrôle par trilatération
+    const nezPos = geometry.getPoint('NEZ');
+    const centrePos = geometry.getPoint('CENTRE');
+    const interDroitPos = geometry.getPoint('INTER_DROIT');
+    
+    if (nezPos && centrePos && interDroitPos) {
+      // Importer dynamiquement KiteEntityFactory pour accéder à calculateControlPoint
+      // Pour éviter les dépendances circulaires, on recalcule directement ici
+      const ctrlDroit = this.calculateControlPointTrilateration(
+        nezPos, 
+        interDroitPos, 
+        centrePos, 
+        bridle.lengths
+      );
+      const ctrlGauche = new THREE.Vector3(-ctrlDroit.x, ctrlDroit.y, ctrlDroit.z);
+      
+      geometry.setPoint('CTRL_GAUCHE', ctrlGauche);
+      geometry.setPoint('CTRL_DROIT', ctrlDroit);
+      
+      console.log('🎯 Points de contrôle recalculés après modification brides:', {
+        longueurs: bridle.lengths,
+        ctrlGauche: ctrlGauche.toArray(),
+        ctrlDroit: ctrlDroit.toArray()
+      });
+    }
+  }
+
+  /**
+   * Calcule le point de contrôle par trilatération 3D (copie de KiteEntityFactory)
+   */
+  private calculateControlPointTrilateration(
+    nez: THREE.Vector3,
+    inter: THREE.Vector3,
+    centre: THREE.Vector3,
+    bridleLengths: { nez: number; inter: number; centre: number }
+  ): THREE.Vector3 {
+    const ex = inter.clone().sub(nez).normalize();
+    const d = inter.distanceTo(nez);
+
+    const centreToNez = centre.clone().sub(nez);
+    const i = ex.dot(centreToNez);
+    const eyTemp = centreToNez.clone().addScaledVector(ex, -i);
+    const ey = eyTemp.normalize();
+
+    const ez = new THREE.Vector3().crossVectors(ex, ey);
+    if (ez.z < 0) ez.negate();
+
+    const j = ey.dot(centreToNez);
+
+    const r1 = bridleLengths.nez;
+    const r2 = bridleLengths.inter;
+    const r3 = bridleLengths.centre;
+
+    const x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
+
+    const zSquared = r1 * r1 - x * x - y * y;
+    const z = zSquared < 0 ? 0 : Math.sqrt(zSquared);
+
+    const result = new THREE.Vector3();
+    result.copy(nez);
+    result.addScaledVector(ex, x);
+    result.addScaledVector(ey, y);
+    result.addScaledVector(ez, z);
+
+    return result;
   }
 
   /**

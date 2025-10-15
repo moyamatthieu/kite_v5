@@ -160,8 +160,9 @@ export class KiteEntityFactory {
   /**
    * Calcule le point de contrôle par trilatération 3D
    * Les 3 brides (nez, inter, centre) convergent vers ce point pour former une pyramide
+   * PUBLIQUE pour permettre le recalcul dynamique depuis BridleSystem
    */
-  private static calculateControlPoint(
+  static calculateControlPoint(
     nez: THREE.Vector3,
     inter: THREE.Vector3,
     centre: THREE.Vector3,
