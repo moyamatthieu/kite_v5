@@ -576,14 +576,19 @@ export class PureConstraintSolver {
       bridleLengths.centre
     );
 
-    // Appliquer contrainte de la ligne (projection sur sphère centrée sur poignée)
+    // Appliquer contrainte de la ligne (projection EXACTE sur sphère centrée sur poignée)
+    // Le point CTRL doit TOUJOURS être à exactement lineLength du handle
     const toHandle = ctrlPosition.clone().sub(handlePosition);
     const distToHandle = toHandle.length();
 
-    if (distToHandle > lineLength) {
-      // Si trop loin, projeter sur la sphère de rayon lineLength
+    if (distToHandle > 0.001) { // Éviter division par zéro
+      // Projeter sur la sphère de rayon lineLength (toujours, pas seulement si trop loin)
       const direction = toHandle.normalize();
       ctrlPosition.copy(handlePosition).add(direction.multiplyScalar(lineLength));
+    } else {
+      // Cas dégénéré : CTRL et handle au même endroit (ne devrait pas arriver)
+      // Placer le CTRL directement en dessous du handle
+      ctrlPosition.copy(handlePosition).add(new THREE.Vector3(0, -lineLength, 0));
     }
 
     return ctrlPosition;
