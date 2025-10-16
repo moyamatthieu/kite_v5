@@ -34,6 +34,7 @@ import { GeometryRenderSystem } from '@/ecs/systems/GeometryRenderSystem';
 import { LoggingSystem } from "@/ecs/systems/LoggingSystem";
 import { AeroVectorsDebugSystem } from "@/ecs/systems/AeroVectorsDebugSystem";
 import { ControlPointSystem } from "@/ecs/systems/ControlPointSystem";
+import { ControlPointDebugRenderer } from "@/ecs/systems/ControlPointDebugRenderer";
 import { PureConstraintSolver } from "@/ecs/systems/ConstraintSolver.pure";
 import { Entity } from '@/ecs/base/Entity';
 import { EntityBuilder } from '@/ecs/entities/EntityBuilder';
@@ -85,6 +86,7 @@ export class SimulationApp {
   private loggingSystem!: LoggingSystem;
   private aeroVectorsDebugSystem!: AeroVectorsDebugSystem;
   private controlPointSystem?: ControlPointSystem;
+  private controlPointDebugRenderer?: ControlPointDebugRenderer;
 
   // === ENTITÉS PRINCIPALES ===
   // Références pour accès direct aux composants (UI, etc.)
@@ -198,6 +200,10 @@ export class SimulationApp {
     this.systemManager.addSystem(this.pilotSystem);
     this.systemManager.addSystem(this.loggingSystem);
 
+    // Système de debug pour visualiser les points de contrôle
+    this.controlPointDebugRenderer = new ControlPointDebugRenderer();
+    this.systemManager.addSystem(this.controlPointDebugRenderer);
+
     // Configurer le LoggingSystem avec l'EntityManager
     this.loggingSystem.setEntityManager(this.entityManager);
 
@@ -244,6 +250,10 @@ export class SimulationApp {
       // Système de visualisation des vecteurs aérodynamiques (debug)
       this.aeroVectorsDebugSystem = new AeroVectorsDebugSystem();
       this.systemManager.addSystem(this.aeroVectorsDebugSystem);
+      
+      // Système de rendu debug des points de contrôle (ordre 96 - après LinesRenderSystem)
+      this.controlPointDebugRenderer = new ControlPointDebugRenderer();
+      this.systemManager.addSystem(this.controlPointDebugRenderer);
     }
 
     // Le système de rendu de géométrie est créé avec le système de rendu
@@ -525,6 +535,36 @@ export class SimulationApp {
         }
       }
     }
+    
+    // Configurer ControlPointDebugRenderer
+    if (this.controlPointDebugRenderer) {
+      // Configurer la scène
+      if (this.renderSystem) {
+        const scene = this.renderSystem.getScene();
+        if (scene) {
+          this.controlPointDebugRenderer.setScene(scene);
+        }
+      }
+      
+      // Configurer les entités CTRL
+      const ctrlLeft = this.entityManager.getEntity('ctrl-left');
+      const ctrlRight = this.entityManager.getEntity('ctrl-right');
+      if (ctrlLeft && ctrlRight) {
+        this.controlPointDebugRenderer.setControlPointEntities(ctrlLeft, ctrlRight);
+      }
+      
+      // Configurer l'entité kite
+      if (kiteEntity) {
+        this.controlPointDebugRenderer.setKiteEntity(kiteEntity);
+      }
+      
+      // Configurer le provider de positions des handles
+      this.controlPointDebugRenderer.setHandlePositionsProvider(() => 
+        this.controlBarSystem.getHandlePositions()
+      );
+      
+      this.logger.info('ControlPointDebugRenderer configured', 'SimulationApp');
+    }
   }
 
   /**
@@ -673,6 +713,12 @@ export class SimulationApp {
       setVectorScale: (type: 'lift' | 'drag' | 'apparentWind', scale: number) => {
         if (this.aeroVectorsDebugSystem) {
           this.aeroVectorsDebugSystem.setVectorScale(type, scale);
+        }
+      },
+      // Contrôles pour le debug des points de contrôle
+      setControlPointDebugEnabled: (enabled: boolean) => {
+        if (this.controlPointDebugRenderer) {
+          this.controlPointDebugRenderer.setDebugEnabled(enabled);
         }
       }
     };

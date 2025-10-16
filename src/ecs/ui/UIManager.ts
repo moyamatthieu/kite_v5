@@ -48,6 +48,8 @@ export interface SimulationControls {
   setAeroVectorsEnabled(enabled: boolean): void;
   setVectorTypeEnabled(type: 'lift' | 'drag' | 'apparentWind', enabled: boolean): void;
   setVectorScale(type: 'lift' | 'drag' | 'apparentWind', scale: number): void;
+  // Contrôles pour debug des points de contrôle
+  setControlPointDebugEnabled?(enabled: boolean): void;
 }
 
 /**

@@ -494,17 +494,28 @@ export class LinesRenderSystem extends BaseSimulationSystem {
     sag: number
   ): THREE.Vector3[] {
     const points: THREE.Vector3[] = [];
+    const end = start.clone().add(spanVector); // Position exacte du endpoint
+    
     for (let i = 0; i <= segments; i += 1) {
       const t = i / segments;
+      
+      // Pour le dernier point, utiliser la position exacte du endpoint (pas de sag)
+      if (i === segments) {
+        points.push(end.clone());
+        break;
+      }
+      
       const point = new THREE.Vector3(
         start.x + spanVector.x * t,
         start.y + spanVector.y * t,
         start.z + spanVector.z * t
       );
+      
       if (segments >= 2 && sag !== 0) {
         const curvature = -sag * 4 * t * (1 - t);
         point.y += curvature;
       }
+      
       points.push(point);
     }
     return points;
