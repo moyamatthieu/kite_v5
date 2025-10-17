@@ -225,8 +225,7 @@ export class UIFactory {
   // ============================================================================
 
   private static getControlLineDiagnostics(system: KitePhysicsSystem | null) {
-    // TODO: Implement in PureKitePhysicsSystem
-    return null;
+    return system?.getControlLineDiagnostics() || null;
   }
 
   private static getAerodynamicForces(system: KitePhysicsSystem | null) {
