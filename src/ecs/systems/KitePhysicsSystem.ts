@@ -349,10 +349,6 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       deltaTime
     );
 
-    // 10. Mettre à jour les lignes de bridage visuelles (après que les points aient bougé)
-    // TODO: Implémenter la mise à jour des lignes de bridage via ECS
-    // this.kite.updateBridleLines();
-
     // 📊 LOG COMPLET toutes les secondes
     this.frameCount++;
     const currentTime = Date.now();
