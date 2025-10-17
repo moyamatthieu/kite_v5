@@ -30,7 +30,6 @@
 
 import { Vector3 } from 'three';
 import { LineConfig } from '@components/LineComponent';
-
 import { PhysicsConstants } from '@config/PhysicsConstants';
 import { CONFIG } from '@config/SimulationConfig';
 

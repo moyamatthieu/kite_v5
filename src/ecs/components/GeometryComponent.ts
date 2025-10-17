@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { Component } from '@base/Component';
+import { Logger } from '@utils/Logging';
 
 /**
  * Connexion entre deux points (pour frames/structures)
@@ -92,7 +93,7 @@ export class GeometryComponent implements Component {
    */
   addSurface(pointNames: string[]): void {
     if (pointNames.length < 3) {
-      console.warn('Une surface nécessite au moins 3 points');
+      Logger.getInstance().warn('Une surface nécessite au moins 3 points', 'GeometryComponent');
       return;
     }
     this.surfaces.push({ points: pointNames });

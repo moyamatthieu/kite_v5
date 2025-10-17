@@ -18,15 +18,16 @@ import { CONFIG } from '@ecs/config/SimulationConfig';
 import { PhysicsConstants } from '@ecs/config/PhysicsConstants';
 import { KiteState, WindState, SurfaceForce, WindParams, HandlePositions} from '@mytypes/PhysicsTypes';
 import { WindSimulator } from '@ecs/systems/WindSimulator';
-import { PureLineSystem } from "@ecs/systems/LineSystem.pure";
-import { PureBridleSystem } from "@ecs/systems/BridleSystem.pure";
 import { AerodynamicsCalculator } from '@ecs/systems/AerodynamicsCalculator';
-import { FlightSphere } from "@ecs/systems/ConstraintSolver.pure";
-import { PureKiteController } from '@ecs/systems/KiteController.pure';
 import { EntityManager } from '@entities/EntityManager';
 import { Entity } from "@base/Entity";
 import { KiteComponent } from "@components/KiteComponent";
 import { TransformComponent } from "@components/TransformComponent";
+import { PhysicsComponent } from "@components/PhysicsComponent";
+
+import { PureKiteController } from '@/ecs/systems/KiteController';
+import { PureBridleSystem } from "@/ecs/systems/BridleSystem";
+import { PureLineSystem } from "@/ecs/systems/LineSystem";
 
 export interface KitePhysicsHandles {
   getHandlePositions: () => HandlePositions | null;
@@ -77,7 +78,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
   private frameCount: number = 0;
 
   // Sphère de vol (pour instrumentation)
-  private flightSphere: FlightSphere | null = null;
+
 
   // Added entityManager to KitePhysicsSystem
   private entityManager: EntityManager;
@@ -93,7 +94,7 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     config: Partial<KitePhysicsConfig> = {},
     entityManager: EntityManager
   ) {
-    super("KitePhysicsSystem", 10);
+    super("KitePhysicsSystem", 60); // Ordre 60 - après ControlPointSystem (50)
 
     this.logger = Logger.getInstance();
     this.entityManager = entityManager;
@@ -183,6 +184,17 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
       
       // Configurer le KiteController avec les entités de lignes pour lire la longueur réelle
       this.kiteController.setLineEntities(leftLine || null, rightLine || null);
+      
+      // Configurer le KiteController avec les entités CTRL (points de contrôle)
+      if (ctrlLeft && ctrlRight) {
+        this.kiteController.setControlPointEntities(ctrlLeft, ctrlRight);
+        this.logger.info(`KiteController configured with CTRL entities`, "KitePhysicsSystem");
+      } else {
+        this.logger.warn(
+          "CTRL entities not found - KiteController will skip bridle constraints",
+          "KitePhysicsSystem"
+        );
+      }
     } else {
       throw new Error("Kite entity not found - cannot initialize physics");
     }
@@ -218,9 +230,6 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     this.barRotation = rotation;
   }
 
-  /**
-   * Mise à jour de la physique complète
-   */
   update(context: SimulationContext): void {
     if (!this.kiteComponent || !this.kiteController) {
       return;
@@ -231,6 +240,15 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     if (isNaN(initialKiteStateForDebug.position.x)) {
       this.logger.error('Kite position is NaN at the beginning of update!', 'KitePhysicsSystem', { state: initialKiteStateForDebug });
       return; // Arrêter la mise à jour si l'état est déjà corrompu
+    }
+
+    // CRITIQUE : Reset des forces accumulées de la frame précédente
+    // Sans ceci, les forces s'accumulent exponentiellement → explosion !
+    if (this.kiteEntity) {
+      const physics = this.kiteEntity.getComponent<PhysicsComponent>('physics');
+      if (physics) {
+        physics.clearForces();
+      }
     }
 
     const deltaTime = Math.min(context.deltaTime, CONFIG.physics.deltaTimeMax);
@@ -307,8 +325,11 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
     }
 
     // 7. Calculer les tensions des brides (pour visualisation)
-    const bridleTensions = this.kiteEntity
-      ? this.bridleSystem.calculateBridleTensions(this.kiteEntity)
+    // Les CTRL sont maintenant des entités séparées
+    const ctrlLeft = this.entityManager.getEntity("ctrl-left");
+    const ctrlRight = this.entityManager.getEntity("ctrl-right");
+    const bridleTensions = (this.kiteEntity && ctrlLeft && ctrlRight)
+      ? this.bridleSystem.calculateBridleTensions(this.kiteEntity, ctrlLeft, ctrlRight)
       : null;
     if (bridleTensions) {
       // this.logger.info('Bridle tensions calculated', 'KitePhysicsSystem', bridleTensions);
@@ -525,17 +546,17 @@ export class KitePhysicsSystem extends BaseSimulationSystem {
    * Met à jour la longueur des lignes
    */
   setLineLength(length: number): void {
-    console.log('🎯 KitePhysicsSystem.setLineLength called with:', length);
+    this.logger.debug(`KitePhysicsSystem.setLineLength called with: ${length}`, 'KitePhysicsSystem');
     this.config.lineLength = length;
     // TODO: Mettre à jour la longueur des lignes via les composants ECS
     // if (this.kite) {
     //   this.kite.userData.lineLength = length;
     // }
     if (this.lineSystem) {
-      console.log('  ➡️ Delegating to LineSystem...');
+      this.logger.debug('Delegating to LineSystem...', 'KitePhysicsSystem');
       this.lineSystem.setLineLength(length);
     } else {
-      console.warn('  ⚠️ LineSystem not initialized!');
+      this.logger.warn('LineSystem not initialized!', 'KitePhysicsSystem');
     }
   }
 

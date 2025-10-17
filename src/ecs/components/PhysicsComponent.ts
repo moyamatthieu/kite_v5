@@ -25,7 +25,9 @@ export class PhysicsComponent implements Component {
   public velocity: THREE.Vector3;
   public angularVelocity: THREE.Vector3;
   public mass: number;
+  public invMass: number; // ✅ PHASE 1.2 : Inverse masse pour optimisation PBD
   public inertia: number;
+  public invInertia: number; // ✅ PHASE 1.2 : Inverse inertie pour optimisation PBD
   public damping: number;
 
   // Forces accumulées (reset à chaque frame)
@@ -33,10 +35,13 @@ export class PhysicsComponent implements Component {
   public torques: THREE.Vector3;
 
   constructor(data: PhysicsComponentData = {}) {
+    this.mass = data.mass || 1.0;
+    this.invMass = 1.0 / this.mass; // ✅ PHASE 1.2 : Calcul automatique invMass
+    this.inertia = data.inertia || 1.0;
+    this.invInertia = 1.0 / this.inertia; // ✅ PHASE 1.2 : Calcul automatique invInertia
+    
     this.velocity = data.velocity?.clone() || new THREE.Vector3();
     this.angularVelocity = data.angularVelocity?.clone() || new THREE.Vector3();
-    this.mass = data.mass || 1.0;
-    this.inertia = data.inertia || 1.0;
     this.damping = data.damping || 0.0;
 
     this.forces = new THREE.Vector3();

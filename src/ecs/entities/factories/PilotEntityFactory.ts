@@ -1,6 +1,7 @@
 import { Entity } from '@base/Entity';
 import { TransformComponent } from '@components/TransformComponent';
 import { MeshComponent } from '@components/MeshComponent';
+import { PilotFeedbackComponent } from '@components/PilotFeedbackComponent';
 import { CONFIG } from '@config/SimulationConfig';
 import * as THREE from 'three';
 
@@ -23,6 +24,10 @@ export class PilotEntityFactory {
       castShadow: true,
       receiveShadow: false
     }));
+    
+    // ✅ PHASE 2.3 : Composant feedback pour tensions filtrées
+    pilotEntity.addComponent(new PilotFeedbackComponent());
+    
     return pilotEntity;
   }
 }

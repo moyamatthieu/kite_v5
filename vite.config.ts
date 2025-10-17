@@ -7,19 +7,32 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      // === Core ECS ===
       '@': resolve(__dirname, 'src'),
-      '@core': resolve(__dirname, 'src/ecs/core'),
+      '@ecs': resolve(__dirname, 'src/ecs'),
       '@base': resolve(__dirname, 'src/ecs/base'),
-      '@factories': resolve(__dirname, 'src/ecs/factories'),
-      '@types': resolve(__dirname, 'src/ecs/types'),
-      '@utils': resolve(__dirname, 'src/ecs/utils'),
-      '@config': resolve(__dirname, 'src/ecs/config'),
-      '@systems': resolve(__dirname, 'src/ecs/systems'),
-      '@entities': resolve(__dirname, 'src/ecs/entities'),
+
+      // === Components & Entities ===
       '@components': resolve(__dirname, 'src/ecs/components'),
-      '@objects': resolve(__dirname, 'src/ecs/objects'),
+      '@entities': resolve(__dirname, 'src/ecs/entities'),
+
+      // === Systems & Physics ===
+      '@systems': resolve(__dirname, 'src/ecs/systems'),
+
+      // === Configuration & Types ===
+      '@config': resolve(__dirname, 'src/ecs/config'),
+      '@mytypes': resolve(__dirname, 'src/ecs/types'),
+      '@utils': resolve(__dirname, 'src/ecs/utils'),
+
+      // === UI & Rendering ===
+      '@ui': resolve(__dirname, 'src/ecs/ui'),
       '@rendering': resolve(__dirname, 'src/ecs/rendering'),
-      '@ecs': resolve(__dirname, 'src/ecs')
+
+      // === Legacy (to be deprecated) ===
+      '@core': resolve(__dirname, 'src/ecs/core'),
+      '@objects': resolve(__dirname, 'src/ecs/objects'),
+      '@factories': resolve(__dirname, 'src/ecs/factories'),
+      '@types': resolve(__dirname, 'src/ecs/types'), // Alias for @mytypes for backward compat
     }
   },
   server: {

@@ -14,12 +14,13 @@
  * @see KiteGeometry.ts - Définit les surfaces et masses
  */
 import * as THREE from "three";
+import { SurfaceForce } from 'src/ecs/types/PhysicsTypes';
+import { Logger } from '@utils/Logging';
+import { PhysicsUtilities } from '@utils/PhysicsUtilities';
 
 import { KiteGeometry } from "../config/KiteGeometry";
 import { PhysicsConstants } from "../config/PhysicsConstants";
 import { CONFIG } from "../config/SimulationConfig";
-import { SurfaceForce } from 'src/ecs/types/PhysicsTypes';
-import { Logger } from '@utils/Logging';
 
 /**
  * Calculateur de forces aérodynamiques amélioré
@@ -157,7 +158,12 @@ export class AerodynamicsCalculator {
     rightForce?: THREE.Vector3;
     surfaceForces: SurfaceForce[];
   } {
-    const windSpeed = apparentWind.length();
+    // CRITICAL: Clamp wind speed to prevent force explosion (F ∝ v²)
+    // This is the last line of defense against explosive feedback loops
+    const rawWindSpeed = apparentWind.length();
+    const MAX_WIND_SPEED = 50; // m/s (~180 km/h - hurricane force winds)
+    const windSpeed = Math.min(rawWindSpeed, MAX_WIND_SPEED);
+
     if (windSpeed < AerodynamicsCalculator.MIN_WIND_SPEED) {
       return {
         lift: new THREE.Vector3(),
@@ -166,6 +172,11 @@ export class AerodynamicsCalculator {
         torque: new THREE.Vector3(),
         surfaceForces: []
       };
+    }
+
+    // If wind was clamped, normalize and rescale apparentWind
+    if (rawWindSpeed > MAX_WIND_SPEED) {
+      apparentWind.normalize().multiplyScalar(windSpeed);
     }
 
     apparentWind.clone().normalize();
@@ -230,51 +241,23 @@ export class AerodynamicsCalculator {
       // (comme l'orientation d'un panneau solaire)
       const normaleMonde = AerodynamicsCalculator.calculateSurfaceNormal(surface, kiteOrientation);
 
-      // Calcul de l'angle d'incidence pour une plaque plane (cerf-volant)
-      // α = angle entre la direction du vent et la surface
-      const windDotNormal = localWindDir.dot(normaleMonde);
-      const cosTheta = Math.abs(windDotNormal); // cos(θ) où θ = angle vent-normale
-
-      // Pour une plaque : sin(α) = cos(θ) et cos(α) = sin(θ)
-      const sinAlpha = cosTheta;
-  // Note: cosAlpha non utilisé dans le modèle actuel
-
-      // Calculer l'angle d'incidence réel (en radians)
-      const alpha = Math.asin(Math.min(1, sinAlpha)); // Limiter à [-π/2, π/2]
+      // Utiliser PhysicsUtilities pour calcul centralisé d'incidence angle
+      // Retourne: sin, cos, rad, deg, windFacingNormal, liftDirection, dragDirection
+      const incidenceResult = PhysicsUtilities.calculateIncidenceAngle(localWindDir, normaleMonde);
 
       // Si le vent glisse sur le côté (angle = 0), pas de force
-      if (sinAlpha <= PhysicsConstants.EPSILON) {
+      if (incidenceResult.sin <= PhysicsConstants.EPSILON) {
         return;
       }
 
-      // 🎯 NOUVEAUX COEFFICIENTS AÉRODYNAMIQUES RÉALISTES
-      // Au lieu des formules simplifiées, utiliser des coefficients expérimentaux
+      // 🎯 COEFFICIENTS AÉRODYNAMIQUES RÉALISTES basés sur angle d'incidence
       const { CL, CD } =
-        AerodynamicsCalculator.calculateAerodynamicCoefficients(alpha);
+        AerodynamicsCalculator.calculateAerodynamicCoefficients(incidenceResult.rad);
 
-      // 🔍 DEBUG première surface (angle et coefficients) - DISABLED for performance
-      // if (surfaceIndex === 0) {
-      //   const alphaDeg = Math.asin(sinAlpha) * 180 / Math.PI;
-      //   this.logger.debug(`Surface 0: alpha=${alphaDeg.toFixed(1)}°, CL=${CL.toFixed(2)}, CD=${CD.toFixed(2)}`);
-      // }
-
-      // Direction : normale à la surface, orientée face au vent
-      const windFacingNormal =
-        windDotNormal >= 0 ? normaleMonde.clone() : normaleMonde.clone().negate();
-
-      // DIRECTION LIFT : Perpendiculaire au vent, dans le plan (vent, normale)
-      // Méthode : liftDir = normalize(windFacingNormal - (windFacingNormal·windDir)×windDir)
-      const liftDir = windFacingNormal.clone()
-        .sub(localWindDir.clone().multiplyScalar(windFacingNormal.dot(localWindDir)))
-        .normalize();
-      
-      // Vérifier validité (éviter division par zéro si vent // normale)
-      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
-        liftDir.copy(windFacingNormal);  // Fallback : utiliser normale
-      }
-      
-      // DIRECTION DRAG : Parallèle au vent
-      const dragDir = localWindDir.clone();
+      // Récupérer directions consolidées du calcul d'incidence angle
+      const windFacingNormal = incidenceResult.windFacingNormal;
+      const liftDir = incidenceResult.liftDirection;
+      const dragDir = incidenceResult.dragDirection;
       
       // FORCES AÉRODYNAMIQUES (AVANT scaling) avec pression dynamique LOCALE
       const liftMagnitude = localDynamicPressure * surface.area * CL;
@@ -314,7 +297,7 @@ export class AerodynamicsCalculator {
       // Centre de pression réaliste qui dépend de l'angle d'incidence
       const centerOfPressure = AerodynamicsCalculator.calculateCenterOfPressure(
         surface,
-        alpha,
+        incidenceResult.rad,
         geometricCentroid
       );
 
@@ -521,27 +504,17 @@ export class AerodynamicsCalculator {
       // Transformer normale en coordonnées monde
       const normal = surface.normal.clone().applyQuaternion(transform.quaternion);
 
-      // Calcul angle d'incidence
-      const windDotNormal = windDir.dot(normal);
-      const cosTheta = Math.abs(windDotNormal);
-      const sinAlpha = cosTheta;
+      // Utiliser PhysicsUtilities pour calcul centralisé d'incidence angle
+      const incidenceResult = PhysicsUtilities.calculateIncidenceAngle(windDir, normal);
 
-      if (sinAlpha <= PhysicsConstants.EPSILON) return;
+      if (incidenceResult.sin <= PhysicsConstants.EPSILON) return;
 
-      const alpha = Math.asin(Math.min(1, sinAlpha));
-      const { CL, CD } = this.calculateAerodynamicCoefficients(alpha);
+      const { CL, CD } = this.calculateAerodynamicCoefficients(incidenceResult.rad);
 
-      // Directions
-      const windFacingNormal = windDotNormal >= 0 ? normal.clone() : normal.clone().negate();
-      const liftDir = windFacingNormal.clone()
-        .sub(windDir.clone().multiplyScalar(windFacingNormal.dot(windDir)))
-        .normalize();
-
-      if (liftDir.lengthSq() < PhysicsConstants.EPSILON) {
-        liftDir.copy(windFacingNormal);
-      }
-
-      const dragDir = windDir.clone();
+      // Utiliser directions consolidées depuis PhysicsUtilities
+      const windFacingNormal = incidenceResult.windFacingNormal;
+      const liftDir = incidenceResult.liftDirection;
+      const dragDir = incidenceResult.dragDirection;
 
       // Forces
       const liftMagnitude = dynamicPressure * surface.area * CL;

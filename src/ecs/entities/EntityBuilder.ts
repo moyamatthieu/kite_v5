@@ -10,7 +10,6 @@
 
 import * as THREE from 'three';
 import { Entity } from '@base/Entity';
-
 import { TransformComponent } from '@components/TransformComponent';
 import { MeshComponent } from '@components/MeshComponent';
 

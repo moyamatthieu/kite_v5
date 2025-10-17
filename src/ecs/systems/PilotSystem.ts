@@ -23,7 +23,7 @@ export class PilotSystem extends BaseSimulationSystem {
   private controlBarPosition: THREE.Vector3 = new THREE.Vector3();
 
   constructor() {
-    super('PilotSystem', 6); // Priorité après ControlBarSystem
+    super('PilotSystem', 6); // Ordre 6 - après ControlBarSystem (5)
     this.logger = Logger.getInstance();
   }
 

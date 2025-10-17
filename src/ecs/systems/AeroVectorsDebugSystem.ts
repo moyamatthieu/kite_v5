@@ -14,8 +14,9 @@
 
 import * as THREE from 'three';
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
-import { KitePhysicsSystem } from './KitePhysicsSystem';
 import { SurfaceForce } from '@mytypes/PhysicsTypes';
+
+import { KitePhysicsSystem } from './KitePhysicsSystem';
 
 /**
  * Configuration des vecteurs de debug

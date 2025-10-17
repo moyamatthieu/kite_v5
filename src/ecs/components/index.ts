@@ -1,5 +1,5 @@
 /**
- * index.ts - Export centralisé des composants ECS
+ * index.ts - Export centralisé de tous les composants ECS
  */
 
 export { TransformComponent } from './TransformComponent';
@@ -9,8 +9,10 @@ export { KiteComponent } from './KiteComponent';
 export { GeometryComponent } from './GeometryComponent';
 export { VisualComponent } from './VisualComponent';
 export { BridleComponent } from './BridleComponent';
-export { AerodynamicsComponent } from './AerodynamicsComponent';
 export { LineComponent, type LineConfig, type LineAttachments, type LineState } from './LineComponent';
+export { AerodynamicsComponent } from './AerodynamicsComponent';
+export { ControlPointComponent, type ControlPointConfig, type BridleAttachments } from './ControlPointComponent';
 export { StructureComponent, type PointConnection } from './StructureComponent';
 export { SurfaceComponent } from './SurfaceComponent';
-export { ControlPointComponent, type ControlPointConfig, type BridleAttachments } from './ControlPointComponent';
+export { PilotFeedbackComponent } from './PilotFeedbackComponent';
+

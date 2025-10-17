@@ -18,8 +18,9 @@ import { ControlPointComponent } from '@components/ControlPointComponent';
 import { TransformComponent } from '@components/TransformComponent';
 import { BridleComponent } from '@components/BridleComponent';
 import { LineComponent } from '@components/LineComponent';
-import { PureConstraintSolver } from './ConstraintSolver.pure';
 import { Logger } from '@utils/Logging';
+
+import { PureConstraintSolver } from './ConstraintSolver';
 
 export interface HandlePositionsProvider {
   getHandlePositions(): { left: THREE.Vector3; right: THREE.Vector3 } | null;
@@ -34,6 +35,7 @@ export class ControlPointSystem extends BaseSimulationSystem {
   private handlesProvider: HandlePositionsProvider | null = null;
   private logger = Logger.getInstance();
   private entityManager: EntityManager;
+  private hasInitialized = false; // Flag pour ne calculer qu'une seule fois
 
   constructor(entityManager: EntityManager, order: number = 50) {
     super('ControlPointSystem', order);
@@ -78,6 +80,17 @@ export class ControlPointSystem extends BaseSimulationSystem {
   }
 
   update(context: SimulationContext): void {
+    // ⚠️ IMPORTANT : Ce système ne s'exécute qu'UNE FOIS au premier frame
+    //
+    // RAISON : Le solveur PBD dans KiteController gère les positions des CTRL chaque frame.
+    // Si ControlPointSystem réinitialise les positions à chaque frame, ils se battent
+    // et créent une instabilité (forces explosent, NaN, simulation diverge).
+    //
+    // STRATÉGIE : Calculer les positions initiales une seule fois, puis laisser le PBD converger.
+    if (this.hasInitialized) {
+      return; // Déjà initialisé, ne rien faire
+    }
+
     if (!this.kiteEntity || !this.ctrlLeftEntity || !this.ctrlRightEntity) {
       return;
     }
@@ -121,6 +134,9 @@ export class ControlPointSystem extends BaseSimulationSystem {
         centre: 'CENTRE'
       }
     );
+
+    this.hasInitialized = true;
+    this.logger.info('Control points initialized once, PBD will take over from here', 'ControlPointSystem');
   }
 
   /**
@@ -169,16 +185,13 @@ export class ControlPointSystem extends BaseSimulationSystem {
     ctrlComponent.updatePosition(resolvedPosition);
     ctrlTransform.position.copy(resolvedPosition);
 
-    // Appliquer les forces de bride sur le kite
-    PureConstraintSolver.applyBridleForces(
-      this.kiteEntity,
-      resolvedPosition,
-      bridleLengths,
-      attachments
-    );
+    // NOTE : Les forces de bride ne sont PAS appliquées ici !
+    // Les contraintes géométriques sont gérées par PBD dans enforceLineConstraints/enforceBridleConstraints
+    // (appelés par KitePhysicsSystem via KiteController)
   }
 
   reset(): void {
+    this.hasInitialized = false; // Permettre de réinitialiser au prochain update
     this.logger.info('ControlPointSystem reset', 'ControlPointSystem');
   }
 

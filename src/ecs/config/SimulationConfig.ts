@@ -118,7 +118,7 @@ export const CONFIG = {
   },
   bridle: {
     defaultLengths: Object.freeze({
-      nez: 0.65,    // m - Longueur bride NEZ → CTRL (alignée avec inter et centre)
+      nez: 0.65,    // m - Longueur bride NEZ → CTRL
       inter: 0.65,  // m - Longueur bride INTER → CTRL
       centre: 0.65  // m - Longueur bride CENTRE → CTRL
     })

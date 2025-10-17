@@ -7,13 +7,12 @@
  * - Fournit des métriques de performance et de débogage
  */
 
-import * as THREE from 'three';
+// import * as THREE from 'three'; // Non utilisé - THREE n'est pas nécessaire ici
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { Entity } from '@base/Entity';
 import { EntityManager } from '@entities/EntityManager';
 import { TransformComponent } from '@components/TransformComponent';
 import { PhysicsComponent } from '@components/PhysicsComponent';
-import { LineComponent } from '@components/LineComponent';
 import { Logger } from '@utils/Logging';
 
 export interface LoggingConfig {

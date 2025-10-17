@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
-import { Entity } from '@base/Entity';
+import { Logger } from '@utils/Logging';
 
 export interface InputState {
   // Entrées analogiques (normalisées -1 à 1)
@@ -57,7 +57,7 @@ export class InputSystem extends BaseSimulationSystem {
   }
 
   initialize(): Promise<void> {
-    console.log('InputSystem initialized');
+    Logger.getInstance().info('InputSystem initialized', 'InputSystem');
     return Promise.resolve();
   }
 

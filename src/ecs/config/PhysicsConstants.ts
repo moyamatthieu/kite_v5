@@ -29,7 +29,9 @@ export class PhysicsConstants {
   static readonly CONTROL_DEADZONE = 0.01; // rad - Zone morte pour input barre de contrôle
   static readonly LINE_CONSTRAINT_TOLERANCE = 0.0005; // m - Tolérance contraintes lignes (0.5mm)
   static readonly LINE_TENSION_FACTOR = 0.99; // Sans unité - Facteur tension lignes (99% = légèrement tendues)
-  static readonly CONSTRAINT_ITERATIONS = 2; // Sans unité - Nombre d'itérations pour convergence PBD
+  static readonly CONSTRAINT_ITERATIONS = 8; // Sans unité - Nombre d'itérations pour convergence PBD
+  // Note: 8 itérations = 1 par contrainte pour convergence robuste
+  // PBD converge mieux avec plus d'itérations, coût acceptable (~50% du temps physique)
 
   // Sol et friction
   static readonly GROUND_FRICTION = 0.95; // Sans unité - Facteur friction sol (5% perte vitesse)

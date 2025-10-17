@@ -1,5 +1,6 @@
-import { SimulationApp } from '@/ecs/SimulationApp';
 import { Logger, LogLevel } from '@utils/Logging';
+
+import { SimulationApp } from '@/ecs/SimulationApp';
 
 // Initialisation de la simulation
 async function startSimulation() {

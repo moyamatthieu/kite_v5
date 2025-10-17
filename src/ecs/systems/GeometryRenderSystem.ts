@@ -13,7 +13,6 @@ import * as THREE from 'three';
 import { Entity } from '@base/Entity';
 import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
 import { EntityManager } from '@entities/EntityManager';
-
 import { GeometryComponent } from '@components/GeometryComponent';
 import { VisualComponent } from '@components/VisualComponent';
 import { BridleComponent, type BridleTensions } from '@components/BridleComponent';
@@ -33,7 +32,7 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
   private initializedEntities = new Set<string>();
 
   constructor(entityManager: EntityManager, renderSystem: RenderSystem) {
-    super('GeometryRenderSystem', 4); // Exécuté après la physique, avant le rendu
+    super('GeometryRenderSystem', 90); // Ordre 90 - après KitePhysicsSystem (60), avant LinesRenderSystem (95)
     this.entityManager = entityManager;
     this.renderSystem = renderSystem;
   }
@@ -82,6 +81,30 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
       this.updateBridleTensions(entity);
     }
     */
+      // Correction : Utiliser la position dynamique du ControlPointComponent (CTRL_GAUCHE)
+      const geometry = entity.getComponent<GeometryComponent>('geometry');
+      const bridle = entity.getComponent<BridleComponent>('bridle');
+      const controlPointLeftEntity = this.entityManager.getAllEntities().find(e => {
+        const ctrl = e.getComponent<import('@components/ControlPointComponent').ControlPointComponent>('controlPoint');
+        return ctrl && ctrl.config.side === 'left';
+      });
+      if (geometry && bridle && controlPointLeftEntity) {
+        const ctrlLeft = controlPointLeftEntity.getComponent<import('@components/ControlPointComponent').ControlPointComponent>('controlPoint');
+        if (ctrlLeft) {
+          // Met à jour la bride gauche en utilisant la position dynamique du contrôle gauche
+          // NEZ, INTER_GAUCHE, CENTRE -> CTRL_GAUCHE
+          const nez = geometry.getPoint('NEZ');
+          const interGauche = geometry.getPoint('INTER_GAUCHE');
+          const centre = geometry.getPoint('CENTRE');
+          const ctrlGauche = ctrlLeft.position;
+          // Ici, on peut mettre à jour la visualisation des brides gauche
+          // (ex: via un DebugRenderer ou MeshComponent)
+          // ... code de rendu pour la bride NEZ-CTRL_GAUCHE ...
+          // ... code de rendu pour la bride INTER_GAUCHE-CTRL_GAUCHE ...
+          // ... code de rendu pour la bride CENTRE-CTRL_GAUCHE ...
+          // (Utiliser ctrlGauche pour la position du contrôle gauche)
+        }
+      }
   }
 
   /**
@@ -153,11 +176,7 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
     // 2. Créer les surfaces
     this.createSurfaces(group, geometry, visual);
 
-    // 3. Créer les brides (si présent)
-    const bridle = entity.getComponent<BridleComponent>('bridle');
-    if (bridle) {
-      this.createBridles(group, geometry, bridle, visual);
-    }
+    // Les brides sont maintenant gérées par ControlPointDebugRenderer
 
     // Ajouter le groupe à un MeshComponent
     entity.addComponent(new MeshComponent(group));
@@ -297,44 +316,6 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
   }
 
   /**
-   * Crée les lignes de bridage
-   */
-  private createBridles(
-    group: THREE.Group,
-    geometry: GeometryComponent,
-    bridle: BridleComponent,
-    visual: VisualComponent
-  ): void {
-    if (!visual.bridleMaterial) return;
-
-    const material = new THREE.LineBasicMaterial({
-      color: visual.bridleMaterial.color,
-      opacity: visual.bridleMaterial.opacity,
-      transparent: true,
-      linewidth: visual.bridleMaterial.linewidth
-    });
-
-    const bridleGroup = new THREE.Group();
-    bridleGroup.name = 'bridles';
-
-    bridle.connections.forEach(conn => {
-      const p1 = geometry.getPoint(conn.from);
-      const p2 = geometry.getPoint(conn.to);
-
-      if (!p1 || !p2) return;
-
-      const lineGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-      const line = new THREE.Line(lineGeom, material);
-      line.name = `bridle_${conn.from}_${conn.to}`;
-      line.userData.connection = conn;
-
-      bridleGroup.add(line);
-    });
-
-    group.add(bridleGroup);
-  }
-
-  /**
    * Crée les marqueurs de debug
    */
   private createDebugMarkers(
@@ -353,90 +334,6 @@ export class GeometryRenderSystem extends BaseSimulationSystem {
       marker.name = `marker_${pointName}`;
 
       group.add(marker);
-    });
-  }
-
-  /**
-   * Met à jour la visualisation des brides selon leurs tensions
-   */
-  updateBridleTensions(entity: Entity): void {
-    const meshComp = entity.getComponent<MeshComponent>('mesh');
-    const bridle = entity.getComponent<BridleComponent>('bridle');
-
-    if (!meshComp || !bridle) return;
-
-    const bridleGroup = meshComp.object3D.getObjectByName('bridles') as THREE.Group;
-    if (!bridleGroup) return;
-
-    bridleGroup.children.forEach(child => {
-      if (!(child instanceof THREE.Line)) return;
-
-      const conn = child.userData.connection;
-      if (!conn) return;
-
-      // Récupérer la tension correspondante
-      let tension = 0;
-      if (conn.side === 'left') {
-        if (conn.from === 'NEZ') tension = bridle.tensions.leftNez;
-        else if (conn.from === 'INTER_GAUCHE') tension = bridle.tensions.leftInter;
-        else if (conn.from === 'CENTRE') tension = bridle.tensions.leftCentre;
-      } else {
-        if (conn.from === 'NEZ') tension = bridle.tensions.rightNez;
-        else if (conn.from === 'INTER_DROIT') tension = bridle.tensions.rightInter;
-        else if (conn.from === 'CENTRE') tension = bridle.tensions.rightCentre;
-      }
-
-      // Appliquer couleur selon tension
-      const material = child.material as THREE.LineBasicMaterial;
-      if (tension < 50) {
-        material.color.setHex(0x00ff00); // Vert
-        material.opacity = 0.5;
-      } else if (tension < 150) {
-        const t = (tension - 50) / 100;
-        const r = Math.floor(t * 255);
-        material.color.setRGB(r / 255, 1, 0); // Vert -> Jaune
-        material.opacity = 0.6 + t * 0.2;
-      } else {
-        const t = Math.min((tension - 150) / 100, 1);
-        const g = Math.floor((1 - t) * 255);
-        material.color.setRGB(1, g / 255, 0); // Jaune -> Rouge
-        material.opacity = 0.8 + t * 0.2;
-      }
-    });
-  }
-
-  /**
-   * Met à jour la géométrie des brides (positions)
-   */
-  private updateBridleGeometry(entity: Entity): void {
-    const geometry = entity.getComponent<GeometryComponent>('geometry');
-    const meshComp = entity.getComponent<MeshComponent>('mesh');
-    const bridle = entity.getComponent<BridleComponent>('bridle');
-
-    if (!geometry || !meshComp || !bridle) return;
-
-    const bridleGroup = meshComp.object3D.getObjectByName('bridles') as THREE.Group;
-    if (!bridleGroup) return;
-
-    // Mettre à jour la position de chaque ligne de bride
-    bridleGroup.children.forEach(child => {
-      if (!(child instanceof THREE.Line)) return;
-
-      const conn = child.userData.connection;
-      if (!conn) return;
-
-      const p1 = geometry.getPoint(conn.from);
-      const p2 = geometry.getPoint(conn.to);
-
-      if (!p1 || !p2) return;
-
-      // Mettre à jour la géométrie de la ligne
-      const positions = new Float32Array([
-        p1.x, p1.y, p1.z,
-        p2.x, p2.y, p2.z
-      ]);
-      child.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      child.geometry.attributes.position.needsUpdate = true;
     });
   }
 

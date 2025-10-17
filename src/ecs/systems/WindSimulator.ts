@@ -23,14 +23,13 @@
  */
 import * as THREE from "three";
 import { WindParams } from "@mytypes/PhysicsTypes";
-
-import { CONFIG } from "../config/SimulationConfig";
-
 import {
   BaseSimulationSystem,
   SimulationContext,
 } from "@base/BaseSimulationSystem";
 import { Logger } from "@utils/Logging";
+
+import { CONFIG } from "../config/SimulationConfig";
 
 /**
  * Simulateur de vent et turbulences

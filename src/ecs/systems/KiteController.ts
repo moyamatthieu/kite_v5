@@ -13,10 +13,12 @@ import { Entity } from '@base/Entity';
 import { TransformComponent } from '@components/TransformComponent';
 import { PhysicsComponent } from '@components/PhysicsComponent';
 import { MeshComponent } from '@components/MeshComponent';
+import { Logger } from '@utils/Logging';
 import { CONFIG } from '@config/SimulationConfig';
 import { PhysicsConstants } from '@config/PhysicsConstants';
 import { KiteState, HandlePositions } from '@mytypes/PhysicsTypes';
-import { PureConstraintSolver } from '@systems/ConstraintSolver.pure';
+
+import { PureConstraintSolver } from '@/ecs/systems/ConstraintSolver';
 
 /**
  * Contrôleur physique ECS pur pour le cerf-volant
@@ -28,6 +30,10 @@ export class PureKiteController {
   // Références aux entités de lignes pour lire la longueur réelle
   private leftLineEntity: Entity | null = null;
   private rightLineEntity: Entity | null = null;
+
+  // Références aux entités de points de contrôle (CTRL)
+  private ctrlLeftEntity: Entity | null = null;
+  private ctrlRightEntity: Entity | null = null;
 
   // États pour les warnings
   private hasExcessiveAccel: boolean = false;
@@ -71,6 +77,14 @@ export class PureKiteController {
   }
 
   /**
+   * Configure les entités de points de contrôle (CTRL)
+   */
+  setControlPointEntities(ctrlLeft: Entity | null, ctrlRight: Entity | null): void {
+    this.ctrlLeftEntity = ctrlLeft;
+    this.ctrlRightEntity = ctrlRight;
+  }
+
+  /**
    * Met à jour la position et l'orientation du cerf-volant
    */
   update(
@@ -79,14 +93,19 @@ export class PureKiteController {
     handles: HandlePositions,
     deltaTime: number
   ): void {
+    Logger.getInstance().debugThrottled('KiteController.update() called', 'KiteController');
+    
     const transform = this.kiteEntity.getComponent<TransformComponent>('transform');
     const physics = this.kiteEntity.getComponent<PhysicsComponent>('physics');
     const mesh = this.kiteEntity.getComponent<MeshComponent>('mesh');
 
-    if (!transform || !physics || !mesh) {
-      console.error('⚠️ KiteEntity missing required components');
+    if (!transform || !physics) {
+      Logger.getInstance().error('KiteEntity missing required components (transform or physics)', 'KiteController');
       return;
     }
+
+    // Le mesh peut ne pas encore exister à la première frame (GeometryRenderSystem le crée)
+    // Ce n'est pas bloquant pour la physique
 
     // Valider les forces brutes
     const validForces = this.validateForces(forces);
@@ -100,28 +119,36 @@ export class PureKiteController {
     // Intégrer la physique
     const newPosition = this.integratePhysics(this.smoothedForce, physics, transform, deltaTime);
 
-    // Résolution itérative des contraintes PBD
-    for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
-      // Appliquer les contraintes de lignes (PBD) - passe les entités pour lire la longueur réelle
-      PureConstraintSolver.enforceLineConstraints(
-        this.kiteEntity,
-        newPosition,
-        {
-          velocity: physics.velocity,
-          angularVelocity: physics.angularVelocity
-        },
-        handles,
-        this.leftLineEntity,
-        this.rightLineEntity
-      );
+    // Résolution itérative des contraintes PBD (Gauss-Seidel)
+    // PHYSICS_MODEL.md Section 8.2 : Itérations successives des 8 contraintes
+    
+    // Récupérer les longueurs des brides depuis le component kite
+    const bridle = this.kiteEntity.getComponent<import('@components/BridleComponent').BridleComponent>('bridle');
+    const bridleLengths = bridle ? bridle.lengths : CONFIG.bridle.defaultLengths;
 
-      // Appliquer la collision au sol DANS la boucle PBD pour éviter que le kite passe en dessous
-      PureConstraintSolver.handleGroundCollision(
-        this.kiteEntity,
-        newPosition,
-        physics.velocity
-      );
+    // ✅ NOUVELLE APPROCHE : Résolution simultanée des contraintes couplées
+    // Au lieu d'appliquer séquentiellement les contraintes (qui se détruisent),
+    // on résout le système global avec équilibrage
+    for (let iter = 0; iter < PhysicsConstants.CONSTRAINT_ITERATIONS; iter++) {
+      if (this.ctrlLeftEntity && this.ctrlRightEntity) {
+        PureConstraintSolver.solveConstraintsGlobal(
+          this.kiteEntity,
+          this.ctrlLeftEntity,
+          this.ctrlRightEntity,
+          handles,
+          bridleLengths,
+          newPosition,
+          {
+            velocity: physics.velocity,
+            angularVelocity: physics.angularVelocity
+          },
+          this.leftLineEntity,
+          this.rightLineEntity
+        );
+      }
     }
+
+
 
     // Valider et appliquer la position
     this.validatePosition(newPosition);
@@ -131,12 +158,55 @@ export class PureKiteController {
     // Mettre à jour l'orientation
     this.updateOrientation(this.smoothedTorque, physics, transform, deltaTime);
 
-    // Synchroniser avec Three.js
-    mesh.syncToObject3D({
-      position: transform.position,
-      quaternion: transform.quaternion,
-      scale: transform.scale
-    });
+    // Synchroniser avec Three.js (si le mesh existe déjà)
+    if (mesh) {
+      mesh.syncToObject3D({
+        position: transform.position,
+        quaternion: transform.quaternion,
+        scale: transform.scale
+      });
+    }
+  }
+
+  /**
+   * Décompose les forces en composantes radiale et tangentielle
+   * 
+   * PHYSICS_MODEL.md Section 3.3 :
+   * - Composante radiale : absorbée par les contraintes (lignes/brides)
+   * - Composante tangentielle : produit le mouvement du kite
+   * 
+   * Cette décomposition est CRITIQUE pour le mouvement contraint !
+   */
+  private decomposeForces(
+    totalForces: THREE.Vector3,
+    pilotPosition: THREE.Vector3,
+    kitePosition: THREE.Vector3
+  ): { radial: THREE.Vector3; tangential: THREE.Vector3 } {
+    // Direction radiale (du pilote vers le kite)
+    const radialDirection = kitePosition.clone().sub(pilotPosition);
+    const distance = radialDirection.length();
+
+    if (distance < PhysicsConstants.EPSILON) {
+      // Cas limite : kite au même endroit que pilote
+      return {
+        radial: new THREE.Vector3(),
+        tangential: totalForces.clone()
+      };
+    }
+
+    radialDirection.normalize();
+
+    // Composante radiale : projection de la force sur la direction radiale
+    const radialMagnitude = totalForces.dot(radialDirection);
+    const radialForce = radialDirection.clone().multiplyScalar(radialMagnitude);
+
+    // Composante tangentielle : force totale - force radiale
+    const tangentialForce = totalForces.clone().sub(radialForce);
+
+    return {
+      radial: radialForce,
+      tangential: tangentialForce
+    };
   }
 
   /**
@@ -144,7 +214,7 @@ export class PureKiteController {
    */
   private validateForces(forces: THREE.Vector3): THREE.Vector3 {
     if (!forces || forces.length() > PhysicsConstants.MAX_FORCE || isNaN(forces.length())) {
-      console.error(`⚠️ Forces invalides: ${forces ? forces.toArray() : "undefined"}`);
+      Logger.getInstance().error(`Forces invalides: ${forces ? forces.toArray() : "undefined"}`, 'KiteController');
       return new THREE.Vector3();
     }
     return forces;
@@ -155,7 +225,7 @@ export class PureKiteController {
    */
   private validateTorque(torque: THREE.Vector3): THREE.Vector3 {
     if (!torque || isNaN(torque.length())) {
-      console.error(`⚠️ Couple invalide: ${torque ? torque.toArray() : "undefined"}`);
+      Logger.getInstance().error(`Couple invalide: ${torque ? torque.toArray() : "undefined"}`, 'KiteController');
       return new THREE.Vector3();
     }
     return torque;
@@ -163,6 +233,9 @@ export class PureKiteController {
 
   /**
    * Intègre les forces pour calculer la nouvelle position (Euler)
+   * 
+   * IMPORTANT : Applique SEULEMENT la composante tangentielle pour le déplacement
+   * La composante radiale est absorbée par les contraintes PBD (lignes/brides)
    */
   private integratePhysics(
     forces: THREE.Vector3,
@@ -170,8 +243,16 @@ export class PureKiteController {
     transform: TransformComponent,
     deltaTime: number
   ): THREE.Vector3 {
-    // Accélération = Force / masse
-    const acceleration = forces.clone().divideScalar(physics.mass);
+    // PHYSICS_MODEL.md Section 3.3 : Décomposer forces en radial/tangentiel
+    const { radial: radialForce, tangential: tangentialForce } = this.decomposeForces(
+      forces,
+      this.previousPosition.clone().add(physics.velocity.clone().multiplyScalar(deltaTime)),
+      transform.position
+    );
+
+    // Utiliser SEULEMENT la composante tangentielle pour l'accélération
+    // La composante radiale sera gérée par les contraintes PBD
+    const acceleration = tangentialForce.clone().divideScalar(physics.mass);
     this.lastAccelMagnitude = acceleration.length();
 
     // Limiter l'accélération
@@ -180,7 +261,7 @@ export class PureKiteController {
       acceleration.normalize().multiplyScalar(PhysicsConstants.MAX_ACCELERATION);
     }
 
-    // Mise à jour de la vitesse : v(t+dt) = v(t) + a·dt
+    // Mise à jour de la vitesse : v(t+dt) = v(t) + a_tangential·dt
     physics.velocity.add(acceleration.clone().multiplyScalar(deltaTime));
 
     // Amortissement linéaire
@@ -203,7 +284,7 @@ export class PureKiteController {
    */
   private validatePosition(newPosition: THREE.Vector3): void {
     if (isNaN(newPosition.x) || isNaN(newPosition.y) || isNaN(newPosition.z)) {
-      console.error(`⚠️ Position NaN détectée! Reset à la position précédente`);
+      Logger.getInstance().error('Position NaN détectée! Reset à la position précédente', 'KiteController');
       newPosition.copy(this.previousPosition);
       const physics = this.kiteEntity.getComponent<PhysicsComponent>('physics');
       if (physics) {

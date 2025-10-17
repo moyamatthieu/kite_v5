@@ -23,7 +23,6 @@ import { TransformComponent } from '@components/TransformComponent';
 import { LineComponent } from '@components/LineComponent';
 import { PhysicsComponent } from '@components/PhysicsComponent';
 import { Entity } from '@base/Entity';
-import { LineEntity } from '@entities/LineEntity';
 
 import { KitePhysicsSystem } from './KitePhysicsSystem';
 
@@ -239,6 +238,18 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       return;
     }
 
+    // Vérification finale : s'assurer que les entités sont toujours valides
+    if (!this.ctrlLeftEntity || !this.ctrlRightEntity) {
+      if (!this.hasLoggedWarning) {
+        this.logger.warn(
+          '🔴 LinesRenderSystem: CTRL entities became null during update',
+          'LinesRenderSystem'
+        );
+        this.hasLoggedWarning = true;
+      }
+      return;
+    }
+
     const ctrlLeftTransform = this.ctrlLeftEntity.getComponent<TransformComponent>('transform');
     const ctrlRightTransform = this.ctrlRightEntity.getComponent<TransformComponent>('transform');
 
@@ -284,9 +295,13 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       // DEBUG: Log pour vérifier l'alignement (1% des frames)
       if (Math.random() < 0.01 && renderData.side === 'left') {
         const actualDist = start.distanceTo(end);
+        const ctrlEntityId = this.ctrlLeftEntity?.id || 'null';
+        const ctrlTransform = this.ctrlLeftEntity?.getComponent<TransformComponent>('transform');
+        const ctrlPos = ctrlTransform?.position.toArray().map(v => v.toFixed(2)).join(',') || 'no-transform';
         this.logger.debug('LinesRenderSystem',
           `LEFT line: handle=${start.toArray().map(v => v.toFixed(2))}, ` +
           `ctrl=${end.toArray().map(v => v.toFixed(2))}, ` +
+          `ctrlEntity=${ctrlEntityId}, ctrlTransform.position=${ctrlPos}, ` +
           `maxLength=${renderData.maxLength.toFixed(2)}, ` +
           `actualDist=${actualDist.toFixed(2)}, ` +
           `diff=${(actualDist - renderData.maxLength).toFixed(3)}`
@@ -629,60 +644,5 @@ export class LinesRenderSystem extends BaseSimulationSystem {
       const b = 0;                      // 0 → 0 (jaune → rouge)
       return (r << 16) | (g << 8) | b;
     }
-  }
-
-  /**
-   * Crée une entité de ligne
-   */
-  createLineEntity(
-    id: string,
-    side: 'left' | 'right',
-    scene: THREE.Scene
-  ): LineEntity {
-    const entity = new LineEntity(side);
-
-    // Récupérer le mesh créé par LineEntity et l'ajouter à la scène
-    const mesh = entity.getComponent<MeshComponent>('mesh');
-    if (mesh) {
-      scene.add(mesh.object3D);
-      const tubeMesh = mesh.object3D as THREE.Mesh;
-      const material = tubeMesh.material as THREE.MeshStandardMaterial;
-      this.logger.info(`✅ Ligne ${side} ajoutée à la scène:`, 'LinesRenderSystem', {
-        id,
-        position: mesh.object3D.position.toArray(),
-        visible: mesh.object3D.visible,
-        geometry: tubeMesh.geometry.type,
-        material: material.type,
-        color: material.color.getHexString()
-      });
-    } else {
-      this.logger.error(`🔴 Ligne ${side}: mesh component manquant!`, 'LinesRenderSystem');
-    }
-
-    // Enregistrer l'entité
-    this.registerLineEntity(id, entity, {
-      segments: CONFIG.defaults.meshSegments,
-      color: CONFIG.colors.controlBar,
-      linewidth: CONFIG.rendering.lineWidth,
-      side
-    });
-
-    return entity;
-  }
-
-  /**
-   * Supprime une entité de ligne
-   */
-  removeLineEntity(id: string, scene: THREE.Scene): void {
-    const entity = this.lineEntities.get(id);
-    if (!entity) return;
-
-    const mesh = entity.getComponent<MeshComponent>('mesh');
-    if (mesh && mesh.object3D.parent) {
-      scene.remove(mesh.object3D);
-    }
-    this.lineEntities.delete(id);
-    this.lineRenderData.delete(id);
-    this.clampedLines.delete(id);
   }
 }

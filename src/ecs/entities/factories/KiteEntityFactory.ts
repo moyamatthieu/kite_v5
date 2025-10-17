@@ -40,46 +40,46 @@ export class KiteEntityFactory {
     geometry.setPoint('BORD_DROIT', new THREE.Vector3(width / 2, 0, 0));
     
     // CENTRE - point central sur la spine (pour bride centrale)
-    const centreY = height / 4; // 25% de la hauteur
+    const centreY = height / 4; // 25% de la hauteur (0.1625m pour height=0.65m)
     geometry.setPoint('CENTRE', new THREE.Vector3(0, centreY, 0));
     
     // INTER points - position de la barre transversale sur les bords d'attaque
-    // Calculés proportionnellement : ratio = (height - centreY) / height = 0.75
-    const ratio = (height - centreY) / height;
-    const interGaucheX = ratio * (-width / 2);  // -0.619
-    const interDroitX = ratio * (width / 2);    // +0.619
-    geometry.setPoint('INTER_GAUCHE', new THREE.Vector3(interGaucheX, centreY, 0));
-    geometry.setPoint('INTER_DROIT', new THREE.Vector3(interDroitX, centreY, 0));
+    // CORRECTION CRITIQUE : Les INTER doivent être à l'intersection des leading edges et de la hauteur centreY
+    // Leading edge gauche : ligne de NEZ (0, height, 0) vers BORD_GAUCHE (-width/2, 0, 0)
+    // Équation paramétrique : P = NEZ + t * (BORD_GAUCHE - NEZ), où y(t) = centreY
+    // height + t * (0 - height) = centreY  →  t = (height - centreY) / height
+    const t = (height - centreY) / height; // = 0.75 pour centreY = height/4
+    
+    // Position INTER_GAUCHE : interpolation sur leading edge gauche
+    const nezPos = new THREE.Vector3(0, height, 0);
+    const bordGauchePos = new THREE.Vector3(-width / 2, 0, 0);
+    const interGauchePos = new THREE.Vector3(
+      nezPos.x + t * (bordGauchePos.x - nezPos.x),  // = -0.619m
+      centreY,
+      nezPos.z + t * (bordGauchePos.z - nezPos.z)   // = 0
+    );
+    
+    // Position INTER_DROIT : symétrie
+    const interDroitPos = new THREE.Vector3(-interGauchePos.x, centreY, 0);
+    
+    geometry.setPoint('INTER_GAUCHE', interGauchePos);
+    geometry.setPoint('INTER_DROIT', interDroitPos);
     
     // FIX points - points de fixation des whiskers sur les bords d'attaque
     // Positionnés à 2/3 de la distance entre CENTRE et INTER (sur l'axe X)
     const fixRatio = 2 / 3;
-    geometry.setPoint('FIX_GAUCHE', new THREE.Vector3(fixRatio * interGaucheX, centreY, 0));
-    geometry.setPoint('FIX_DROIT', new THREE.Vector3(fixRatio * interDroitX, centreY, 0));
+    geometry.setPoint('FIX_GAUCHE', new THREE.Vector3(fixRatio * interGauchePos.x, centreY, 0));
+    geometry.setPoint('FIX_DROIT', new THREE.Vector3(fixRatio * interDroitPos.x, centreY, 0));
     
     // WHISKER points - longerons arrière partant des FIX vers l'arrière
     // Positionnés à 1/4 de l'envergure depuis le centre, légèrement bas, en arrière
     geometry.setPoint('WHISKER_GAUCHE', new THREE.Vector3(-width / 4, 0.1, -depth));
     geometry.setPoint('WHISKER_DROIT', new THREE.Vector3(width / 4, 0.1, -depth));
     
-    // Calculer les points de contrôle par trilatération 3D
-    // Les brides convergent vers ces points pour former une pyramide
-    const nezPos = new THREE.Vector3(0, height, 0);
-    const centrePos = new THREE.Vector3(0, centreY, 0);
-    const interDroitPos = new THREE.Vector3(interDroitX, centreY, 0);
-    const bridleLengths = { ...CONFIG.bridle.defaultLengths };
-    
-    const ctrlDroit = this.calculateControlPoint(nezPos, interDroitPos, centrePos, bridleLengths);
-    const ctrlGauche = new THREE.Vector3(-ctrlDroit.x, ctrlDroit.y, ctrlDroit.z);
-    
-    // Log pour debug : voir où sont positionnés les points de contrôle
-    console.log('🎯 Points de contrôle calculés par trilatération:');
-    console.log('  CTRL_GAUCHE:', ctrlGauche.toArray().map(v => v.toFixed(3)).join(', '));
-    console.log('  CTRL_DROIT:', ctrlDroit.toArray().map(v => v.toFixed(3)).join(', '));
-    console.log('  Longueurs brides:', bridleLengths);
-    
-    geometry.setPoint('CTRL_GAUCHE', ctrlGauche);
-    geometry.setPoint('CTRL_DROIT', ctrlDroit);
+    // NOTE ARCHITECTURE ECS :
+    // Les points de contrôle CTRL_GAUCHE et CTRL_DROIT ne sont PAS ajoutés au GeometryComponent
+    // car ce sont des ENTITÉS SÉPARÉES avec leur propre physique (voir ControlPointEntityFactory).
+    // Ils seront créés dynamiquement par ControlPointSystem et reliés au kite par des contraintes de brides.
     
     // Connexions pour la structure (basée sur la branche main)
     // Spine centrale
@@ -115,10 +115,6 @@ export class KiteEntityFactory {
     // Composant Bridle
     const bridle = new BridleComponent();
     bridle.lengths = { ...CONFIG.bridle.defaultLengths };
-    console.log('🔧 BridleComponent après init:', {
-      lengths: bridle.lengths,
-      connections: bridle.connections.map(c => ({ from: c.from, to: c.to, length: c.length }))
-    });
     kiteEntity.addComponent(bridle);
 
     // Composant Aerodynamics

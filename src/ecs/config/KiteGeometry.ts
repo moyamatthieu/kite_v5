@@ -21,7 +21,7 @@
  *   - src/simulation/config/SimulationConfig.ts
  */
 import * as THREE from "three";
-import { Point3D } from "@utils/geometry";
+import { Logger } from '@utils/Logging';
 
 /**
  * Géométrie du cerf-volant
@@ -35,15 +35,15 @@ export class KiteGeometry {
   // NOTE: Les points de contrôle CTRL_GAUCHE/CTRL_DROIT ne sont PAS définis ici.
   // Ils sont calculés dynamiquement à partir des longueurs de brides via PointFactory.
   /**
-   * Converts the static POINTS to use the Point class instead of THREE.Vector3.
+   * Converts the static POINTS to use THREE.Vector3.
    */
   static readonly POINTS = {
-    NEZ: new Point3D(0, 0.65, 0), // Le bout pointu en haut
-    SPINE_BAS: new Point3D(0, 0, 0), // Le centre en bas
-    BORD_GAUCHE: new Point3D(-0.825, 0, 0), // L'extrémité de l'aile gauche
-    BORD_DROIT: new Point3D(0.825, 0, 0), // L'extrémité de l'aile droite
-    WHISKER_GAUCHE: new Point3D(-0.4125, 0.1, -0.15), // Stabilisateur gauche
-    WHISKER_DROIT: new Point3D(0.4125, 0.1, -0.15), // Stabilisateur droit
+    NEZ: new THREE.Vector3(0, 0.65, 0), // Le bout pointu en haut
+    SPINE_BAS: new THREE.Vector3(0, 0, 0), // Le centre en bas
+    BORD_GAUCHE: new THREE.Vector3(-0.825, 0, 0), // L'extrémité de l'aile gauche
+    BORD_DROIT: new THREE.Vector3(0.825, 0, 0), // L'extrémité de l'aile droite
+    WHISKER_GAUCHE: new THREE.Vector3(-0.4125, 0.1, -0.15), // Stabilisateur gauche
+    WHISKER_DROIT: new THREE.Vector3(0.4125, 0.1, -0.15), // Stabilisateur droit
   };
 
   /**
@@ -282,10 +282,11 @@ export class KiteGeometry {
     // Warning si niveau trop élevé
     if (level > KiteGeometry.MAX_SUBDIVISION_LEVEL) {
       const totalTriangles = KiteGeometry.SURFACES.length * KiteGeometry.TRIANGLES_PER_SURFACE_AT_LEVEL(level);
-      console.warn(
-        `⚠️ Niveau de subdivision ${level} trop élevé (${totalTriangles} triangles).\n` +
-        `Limité à ${KiteGeometry.MAX_SUBDIVISION_LEVEL} pour éviter surcharge performance.\n` +
-        `Si vous avez vraiment besoin de plus, augmentez MAX_SUBDIVISION_LEVEL.`
+      Logger.getInstance().warn(
+        `Niveau de subdivision ${level} trop élevé (${totalTriangles} triangles). ` +
+        `Limité à ${KiteGeometry.MAX_SUBDIVISION_LEVEL} pour éviter surcharge performance. ` +
+        `Si vous avez vraiment besoin de plus, augmentez MAX_SUBDIVISION_LEVEL.`,
+        'KiteGeometry'
       );
     }
 
@@ -295,7 +296,7 @@ export class KiteGeometry {
       KiteGeometry._subdividedSurfaces = null;
 
       const totalTriangles = KiteGeometry.SURFACES.length * KiteGeometry.TRIANGLES_PER_SURFACE_AT_LEVEL(clampedLevel);
-      console.log(`🔧 Maillage subdivisé : niveau ${clampedLevel} → ${totalTriangles} triangles au total`);
+      Logger.getInstance().info(`Maillage subdivisé : niveau ${clampedLevel} → ${totalTriangles} triangles au total`, 'KiteGeometry');
     }
   }
 

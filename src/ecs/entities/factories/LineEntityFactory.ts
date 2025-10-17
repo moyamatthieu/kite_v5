@@ -5,7 +5,6 @@ import { GeometryComponent } from '@components/GeometryComponent';
 import { VisualComponent } from '@components/VisualComponent';
 import { TransformComponent } from '@components/TransformComponent';
 import { CONFIG } from '@config/SimulationConfig';
-import { Logger } from '@utils/Logging';
 
 export class LineEntityFactory {
   static create(

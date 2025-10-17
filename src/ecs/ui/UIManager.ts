@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import type { KiteState } from "@mytypes/PhysicsTypes";
+import { Logger, LogLevel } from "@utils/Logging";
+import { LoggingConfig } from "@config/LoggingConfig";
 
 import { CONFIG } from "../config/SimulationConfig";
 import { DebugRenderer } from "../rendering/DebugRenderer";
@@ -70,6 +72,7 @@ export class UIManager {
   private debugRenderer: DebugRenderer;
   private resetCallback: () => void;
   private togglePlayCallback: () => void;
+  private logger: Logger;
 
   constructor(
     simulation: SimulationControls,
@@ -81,6 +84,7 @@ export class UIManager {
     this.debugRenderer = debugRenderer;
     this.resetCallback = resetCallback;
     this.togglePlayCallback = togglePlayCallback;
+    this.logger = Logger.getInstance();
     this.setupControls();
   }
 
@@ -150,12 +154,12 @@ export class UIManager {
     const valueElement = document.getElementById(`${config.id}-value`);
 
     if (!slider || !valueElement) {
-      console.warn(`⚠️ Slider not found: ${config.id}`);
+      this.logger.warn(`Slider not found: ${config.id}`, 'UIManager');
       return;
     }
 
     // Définir la valeur initiale du slider
-    console.log(`🎚️ Setting slider ${config.id} to:`, config.initialValue);
+    this.logger.debug(`Setting slider ${config.id} to: ${config.initialValue}`, 'UIManager');
     slider.value = config.initialValue.toString();
     
     // Afficher la valeur initiale formatée
@@ -211,7 +215,7 @@ export class UIManager {
   private setupLineControlsGroup(): void {
     // Longueur des lignes
     const lineLength = this.simulation.getLineLength();
-    console.log('🔍 UIManager init - Line length:', lineLength);
+    this.logger.debug(`UIManager init - Line length: ${lineLength}`, 'UIManager');
     
     this.createSlider({
       id: "line-length",
@@ -223,11 +227,7 @@ export class UIManager {
 
     // Brides
     const currentBridle = this.simulation.getBridleLengths();
-    console.log('🔍 UIManager init - Bridle lengths:', {
-      nez: currentBridle.nez,
-      inter: currentBridle.inter,
-      centre: currentBridle.centre
-    });
+    this.logger.debug(`UIManager init - Bridle lengths: nez=${currentBridle.nez}, inter=${currentBridle.inter}, centre=${currentBridle.centre}`, 'UIManager');
 
     this.createSlider({
       id: "bridle-nez",
@@ -313,11 +313,83 @@ export class UIManager {
     });
   }
 
+  /**
+   * Configure les contrôles de logging
+   */
+  private setupLoggingControlsGroup(): void {
+    // Niveau de log
+    const logSelect = document.getElementById("log-level") as HTMLSelectElement;
+    if (logSelect) {
+      logSelect.onchange = () => {
+        const level = parseInt(logSelect.value, 10) as LogLevel;
+        Logger.getInstance().setLogLevel(level);
+        Logger.getInstance().info(`Niveau de log changé: ${LogLevel[level]}`, 'UIManager');
+      };
+    }
+
+    // Boutons de configuration prédéfinie
+    const devBtn = document.getElementById("log-dev");
+    const prodBtn = document.getElementById("log-prod");
+    const perfBtn = document.getElementById("log-perf");
+    const debugBtn = document.getElementById("log-debug");
+
+    if (devBtn) {
+      devBtn.onclick = () => {
+        LoggingConfig.apply(LoggingConfig.DEVELOPMENT);
+        this.logger.info('Configuration développement appliquée', 'UIManager');
+      };
+    }
+
+    if (prodBtn) {
+      prodBtn.onclick = () => {
+        LoggingConfig.apply(LoggingConfig.PRODUCTION);
+        this.logger.info('Configuration production appliquée', 'UIManager');
+      };
+    }
+
+    if (perfBtn) {
+      perfBtn.onclick = () => {
+        LoggingConfig.apply(LoggingConfig.PERFORMANCE);
+        this.logger.info('Configuration performance appliquée', 'UIManager');
+      };
+    }
+
+    if (debugBtn) {
+      debugBtn.onclick = () => {
+        LoggingConfig.apply(LoggingConfig.DEBUG_INTENSIVE);
+        this.logger.info('Configuration debug intensive appliquée', 'UIManager');
+      };
+    }
+
+    // Statistiques de throttling
+    const statsBtn = document.getElementById("log-stats");
+    if (statsBtn) {
+      statsBtn.onclick = () => {
+        const stats = Logger.getInstance().getThrottleStats();
+        this.logger.info(
+          `Statistiques throttling: ${stats.activeKeys} clés actives, ${stats.totalSuppressed} messages supprimés`,
+          'UIManager'
+        );
+      };
+    }
+
+    // Clear logs
+    const clearBtn = document.getElementById("log-clear");
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        Logger.getInstance().clearLogs();
+        Logger.getInstance().resetThrottleCache();
+        this.logger.info('Logs et cache throttling nettoyés', 'UIManager');
+      };
+    }
+  }
+
   private setupWindControls(): void {
     this.setupWindControlsGroup();
     this.setupLineControlsGroup();
     this.setupPhysicsControlsGroup();
     this.setupAerodynamicControlsGroup();
+    this.setupLoggingControlsGroup();
   }
 
   updatePlayButton(isPlaying: boolean): void {

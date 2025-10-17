@@ -332,6 +332,40 @@
                     <span class="slider-value" id="force-smoothing-value">0.80</span>
                 </div>
             </div>
+
+            <!-- Contrôles de Logging -->
+            <div class="control-group">
+                <label>📋 Configuration Logging</label>
+                
+                <!-- Niveau de log -->
+                <div style="margin: 10px 0;">
+                    <label for="log-level" style="font-size: 12px;">Niveau de log:</label>
+                    <select id="log-level" style="margin-left: 8px; padding: 2px;">
+                        <option value="0">DEBUG</option>
+                        <option value="1" selected>INFO</option>
+                        <option value="2">WARN</option>
+                        <option value="3">ERROR</option>
+                    </select>
+                </div>
+
+                <!-- Configurations prédéfinies -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-dev" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">🚀 Dev</button>
+                        <button id="log-prod" style="padding: 4px 8px; font-size: 11px; background: #FF9800; color: white; border: none; border-radius: 3px; cursor: pointer;">🏭 Prod</button>
+                        <button id="log-perf" style="padding: 4px 8px; font-size: 11px; background: #9C27B0; color: white; border: none; border-radius: 3px; cursor: pointer;">⚡ Perf</button>
+                        <button id="log-debug" style="padding: 4px 8px; font-size: 11px; background: #F44336; color: white; border: none; border-radius: 3px; cursor: pointer;">🐛 Debug</button>
+                    </div>
+                </div>
+
+                <!-- Utilitaires -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-stats" style="padding: 4px 8px; font-size: 11px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">📊 Stats</button>
+                        <button id="log-clear" style="padding: 4px 8px; font-size: 11px; background: #607D8B; color: white; border: none; border-radius: 3px; cursor: pointer;">🗑️ Clear</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Panneau de debug -->

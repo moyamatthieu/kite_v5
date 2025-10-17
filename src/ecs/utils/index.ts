@@ -7,4 +7,6 @@ export { MathUtils } from './MathUtils';
 export { GeometryUtils } from './GeometryUtils';
 export { KiteEntityHelper } from './KiteEntityHelper';
 export { UidGenerator } from './UidGenerator';
-export { Point3D, FrameGeometry, SurfaceGeometry } from './geometry';
+export { PhysicsUtilities } from './PhysicsUtilities';
+export { ConstraintUtilities } from './ConstraintUtilities';
+// Point3D, FrameGeometry, SurfaceGeometry archivés dans .legacy/geometry.ts (wrappers OO inutiles)

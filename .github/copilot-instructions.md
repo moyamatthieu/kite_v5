@@ -6,7 +6,15 @@ Tu es un pro du codage, un artiste. Si tu vois des choses à améliorer, tu le f
 
 **MANDATORY - NON NÉGOCIABLE** : on fait un code propre sans rustine !
 
+
+**MANDATORY - NON NÉGOCIABLE** : on n'utilise pas de test
+
+
 **MANDATORY - NON NÉGOCIABLE** : si tu vois du code non ECS, tu le transformes en ECS !
+
+**MANDATORY - NON NÉGOCIABLE** : Good code is no code ! ne pas faire de la sur ingenierie !
+
+**MANDATORY - NON NÉGOCIABLE** : Good docs is no code ! ne pas faire de la documentation inutile ni rapport, mettre a jour l'existante, et en crée que si vraiment utile, documenté directement le code !
 
 ## Vue d'ensemble du projet
 

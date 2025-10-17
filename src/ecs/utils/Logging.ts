@@ -24,6 +24,13 @@ export class Logger {
   private logs: LogEntry[] = [];
   private maxLogs: number = 1000;
   private categories: Set<string> = new Set();
+  
+  // Système de throttling pour éviter le flood
+  private throttleCache: Map<string, { count: number; lastTime: number; lastMessage: string }> = new Map();
+  private throttleInterval: number = 2000; // 2 secondes pour physics
+  private maxSimilarLogs: number = 3; // Max 3 logs identiques par intervalle (réduit)
+  private summaryInterval: number = 5000; // Rapport de résumé toutes les 5 secondes
+  private lastSummaryTime: number = 0;
 
   private constructor() {}
 
@@ -81,8 +88,154 @@ export class Logger {
   }
 
   /**
-   * Log générique
+   * Log debug avec throttling - évite le flood des logs répétitifs
    */
+  debugThrottled(message: string, category?: string, data?: unknown): void {
+    this.logThrottled(LogLevel.DEBUG, message, category, data);
+  }
+
+  /**
+   * Log info avec throttling - évite le flood des logs répétitifs
+   */
+  infoThrottled(message: string, category?: string, data?: unknown): void {
+    this.logThrottled(LogLevel.INFO, message, category, data);
+  }
+
+  /**
+   * Log warn avec throttling - évite le flood des logs répétitifs
+   */
+  warnThrottled(message: string, category?: string, data?: unknown): void {
+    this.logThrottled(LogLevel.WARN, message, category, data);
+  }
+
+  /**
+   * Log error avec throttling - évite le flood des logs répétitifs
+   */
+  errorThrottled(message: string, category?: string, data?: unknown): void {
+    this.logThrottled(LogLevel.ERROR, message, category, data);
+  }
+
+  /**
+   * Log avec throttling pour éviter le spam
+   */
+  private logThrottled(
+    level: LogLevel,
+    message: string,
+    category?: string,
+    data?: unknown
+  ): void {
+    const now = Date.now();
+    
+    // Créer une clé plus précise pour grouper les messages similaires
+    const messageType = message.replace(/[\d.-]+/g, '#'); // Remplace nombres par # pour grouper
+    const key = `${category || 'global'}-${level}-${messageType}`;
+    
+    const cached = this.throttleCache.get(key);
+    
+    if (!cached) {
+      // Premier log de ce type
+      this.throttleCache.set(key, { count: 1, lastTime: now, lastMessage: message });
+      this.log(level, message, category, data);
+      return;
+    }
+    
+    // Incrémenter le compteur
+    cached.count++;
+    cached.lastMessage = message;
+    
+    // Si dans l'intervalle de throttling
+    if (now - cached.lastTime < this.throttleInterval) {
+      // Log seulement les premiers messages
+      if (cached.count <= this.maxSimilarLogs) {
+        this.log(level, message, category, data);
+      } else if (cached.count === this.maxSimilarLogs + 1) {
+        // Premier message de suppression
+        this.log(level, `[THROTTLED] Future similar messages will be grouped...`, category);
+      }
+      return;
+    }
+    
+    // Intervalle dépassé - logger un résumé si nécessaire
+    if (cached.count > this.maxSimilarLogs) {
+      const suppressedCount = cached.count - this.maxSimilarLogs;
+      this.log(level, `[SUMMARY] ${suppressedCount}x similar: "${messageType}" (last: ${cached.lastMessage})`, category);
+    }
+    
+    // Redémarrer le compteur pour cette clé
+    cached.count = 1;
+    cached.lastTime = now;
+    cached.lastMessage = message;
+    this.log(level, message, category, data);
+    
+    // Nettoyage périodique du cache pour éviter la fuite mémoire
+    this.cleanupThrottleCache(now);
+  }
+
+  /**
+   * Nettoie le cache de throttling des entrées anciennes
+   */
+  private cleanupThrottleCache(now: number): void {
+    if (now - this.lastSummaryTime > this.summaryInterval) {
+      this.lastSummaryTime = now;
+      
+      // Supprimer les entrées anciennes (plus de 10 secondes)
+      const oldKeys: string[] = [];
+      for (const [key, cached] of this.throttleCache.entries()) {
+        if (now - cached.lastTime > 10000) {
+          oldKeys.push(key);
+        }
+      }
+      
+      for (const key of oldKeys) {
+        this.throttleCache.delete(key);
+      }
+      
+      // Log du nettoyage si nécessaire
+      if (oldKeys.length > 0) {
+        this.debug(`Throttle cache cleanup: removed ${oldKeys.length} old entries`, 'Logger');
+      }
+    }
+  }
+
+  /**
+   * Configure le système de throttling
+   */
+  configureThrottling(options: {
+    interval?: number;
+    maxSimilarLogs?: number;
+    summaryInterval?: number;
+  }): void {
+    if (options.interval) this.throttleInterval = options.interval;
+    if (options.maxSimilarLogs) this.maxSimilarLogs = options.maxSimilarLogs;
+    if (options.summaryInterval) this.summaryInterval = options.summaryInterval;
+    
+    this.info(`Throttling configuré: interval=${this.throttleInterval}ms, max=${this.maxSimilarLogs}, summary=${this.summaryInterval}ms`, 'Logger');
+  }
+
+  /**
+   * Obtient les statistiques de throttling
+   */
+  getThrottleStats(): { activeKeys: number; totalSuppressed: number } {
+    let totalSuppressed = 0;
+    for (const cached of this.throttleCache.values()) {
+      if (cached.count > this.maxSimilarLogs) {
+        totalSuppressed += cached.count - this.maxSimilarLogs;
+      }
+    }
+    
+    return {
+      activeKeys: this.throttleCache.size,
+      totalSuppressed
+    };
+  }
+
+  /**
+   * Remet à zéro le cache de throttling
+   */
+  resetThrottleCache(): void {
+    this.throttleCache.clear();
+    this.debug('Throttle cache reset', 'Logger');
+  }
   private log(
     level: LogLevel,
     message: string,
