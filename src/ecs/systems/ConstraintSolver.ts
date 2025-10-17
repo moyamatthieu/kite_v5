@@ -55,17 +55,24 @@ export interface ConvergenceMetrics {
  * Solveur de contraintes ECS pur
  */
 export class PureConstraintSolver {
+  // Nombre d'itérations internes PBD pour convergence du système couplé kite-CTRL
+  private static readonly INTERNAL_PBD_ITERATIONS = 4;
 
   /**
-   * ✅ NOUVEAU : Résolution simultanée de toutes les contraintes
+   * ✅ REFACTORISATION COMPLÈTE : Résolution itérative Gauss-Seidel
    * 
    * PRINCIPE PHYSIQUE CORRECT :
-   * Le CTRL est un **point libre en 3D** soumis à :
-   * - 1 contrainte de ligne : |CTRL - HANDLE| ≤ 15m (sphère)
-   * - 3 contraintes de brides : |CTRL - KITE_POINT_i| = 0.65m (3 sphères)
+   * Le système kite-CTRL est COUPLÉ : bouger le kite invalide les CTRL et vice-versa.
+   * On doit itérer jusqu'à convergence :
    * 
-   * Le CTRL doit trouver sa position d'équilibre qui satisfait ces 4 contraintes.
-   * C'est un problème de **trilatération contrainte** en 3D.
+   * BOUCLE PBD INTERNE :
+   *   1. Trilatérer CTRL depuis position actuelle du kite (contraintes brides)
+   *   2. Appliquer forces PBD sur kite depuis CTRL → kite bouge
+   *   3. Les CTRL sont invalides → recommencer (convergence itérative)
+   * 
+   * APRÈS convergence :
+   *   4. Projeter CTRL sur sphère ligne (contrainte ligne, appliquée UNE FOIS à la fin)
+   *   5. Collision sol kite
    */
   static solveConstraintsGlobal(
     kiteEntity: Entity,
@@ -78,41 +85,210 @@ export class PureConstraintSolver {
     leftLineEntity?: Entity | null,
     rightLineEntity?: Entity | null
   ): void {
-    // Résoudre pour chaque CTRL séparément avec points d'attache SÉPARÉS
-    // ✅ CORRECTION : Chaque CTRL a ses propres points d'attache pour éviter suspension unique
-    this.solveFreePointConstraints(
-      ctrlLeftEntity,
-      handles.left,
-      kiteEntity,
-      bridleLengths,
-      { nez: "NEZ", inter: "INTER_GAUCHE", centre: "CENTRE" }, // CENTRE unique pour les deux côtés
-      leftLineEntity
-    );
+    // Lire longueur de ligne
+    let lineLength = CONFIG.lines.defaultLength;
+    if (leftLineEntity) {
+      const lineComponent = leftLineEntity.getComponent<LineComponent>('line');
+      if (lineComponent) lineLength = lineComponent.config.length;
+    }
 
-    this.solveFreePointConstraints(
-      ctrlRightEntity,
-      handles.right,
-      kiteEntity,
-      bridleLengths,
-      { nez: "NEZ", inter: "INTER_DROIT", centre: "CENTRE" }, // CENTRE unique pour les deux côtés
-      rightLineEntity
-    );
+    // ✅ BOUCLE PBD ITÉRATIVE : Convergence du système couplé kite-CTRL
+    for (let iter = 0; iter < this.INTERNAL_PBD_ITERATIONS; iter++) {
+      // ÉTAPE 1 : Trilatération CTRL (contraintes brides) SANS projection ligne
+      this.trilaterateCtrl(
+        ctrlLeftEntity,
+        kiteEntity,
+        bridleLengths,
+        { nez: "NEZ", inter: "INTER_GAUCHE", centre: "CENTRE" }
+      );
 
-    // Collision sol pour le kite
+      this.trilaterateCtrl(
+        ctrlRightEntity,
+        kiteEntity,
+        bridleLengths,
+        { nez: "NEZ", inter: "INTER_DROIT", centre: "CENTRE" }
+      );
+
+      // ÉTAPE 2 : Appliquer forces PBD sur kite depuis CTRL → kite bouge
+      this.enforceBridleConstraints(
+        kiteEntity,
+        ctrlLeftEntity,
+        ctrlRightEntity,
+        newKitePosition,
+        kiteState,
+        bridleLengths
+      );
+
+      // Log convergence (throttled pour éviter spam)
+      if (iter === 0 || iter === this.INTERNAL_PBD_ITERATIONS - 1) {
+        this.logConstraintState(
+          iter,
+          kiteEntity,
+          ctrlLeftEntity,
+          ctrlRightEntity,
+          handles,
+          bridleLengths,
+          lineLength
+        );
+      }
+    }
+
+    // ÉTAPE 3 : Projection finale sur sphère ligne (contrainte ligne)
+    // Appliquée UNE FOIS à la fin pour ne pas casser les contraintes de brides
+    this.projectCtrlOnLineSphere(ctrlLeftEntity, handles.left, lineLength);
+    this.projectCtrlOnLineSphere(ctrlRightEntity, handles.right, lineLength);
+
+    // ÉTAPE 4 : Collision sol
     this.handleGroundCollision(kiteEntity, newKitePosition, kiteState.velocity);
+  }
+
+  /**
+   * ✅ NOUVELLE MÉTHODE : Trilatération CTRL pure (contraintes brides uniquement)
+   * 
+   * Calcule la position du CTRL qui satisfait les 3 contraintes de brides :
+   * - |CTRL - NEZ| = bridleLength.nez
+   * - |CTRL - INTER| = bridleLength.inter
+   * - |CTRL - CENTRE| = bridleLength.centre
+   * 
+   * SANS projection ligne → celle-ci sera appliquée après convergence PBD
+   */
+  private static trilaterateCtrl(
+    ctrlEntity: Entity,
+    kiteEntity: Entity,
+    bridleLengths: BridleLengths,
+    attachments: { nez: string; inter: string; centre: string }
+  ): void {
+    const ctrlTransform = ctrlEntity.getComponent<TransformComponent>('transform');
+    const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    const kiteTransform = kiteEntity.getComponent<TransformComponent>('transform');
+
+    if (!ctrlTransform || !geometry || !kiteTransform) {
+      Logger.getInstance().warn('Missing components for CTRL trilateration', 'ConstraintSolver');
+      return;
+    }
+
+    // Convertir points locaux kite en coordonnées monde
+    const toWorldCoordinates = (localPoint: THREE.Vector3): THREE.Vector3 => {
+      return localPoint.clone().applyQuaternion(kiteTransform.quaternion).add(kiteTransform.position);
+    };
+
+    const nezLocal = geometry.getPoint(attachments.nez);
+    const interLocal = geometry.getPoint(attachments.inter);
+    const centreLocal = geometry.getPoint(attachments.centre);
+
+    if (!nezLocal || !interLocal || !centreLocal) {
+      Logger.getInstance().warn(
+        `Missing attachment points: ${attachments.nez}=${!!nezLocal}, ${attachments.inter}=${!!interLocal}, ${attachments.centre}=${!!centreLocal}`,
+        'ConstraintSolver'
+      );
+      return;
+    }
+
+    const nezWorld = toWorldCoordinates(nezLocal);
+    const interWorld = toWorldCoordinates(interLocal);
+    const centreWorld = toWorldCoordinates(centreLocal);
+
+    // Trilatération 3D sur les 3 points de bride
+    const newCtrlPos = this.trilaterate3D(
+      nezWorld, bridleLengths.nez,
+      interWorld, bridleLengths.inter,
+      centreWorld, bridleLengths.centre
+    );
+
+    // Appliquer la nouvelle position (SANS projection ligne ici)
+    ctrlTransform.position.copy(newCtrlPos);
+  }
+
+  /**
+   * ✅ NOUVELLE MÉTHODE : Projection CTRL sur sphère ligne
+   * 
+   * Appliquée UNE FOIS après convergence PBD pour ne pas casser les contraintes de brides.
+   * Si |CTRL - HANDLE| > lineLength, ramène CTRL à exactement lineLength.
+   */
+  private static projectCtrlOnLineSphere(
+    ctrlEntity: Entity,
+    handle: THREE.Vector3,
+    lineLength: number
+  ): void {
+    const ctrlTransform = ctrlEntity.getComponent<TransformComponent>('transform');
+    if (!ctrlTransform) {
+      Logger.getInstance().warn('Missing transform for CTRL line projection', 'ConstraintSolver');
+      return;
+    }
+
+    const distToHandle = ctrlTransform.position.distanceTo(handle);
+    
+    if (distToHandle > lineLength) {
+      // Projeter sur sphère de ligne
+      const direction = ctrlTransform.position.clone().sub(handle).normalize();
+      ctrlTransform.position.copy(handle.clone().add(direction.multiplyScalar(lineLength)));
+      
+      // Log violations significatives (> 10cm)
+      if (distToHandle > lineLength + 0.1) {
+        Logger.getInstance().debugThrottled(
+          `CTRL line constraint enforced: ${distToHandle.toFixed(3)}m -> ${lineLength.toFixed(3)}m`,
+          'ConstraintSolver'
+        );
+      }
+    }
+  }
+
+  /**
+   * ✅ NOUVELLE MÉTHODE : Log détaillé de l'état des contraintes
+   * 
+   * Affiche les distances réelles vs cibles pour debug et validation.
+   */
+  private static logConstraintState(
+    iteration: number,
+    kiteEntity: Entity,
+    ctrlLeftEntity: Entity,
+    ctrlRightEntity: Entity,
+    handles: HandlePositions,
+    bridleLengths: BridleLengths,
+    lineLength: number
+  ): void {
+    const geometry = kiteEntity.getComponent<GeometryComponent>('geometry');
+    const kiteTransform = kiteEntity.getComponent<TransformComponent>('transform');
+    const ctrlLeftTransform = ctrlLeftEntity.getComponent<TransformComponent>('transform');
+    const ctrlRightTransform = ctrlRightEntity.getComponent<TransformComponent>('transform');
+
+    if (!geometry || !kiteTransform || !ctrlLeftTransform || !ctrlRightTransform) return;
+
+    // Helper pour convertir local → monde
+    const toWorld = (local: THREE.Vector3) =>
+      local.clone().applyQuaternion(kiteTransform.quaternion).add(kiteTransform.position);
+
+    // Calculer distances CTRL-left
+    const nezWorld = toWorld(geometry.getPoint("NEZ")!);
+    const interLeftWorld = toWorld(geometry.getPoint("INTER_GAUCHE")!);
+    const centreWorld = toWorld(geometry.getPoint("CENTRE")!);
+
+    const distNezLeft = ctrlLeftTransform.position.distanceTo(nezWorld);
+    const distInterLeft = ctrlLeftTransform.position.distanceTo(interLeftWorld);
+    const distCentreLeft = ctrlLeftTransform.position.distanceTo(centreWorld);
+    const distLineLeft = ctrlLeftTransform.position.distanceTo(handles.left);
+
+    // Erreur max
+    const errorNez = Math.abs(distNezLeft - bridleLengths.nez);
+    const errorInter = Math.abs(distInterLeft - bridleLengths.inter);
+    const errorCentre = Math.abs(distCentreLeft - bridleLengths.centre);
+    const maxError = Math.max(errorNez, errorInter, errorCentre);
+
+    Logger.getInstance().debugThrottled(
+      `PBD Iter ${iteration}/${this.INTERNAL_PBD_ITERATIONS} | ` +
+      `CTRL-L: brides[${distNezLeft.toFixed(3)}, ${distInterLeft.toFixed(3)}, ${distCentreLeft.toFixed(3)}]m ` +
+      `(target=${bridleLengths.nez.toFixed(2)}m) | ` +
+      `line=${distLineLeft.toFixed(2)}m/${lineLength.toFixed(2)}m | ` +
+      `maxError=${(maxError * 1000).toFixed(1)}mm`,
+      'ConstraintSolver'
+    );
   }
 
   /**
    * Résout la position d'un CTRL libre en 3D sous contraintes multiples
    * 
-   * CONTRAINTES :
-   * - Ligne : |CTRL - HANDLE| ≤ lineLength
-   * - Brides : |CTRL - KITE_POINT_i| = bridleLength_i (pour i = nez, inter, centre)
-   * 
-   * MÉTHODE :
-   * 1. Trilatération sur les 3 brides → position candidate
-   * 2. Projection sur sphère de ligne si nécessaire
-   * 3. Équilibrage itératif pour satisfaire toutes les contraintes
+   * ⚠️ DEPRECATED : Utilisée temporairement pour compatibilité, sera supprimée
+   * Utiliser trilaterateCtrl + projectCtrlOnLineSphere à la place
    */
   static solveFreePointConstraints(
     ctrlEntity: Entity,
@@ -288,24 +464,22 @@ export class PureConstraintSolver {
   }
 
   /**
-   * ✅ OPTION A : CTRL = POINTS GÉOMÉTRIQUES PURS
+   * ✅ PBD BIDIRECTIONNEL : Applique les contraintes des brides selon PHYSICS_MODEL.md Section 8
    * 
-   * Applique les contraintes des brides sur le KITE uniquement
-   * Les CTRL sont des points géométriques calculés par trilatération - AUCUNE MASSE !
+   * ARCHITECTURE CORRECTE (PHYSICS_MODEL.md) :
+   * - Les contraintes PBD corrigent LES DEUX extrémités selon leurs masses inverses
+   * - KITE : masse = 0.31 kg → bouge peu (invMass = 3.2)
+   * - CTRL : masse = 0.01 kg → bouge beaucoup (invMass = 100)
+   * - Correction répartie : delta_A = -n × (λ / masse_A), delta_B = +n × (λ / masse_B)
    * 
-   * ARCHITECTURE PHYSIQUE CORRECTE :
-   * - CTRL = points géométriques purs (trilatération uniquement)
-   * - KITE = seule entité avec masse qui bouge physiquement
-   * - Brides = contraintes rigides entre KITE et CTRL géométriques
+   * FLUX BIDIRECTIONNEL :
+   * 1. Forces aéro (kite) → tensions brides → forces sur CTRL
+   * 2. Forces sur CTRL → tensions lignes → traction handles (pilote ressent)
+   * 3. PBD équilibre les positions pour satisfaire contraintes de distance
    * 
-   * FLUX :
-   * 1. CTRL calculés par trilatération (géométrie pure)
-   * 2. Brides tirent le KITE vers les CTRL fixes
-   * 3. Résultat : physique cohérente sans masses contradictoires
-   * 
-   * @param kiteEntity - Entité kite avec masse physique
-   * @param ctrlLeftEntity - Point géométrique calculé (SANS MASSE)
-   * @param ctrlRightEntity - Point géométrique calculé (SANS MASSE)
+   * @param kiteEntity - Entité kite avec masse ~0.31 kg
+   * @param ctrlLeftEntity - Point CTRL avec petite masse ~0.01 kg
+   * @param ctrlRightEntity - Point CTRL avec petite masse ~0.01 kg
    * @param predictedKitePosition - Position prédite du kite (modifiée par PBD)
    * @param kiteState - État physique du kite (velocity, angularVelocity)
    * @param bridleLengths - Longueurs cibles des brides
@@ -330,7 +504,11 @@ export class PureConstraintSolver {
     const ctrlLeftTransform = ctrlLeftEntity.getComponent<TransformComponent>('transform');
     const ctrlRightTransform = ctrlRightEntity.getComponent<TransformComponent>('transform');
 
-    if (!geometry || !transform || !physics || !ctrlLeftTransform || !ctrlRightTransform) {
+    // Lire masses des CTRL depuis ControlPointComponent
+    const ctrlLeftComp = ctrlLeftEntity.getComponent<import('@components/ControlPointComponent').ControlPointComponent>('controlPoint');
+    const ctrlRightComp = ctrlRightEntity.getComponent<import('@components/ControlPointComponent').ControlPointComponent>('controlPoint');
+
+    if (!geometry || !transform || !physics || !ctrlLeftTransform || !ctrlRightTransform || !ctrlLeftComp || !ctrlRightComp) {
       Logger.getInstance().warn('Missing components for bridle constraints', 'ConstraintSolver');
       return;
     }
@@ -342,10 +520,11 @@ export class PureConstraintSolver {
       return;
     }
 
-    // ✅ OPTION A : CTRL = POINTS GÉOMÉTRIQUES PURS (SANS MASSE)
-    // Seul le KITE a une masse et peut bouger physiquement
+    // ✅ PBD BIDIRECTIONNEL : Masses inverses pour les deux extrémités
     const invMassKite = physics.invMass;
     const invInertiaKite = physics.invInertia;
+    const invMassCtrlLeft = 1.0 / ctrlLeftComp.config.mass;  // ~100 (masse 0.01 kg)
+    const invMassCtrlRight = 1.0 / ctrlRightComp.config.mass;
 
     // Helper : convertir point local du kite en coordonnées monde
     const toWorldCoordinates = (localPoint: THREE.Vector3, position: THREE.Vector3, quaternion: THREE.Quaternion): THREE.Vector3 => {
@@ -367,8 +546,8 @@ export class PureConstraintSolver {
 
     const allBridles = [...bridlesLeft, ...bridlesRight];
 
-    // Résolution PBD pour chaque bride - VERSION CTRL VIRTUELS
-    // Les CTRL n'ont pas de masse → seul le kite bouge
+    // Résolution PBD bidirectionnelle pour chaque bride
+    // ✅ PBD BIDIRECTIONNEL : Correction des deux extrémités selon masses inverses
     const solveBridle = (
       kitePointName: string,
       ctrlEntity: Entity,
@@ -376,8 +555,9 @@ export class PureConstraintSolver {
     ) => {
       const kitePointLocal = geometry.getPoint(kitePointName);
       const ctrlTransform = ctrlEntity.getComponent<TransformComponent>('transform');
+      const ctrlComp = ctrlEntity.getComponent<import('@components/ControlPointComponent').ControlPointComponent>('controlPoint');
 
-      if (!kitePointLocal || !ctrlTransform) {
+      if (!kitePointLocal || !ctrlTransform || !ctrlComp) {
         Logger.getInstance().warn(`Points bride introuvables: ${kitePointName}`, 'ConstraintSolver');
         return;
       }
@@ -405,26 +585,36 @@ export class PureConstraintSolver {
       // Moments angulaires
       const alphaKite = new THREE.Vector3().crossVectors(rKite, n);
 
-      // Inverse masses - ✅ PHASE 1.2 : Utilisation directe des propriétés PhysicsComponent
+      // ✅ PBD BIDIRECTIONNEL : Masses inverses des deux extrémités
       const invMassKite = physics.invMass;
       const invInertiaKite = physics.invInertia;
+      const invMassCtrl = 1.0 / ctrlComp.config.mass;
 
-      // ✅ OPTION A : CTRL GÉOMÉTRIQUES - Seul le KITE bouge
-      const denom = invMassKite + alphaKite.lengthSq() * invInertiaKite;
+      // Dénominateur PBD bidirectionnel : w_A + w_B (masses inverses)
+      const denom = invMassKite + invMassCtrl + alphaKite.lengthSq() * invInertiaKite;
       const lambda = C / Math.max(denom, PhysicsConstants.EPSILON);
 
-      // Correction PBD simple : seul le KITE bouge vers la contrainte
+      // ✅ CORRECTION BIDIRECTIONNELLE (PHYSICS_MODEL.md Section 8.2)
+      // Kite : delta_A = -n × (invMass_A × λ)
       const dPosKite = n.clone().multiplyScalar(-invMassKite * lambda);
       
+      // CTRL : delta_B = +n × (invMass_B × λ)
+      const dPosCtrl = n.clone().multiplyScalar(invMassCtrl * lambda);
+
       // Clamping conservateur pour stabilité
-      const maxCorrection = bridleLength * 0.3;
-      if (dPosKite.length() > maxCorrection) {
-        dPosKite.normalize().multiplyScalar(maxCorrection);
+      const maxCorrectionKite = bridleLength * 0.3;
+      const maxCorrectionCtrl = bridleLength * 0.3;
+      
+      if (dPosKite.length() > maxCorrectionKite) {
+        dPosKite.normalize().multiplyScalar(maxCorrectionKite);
+      }
+      if (dPosCtrl.length() > maxCorrectionCtrl) {
+        dPosCtrl.normalize().multiplyScalar(maxCorrectionCtrl);
       }
 
+      // Application des corrections
       predictedKitePosition.add(dPosKite);
-      
-      // ✅ CTRL = POINTS GÉOMÉTRIQUES FIXES - Ne bougent JAMAIS ici !
+      ctrlTransform.position.add(dPosCtrl);  // ✅ CTRL bouge maintenant !
 
       // Correction de rotation du kite
       const dThetaKite = alphaKite.clone().multiplyScalar(-invInertiaKite * lambda);
@@ -436,8 +626,6 @@ export class PureConstraintSolver {
       }
 
       // ✅ Correction de vitesse bidirectionnelle
-      // Note: Les CTRL n'ont pas de PhysicsComponent, donc on ne corrige que le kite
-      // (La vitesse des CTRL est implicite via leur position qui change entre frames)
       const kitePointWorld2 = toWorldCoordinates(kitePointLocal, predictedKitePosition, transform.quaternion);
       const diff2 = ctrlTransform.position.clone().sub(kitePointWorld2);
       const dist2 = diff2.length();
@@ -452,19 +640,19 @@ export class PureConstraintSolver {
         .clone()
         .add(new THREE.Vector3().crossVectors(kiteState.angularVelocity, rKite2));
       
-      // Vitesse CTRL = différence de position entre frames (implicite)
-      // Pour simplification, on considère CTRL quasi-statique
-      const velCtrl = new THREE.Vector3(0, 0, 0);
+      // Vitesse CTRL depuis ControlPointComponent
+      const velCtrl = ctrlComp.velocity.clone();
 
       const relVel = velCtrl.clone().sub(velKitePoint);
       const radialSpeed = relVel.dot(n2);
 
       if (radialSpeed > 0) {
-        // ✅ OPTION A : Correction de vitesse du KITE uniquement
+        // ✅ PBD BIDIRECTIONNEL : Correction de vitesse des deux extrémités
         const rxnKite = new THREE.Vector3().crossVectors(rKite2, n2);
-        const eff = invMassKite + rxnKite.lengthSq() * invInertiaKite;
+        const eff = invMassKite + invMassCtrl + rxnKite.lengthSq() * invInertiaKite;
         const J = -radialSpeed / Math.max(eff, PhysicsConstants.EPSILON);
 
+        // Correction vitesse KITE
         kiteState.velocity.add(n2.clone().multiplyScalar(J * invMassKite));
 
         const angImpulseKite = new THREE.Vector3().crossVectors(
@@ -473,7 +661,10 @@ export class PureConstraintSolver {
         );
         kiteState.angularVelocity.add(angImpulseKite.multiplyScalar(invInertiaKite));
 
-        // Clamp kite velocities to prevent explosion
+        // ✅ Correction vitesse CTRL (bidirectionnel)
+        ctrlComp.velocity.add(n2.clone().multiplyScalar(-J * invMassCtrl));
+
+        // Clamp velocities to prevent explosion
         const kiteVelMag = kiteState.velocity.length();
         if (kiteVelMag > PhysicsConstants.MAX_VELOCITY) {
           kiteState.velocity.multiplyScalar(PhysicsConstants.MAX_VELOCITY / kiteVelMag);
@@ -482,6 +673,11 @@ export class PureConstraintSolver {
         const angVelMag = kiteState.angularVelocity.length();
         if (angVelMag > PhysicsConstants.MAX_ANGULAR_VELOCITY) {
           kiteState.angularVelocity.multiplyScalar(PhysicsConstants.MAX_ANGULAR_VELOCITY / angVelMag);
+        }
+        
+        const ctrlVelMag = ctrlComp.velocity.length();
+        if (ctrlVelMag > PhysicsConstants.MAX_VELOCITY) {
+          ctrlComp.velocity.multiplyScalar(PhysicsConstants.MAX_VELOCITY / ctrlVelMag);
         }
       }
     };
