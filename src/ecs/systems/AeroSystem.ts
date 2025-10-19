@@ -99,11 +99,12 @@ export class AeroSystem extends System {
 
         const localWindDir = localApparentWind.clone().normalize();
 
-        // 3. Angle d'attaque local - calculé entre la normale du panneau et le vent
-        // (FIX audit 19/10/2025: au lieu d'une corde arbitraire)
+        // 3. Angle d'attaque local (basé sur la normale du panneau)
+        // Pour un cerf-volant : alpha = arccos(|normale · vent|)
+        // Cela donne alpha=90° quand le vent frappe frontalement (surface perpendiculaire au vent)
         let surfaceNormal = sample.normal.clone();
-        const dotProduct = surfaceNormal.dot(localWindDir);
-        const alpha = Math.asin(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
+        const dotProduct = Math.abs(surfaceNormal.dot(localWindDir));
+        const alpha = Math.acos(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
 
         // 4. Coefficients aéro locaux
         const CL = this.calculateCL(aero, alpha);
@@ -119,7 +120,7 @@ export class AeroSystem extends System {
         //
         // La portance monte le kite, la traînée le tire d'avant en arrière
         
-        // Assurer que la normale pointe VERS LE VENT (hors de la surface)
+        // Assurer que la normale pointe VERS LE VENT (pour que la portance monte vers le haut)
         if (surfaceNormal.dot(localWindDir) < 0) {
           surfaceNormal.negate(); // Inverser si elle pointe loin du vent
         }
@@ -127,7 +128,7 @@ export class AeroSystem extends System {
         // === LIFT (Portance) : perpendiculaire à la surface ===
         // Le coefficient de portance dépend de l'angle d'attaque par rapport au vent
         // mais la DIRECTION est toujours la normale de la surface
-        const liftDir = surfaceNormal.clone(); // Perpendiculaire à la surface
+        const liftDir = surfaceNormal.clone(); // Perpendiculaire à la surface (déjà correcte après vérif ci-dessus)
         
         // === DRAG (Traînée) : parallèle au vent ===
         // Tire le kite dans la direction du vent apparent
