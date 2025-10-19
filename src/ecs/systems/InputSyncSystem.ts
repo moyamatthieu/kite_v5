@@ -112,21 +112,42 @@ export class InputSyncSystem extends System {
   }
 
   /**
-   * Met à jour les brides (TODO: implémentation complète)
+   * Met à jour la longueur de la bride nez du kite
    */
   private updateBridleNez(entityManager: EntityManager, newLength: number): void {
-    // TODO: mettre à jour les composants des brides du kite
-    console.log(`[InputSyncSystem] TODO: Update bridle nez to ${newLength}`);
+    const kite = entityManager.getEntity('kite');
+    if (!kite) return;
+
+    const bridle = kite.getComponent('bridle') as any;
+    if (bridle && bridle.lengths) {
+      bridle.lengths.nez = newLength;
+    }
   }
 
+  /**
+   * Met à jour la longueur de la bride inter du kite
+   */
   private updateBridleInter(entityManager: EntityManager, newLength: number): void {
-    // TODO: mettre à jour les composants des brides du kite
-    console.log(`[InputSyncSystem] TODO: Update bridle inter to ${newLength}`);
+    const kite = entityManager.getEntity('kite');
+    if (!kite) return;
+
+    const bridle = kite.getComponent('bridle') as any;
+    if (bridle && bridle.lengths) {
+      bridle.lengths.inter = newLength;
+    }
   }
 
+  /**
+   * Met à jour la longueur de la bride centre du kite
+   */
   private updateBridleCentre(entityManager: EntityManager, newLength: number): void {
-    // TODO: mettre à jour les composants des brides du kite
-    console.log(`[InputSyncSystem] TODO: Update bridle centre to ${newLength}`);
+    const kite = entityManager.getEntity('kite');
+    if (!kite) return;
+
+    const bridle = kite.getComponent('bridle') as any;
+    if (bridle && bridle.lengths) {
+      bridle.lengths.centre = newLength;
+    }
   }
 
   /**

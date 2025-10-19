@@ -48,21 +48,21 @@ export const UI_METADATA = {
       nez: {
         min: 0.5,
         max: 5,
-        step: 0.1,
+        step: 0.01,
         unit: 'm',
         label: 'Bride nez'
       },
       inter: {
         min: 0.5,
         max: 5,
-        step: 0.1,
+        step: 0.01,
         unit: 'm',
         label: 'Bride inter'
       },
       centre: {
         min: 0.5,
         max: 5,
-        step: 0.1,
+        step: 0.01,
         unit: 'm',
         label: 'Bride centre'
       }

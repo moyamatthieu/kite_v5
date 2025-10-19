@@ -34,6 +34,9 @@ export class InputComponent extends Component {
   isPaused: boolean = false; // true = en pause, false = en cours d'exécution
   debugMode: boolean = false;
 
+  // === Contrôle barre (clavier) ===
+  barRotationInput: number = 0; // -1 = gauche, 0 = neutre, 1 = droite
+
   constructor(initialValues: Partial<InputComponent> = {}) {
     super();
     // Vent
@@ -61,5 +64,8 @@ export class InputComponent extends Component {
     this.resetSimulation = initialValues.resetSimulation ?? false;
     this.isPaused = initialValues.isPaused ?? false;
     this.debugMode = initialValues.debugMode ?? false;
+
+    // Contrôle barre
+    this.barRotationInput = initialValues.barRotationInput ?? 0;
   }
 }

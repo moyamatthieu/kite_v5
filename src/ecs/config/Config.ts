@@ -63,7 +63,7 @@ export const CONFIG = {
   
   // === VENT ===
   wind: {
-    speed: 7, // m/s (~25 km/h - bon pour le vol du kite)
+    speed: 12, // m/s (~25 km/h - bon pour le vol du kite)
     direction: 270, // degrés (270 = -Z = Nord)
     turbulence: 0 // % (0-100) - Variations aléatoires du vent
   },
@@ -71,15 +71,16 @@ export const CONFIG = {
   // === PHYSIQUE ===
   physics: {
     gravity: 9.81, // m/s²
-    linearDamping: 0.5,
+    linearDamping: 0.8,
     angularDamping: 0.5
   },
   
   // === INITIALISATION ===
   // Système de coordonnées Three.js :
   // X = droite/gauche, Y = haut/bas, Z = devant/derrière (vent vient de -Z)
+  // Pilote : centre à (0, 0.8, 0), hauteur 1.6m
   initialization: {
-    controlBarPosition: new THREE.Vector3(0, 1, -0.6), // 1m haut, 60cm devant (Z négatif)
+    controlBarPosition: new THREE.Vector3(0, 1, -0.6), // Position du pivot de la barre : 1m hauteur, 60cm devant
     kiteAltitude: 10, // m au-dessus de la barre (Y)
     kiteDistance: 15, // m devant la barre (Z négatif)
     

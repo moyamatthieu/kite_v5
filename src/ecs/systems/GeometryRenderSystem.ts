@@ -132,11 +132,15 @@ export class GeometryRenderSystem extends System {
     // === 2. FRAME (armature noire) ===
     this.createKiteFrame(group, geometry);
     
-    // === 3. BRIDES (6 lignes de bridage) ===
-    this.createKiteBridles(group, geometry);
+    // === 3. BRIDES ===
+    // DÉSACTIVÉ: Les brides sont maintenant gérées par BridleRenderSystem
+    // qui les affiche dynamiquement en coordonnées MONDE
+    // this.createKiteBridles(group, geometry);
     
     // === 4. MARQUEURS DES POINTS DE CONTRÔLE ===
-    this.createControlPointMarkers(group, geometry);
+    // DÉSACTIVÉ: Les points CTRL sont visualisés via les brides dynamiques
+    // Pour debug, vous pouvez réactiver cette ligne
+    // this.createControlPointMarkers(group, geometry);
     
     return group;
   }

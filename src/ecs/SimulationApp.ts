@@ -12,13 +12,15 @@ import * as THREE from 'three';
 import { EntityManager } from './core/EntityManager';
 import { SystemManager } from './core/SystemManager';
 import { TransformComponent } from './components/TransformComponent';
-import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory } from './entities';
+import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory, BridleFactory } from './entities';
 import { DebugFactory } from './entities/DebugFactory';
 import {
   InputSyncSystem,
   InputSystem,
   WindSystem,
   AeroSystem,
+  BridleConstraintSystem,
+  BridleRenderSystem,
   ConstraintSystem,
   PhysicsSystem,
   PilotSystem,
@@ -109,6 +111,10 @@ export class SimulationApp {
     this.entityManager.register(leftLine);
     this.entityManager.register(rightLine);
     
+    // Brides (6 entités)
+    const bridles = BridleFactory.createAll();
+    bridles.forEach(bridle => this.entityManager.register(bridle));
+    
     // Kite
     const kite = KiteFactory.create(kitePos);
     this.entityManager.register(kite);
@@ -140,6 +146,7 @@ export class SimulationApp {
       new CameraControlsSystem(renderSystem.getCanvas(), camera)
     ); // Priority 1 (bis)
     this.systemManager.add(new InputSyncSystem()); // Priority 5 - Synchronise UI → Composants
+    this.systemManager.add(new BridleConstraintSystem()); // Priority 10 - Met à jour positions des brides via trilatération
     this.systemManager.add(new InputSystem()); // Priority 10
     this.systemManager.add(new WindSystem()); // Priority 20
     this.systemManager.add(new AeroSystem()); // Priority 30
@@ -147,6 +154,7 @@ export class SimulationApp {
     this.systemManager.add(new PhysicsSystem()); // Priority 50 - LIT forces accumulées
     this.systemManager.add(new PilotSystem()); // Priority 55
     this.systemManager.add(new LineRenderSystem()); // Priority 55 (bis)
+    this.systemManager.add(new BridleRenderSystem()); // Priority 56 - Rend les brides dynamiquement
     this.systemManager.add(new GeometryRenderSystem()); // Priority 60
 
     this.systemManager.add(renderSystem); // Priority 70
@@ -210,7 +218,7 @@ export class SimulationApp {
     if (this.paused) {
       // En pause : exécuter les systèmes physiques ET de rendu
       // Cela permet d'afficher les forces même en pause (gravité, etc)
-      const systemsToRun = ['AeroSystem', 'GeometryRenderSystem', 'LineRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
+      const systemsToRun = ['AeroSystem', 'GeometryRenderSystem', 'LineRenderSystem', 'BridleRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
       systemsToRun.forEach(name => {
         const system = this.systemManager.getSystem(name);
         if (system && system.isEnabled()) {

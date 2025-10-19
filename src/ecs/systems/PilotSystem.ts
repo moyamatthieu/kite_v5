@@ -27,8 +27,16 @@ import { PilotComponent } from '../components/PilotComponent';
 import { LineComponent } from '../components/LineComponent';
 import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
+import { InputComponent } from '../components/InputComponent';
+import { CONFIG } from '../config/Config';
 
 export class PilotSystem extends System {
+  private barRotationAngle: number = 0; // Angle de rotation actuel (degrés)
+
+  // Configuration de la rotation de la barre
+  private readonly MAX_ROTATION_ANGLE = 30; // degrés max de chaque côté
+  private readonly ROTATION_SPEED = 60; // degrés/seconde
+
   constructor() {
     // S'exécute après ConstraintSystem (priorité 50)
     super('PilotSystem', 55);
@@ -53,6 +61,9 @@ export class PilotSystem extends System {
     this.detectDominantSide(pilotComp);
     this.calculateTensionDeltas(pilotComp, deltaTime);
     this.updateFlightState(pilotComp);
+
+    // Gérer la rotation de la barre depuis les inputs clavier
+    this.updateBarRotation(entityManager, deltaTime);
 
     // Le pilote maintient la barre de contrôle
     this.applyPilotGrip(entityManager);
@@ -148,14 +159,59 @@ export class PilotSystem extends System {
    */
   private calculateTensionDeltas(pilotComp: PilotComponent, deltaTime: number): void {
     if (deltaTime <= 0) return;
-    
+
     const prevLeftRaw = pilotComp.leftHandRawTension;
     const prevRightRaw = pilotComp.rightHandRawTension;
-    
+
     pilotComp.leftHandTensionDelta = (pilotComp.leftHandRawTension - prevLeftRaw) / deltaTime;
     pilotComp.rightHandTensionDelta = (pilotComp.rightHandRawTension - prevRightRaw) / deltaTime;
   }
-  
+
+  /**
+   * Met à jour la rotation de la barre de contrôle depuis les inputs clavier
+   * Rotation autour de l'axe Y (vertical) au niveau du point pivot
+   */
+  private updateBarRotation(entityManager: EntityManager, deltaTime: number): void {
+    // Récupérer l'input de rotation depuis InputComponent
+    const uiEntity = entityManager.query(['Input'])[0];
+    if (!uiEntity) return;
+
+    const inputComp = uiEntity.getComponent<InputComponent>('Input');
+    if (!inputComp) return;
+
+    // Récupérer la barre de contrôle
+    const controlBar = entityManager.getEntity('controlBar');
+    if (!controlBar) return;
+
+    const barTransform = controlBar.getComponent<TransformComponent>('transform');
+    if (!barTransform) return;
+
+    // Mettre à jour l'angle de rotation selon l'input (-1, 0, ou 1)
+    const rotationInput = inputComp.barRotationInput;
+    if (rotationInput !== 0) {
+      // Appliquer la rotation progressive
+      const rotationDelta = rotationInput * this.ROTATION_SPEED * deltaTime;
+      this.barRotationAngle = Math.max(
+        -this.MAX_ROTATION_ANGLE,
+        Math.min(this.MAX_ROTATION_ANGLE, this.barRotationAngle + rotationDelta)
+      );
+    } else {
+      // Retour progressif au centre quand aucun input
+      const RETURN_SPEED_FACTOR = 2.0;
+      const returnSpeed = this.ROTATION_SPEED * RETURN_SPEED_FACTOR * deltaTime;
+      if (Math.abs(this.barRotationAngle) < returnSpeed) {
+        this.barRotationAngle = 0;
+      } else {
+        this.barRotationAngle -= Math.sign(this.barRotationAngle) * returnSpeed;
+      }
+    }
+
+    // Appliquer la rotation autour de l'axe Y (vertical)
+    const rotationRad = this.barRotationAngle * Math.PI / 180;
+    const yAxis = new THREE.Vector3(0, 1, 0);
+    barTransform.quaternion.setFromAxisAngle(yAxis, rotationRad);
+  }
+
   /**
    * Applique la force du pilote qui maintient la barre de contrôle
    * Le pilote agit comme un ressort-amortisseur pour garder la barre en position
@@ -169,8 +225,8 @@ export class PilotSystem extends System {
 
     if (!barTransform || !barPhysics || barPhysics.isKinematic) return;
 
-    // Position cible de la barre (position du pilote)
-    const targetPosition = new THREE.Vector3(0, 1.5, 0);
+    // Position cible de la barre (depuis CONFIG)
+    const targetPosition = CONFIG.initialization.controlBarPosition.clone();
 
     // Force de rappel : F = -k × (x - x0) - c × v
     // Le pilote résiste au déplacement de la barre

@@ -23,15 +23,18 @@ export class ControlBarFactory {
     
     // === GEOMETRY ===
     const geometry = new GeometryComponent();
-    
+
     // Handles espacés de 65cm
     const handleSpacing = 0.65;
     geometry.setPoint('leftHandle', new THREE.Vector3(-handleSpacing / 2, 0, 0));
     geometry.setPoint('rightHandle', new THREE.Vector3(handleSpacing / 2, 0, 0));
-    
+
+    // Point pivot au centre de la barre (pour rotation et référence)
+    geometry.setPoint('pivot', new THREE.Vector3(0, 0, 0));
+
     // Connexion entre les handles (la barre elle-même)
     geometry.addConnection('leftHandle', 'rightHandle');
-    
+
     entity.addComponent(geometry);
 
     // === PHYSICS ===

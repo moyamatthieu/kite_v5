@@ -327,6 +327,9 @@ export class UISystem extends System {
 
       // === Tensions des lignes ===
       this.updateLineTensions(context);
+
+      // === Distances des lignes (handles -> points de contrôle) ===
+      this.updateLineDistances(context);
     }
 
     // === Vent ambiant et apparent ===
@@ -464,5 +467,90 @@ export class UISystem extends System {
 
     const apparentSpeed = windState.apparent.length();
     windApparentValue.textContent = `${apparentSpeed.toFixed(DECIMAL_PRECISION_POSITION)} m/s`;
+  }
+
+  /**
+   * Calcule et affiche les distances des lignes (handles -> points de contrôle du kite)
+   * Compare avec la distance attendue depuis Config
+   */
+  private updateLineDistances(context: SimulationContext): void {
+    const { entityManager } = context;
+
+    // Récupérer les entités
+    const kite = entityManager.getEntity('kite');
+    const controlBar = entityManager.getEntity('controlBar');
+
+    if (!kite || !controlBar) return;
+
+    const kiteGeometry = kite.getComponent('geometry') as any;
+    const barGeometry = controlBar.getComponent('geometry') as any;
+
+    if (!kiteGeometry || !barGeometry) return;
+
+    // === Ligne gauche ===
+    const leftHandleWorld = barGeometry.getPointWorld('leftHandle', controlBar);
+    const leftCtrlWorld = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
+
+    if (leftHandleWorld && leftCtrlWorld) {
+      // Distance actuelle
+      const actualLeftDistance = leftHandleWorld.distanceTo(leftCtrlWorld);
+
+      // Distance attendue depuis Config
+      const expectedDistance = this.inputComponent?.lineLength ?? 150;
+
+      // Écart
+      const leftDiff = actualLeftDistance - expectedDistance;
+
+      // Afficher
+      const leftActual = document.getElementById('line-left-actual-value');
+      const leftExpected = document.getElementById('line-left-expected-value');
+      const leftDiffElem = document.getElementById('line-left-diff-value');
+
+      if (leftActual) leftActual.textContent = `${actualLeftDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      if (leftExpected) leftExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      if (leftDiffElem) {
+        const sign = leftDiff >= 0 ? '+' : '';
+        leftDiffElem.textContent = `${sign}${leftDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        // Colorer en rouge si l'écart est > 1m
+        if (Math.abs(leftDiff) > 1) {
+          leftDiffElem.style.color = '#ff4444';
+        } else {
+          leftDiffElem.style.color = '#4da6ff';
+        }
+      }
+    }
+
+    // === Ligne droite ===
+    const rightHandleWorld = barGeometry.getPointWorld('rightHandle', controlBar);
+    const rightCtrlWorld = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
+
+    if (rightHandleWorld && rightCtrlWorld) {
+      // Distance actuelle
+      const actualRightDistance = rightHandleWorld.distanceTo(rightCtrlWorld);
+
+      // Distance attendue depuis Config
+      const expectedDistance = this.inputComponent?.lineLength ?? 150;
+
+      // Écart
+      const rightDiff = actualRightDistance - expectedDistance;
+
+      // Afficher
+      const rightActual = document.getElementById('line-right-actual-value');
+      const rightExpected = document.getElementById('line-right-expected-value');
+      const rightDiffElem = document.getElementById('line-right-diff-value');
+
+      if (rightActual) rightActual.textContent = `${actualRightDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      if (rightExpected) rightExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      if (rightDiffElem) {
+        const sign = rightDiff >= 0 ? '+' : '';
+        rightDiffElem.textContent = `${sign}${rightDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        // Colorer en rouge si l'écart est > 1m
+        if (Math.abs(rightDiff) > 1) {
+          rightDiffElem.style.color = '#ff4444';
+        } else {
+          rightDiffElem.style.color = '#4da6ff';
+        }
+      }
+    }
   }
 }

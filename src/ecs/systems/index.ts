@@ -7,6 +7,8 @@ export { InputSystem } from './InputSystem';
 export { WindSystem } from './WindSystem';
 export type { WindState } from './WindSystem';
 export { AeroSystem } from './AeroSystem';
+export { BridleConstraintSystem } from './BridleConstraintSystem';
+export { BridleRenderSystem } from './BridleRenderSystem';
 export { ConstraintSystem } from './ConstraintSystem';
 export { PhysicsSystem } from './PhysicsSystem';
 export { GeometryRenderSystem } from './GeometryRenderSystem';
