@@ -18,10 +18,8 @@ import { KiteComponent } from '../components/KiteComponent';
 const LINE_GEOMETRY_UPDATE_THRESHOLD = 0.01; // 1cm - seuil de recréation de géométrie
 const LINE_TUBE_RADIUS = 0.003; // 3mm - rayon des lignes
 const LINE_TUBE_SEGMENTS = 8; // segments radiaux du tube
-const CONTROL_MARKER_SIZE = 0.05; // 5cm - taille des marqueurs de contrôle
-const CONTROL_MARKER_SEGMENTS = 16; // segments des sphères marqueurs
-const COLOR_GREEN = 0x00ff00; // Vert pour contrôle droit
-const COLOR_RED = 0xff0000; // Rouge pour contrôle gauche
+const COLOR_GREEN = 0x00ff00; // Vert pour poignée droite
+const COLOR_RED = 0xff0000; // Rouge pour poignée gauche
 
 export class GeometryRenderSystem extends System {
   constructor() {
@@ -308,81 +306,7 @@ export class GeometryRenderSystem extends System {
     });
   }
   
-  /**
-   * Crée les lignes de bridage (6 brides)
-   */
-  private createKiteBridles(group: THREE.Group, geometry: GeometryComponent): void {
-    // 6 brides : 3 gauche + 3 droite
-    const bridleConnections = [
-      ['CTRL_GAUCHE', 'NEZ'],
-      ['CTRL_GAUCHE', 'INTER_GAUCHE'],
-      ['CTRL_GAUCHE', 'CENTRE'],
-      ['CTRL_DROIT', 'NEZ'],
-      ['CTRL_DROIT', 'INTER_DROIT'],
-      ['CTRL_DROIT', 'CENTRE']
-    ];
-    
-    const bridleMaterial = new THREE.LineBasicMaterial({
-      color: 0x333333,
-      linewidth: 1,
-      opacity: 0.8,
-      transparent: true
-    });
-    
-    bridleConnections.forEach(([from, to]) => {
-      const p1 = geometry.getPoint(from);
-      const p2 = geometry.getPoint(to);
-      if (p1 && p2) {
-        const lineGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-        const line = new THREE.Line(lineGeom, bridleMaterial);
-        line.name = `Bridle_${from}_${to}`;
-        group.add(line);
-      }
-    });
-  }
-  
-  /**
-   * Crée des marqueurs visuels pour les points de contrôle (CTRL)
-   * - CTRL_GAUCHE : rouge
-   * - CTRL_DROIT : vert
-   */
-  private createControlPointMarkers(group: THREE.Group, geometry: GeometryComponent): void {
-    const sphereGeometry = new THREE.SphereGeometry(
-      CONTROL_MARKER_SIZE / 2, 
-      CONTROL_MARKER_SEGMENTS, 
-      CONTROL_MARKER_SEGMENTS
-    ); // Rayon = taille/2
-    
-    // === CTRL GAUCHE (rouge) ===
-    const ctrlLeft = geometry.getPoint('CTRL_GAUCHE');
-    if (ctrlLeft) {
-      const leftMaterial = new THREE.MeshStandardMaterial({
-        color: COLOR_RED,
-        emissive: 0xaa0000,
-        roughness: 0.5,
-        metalness: 0.3
-      });
-      const leftSphere = new THREE.Mesh(sphereGeometry, leftMaterial);
-      leftSphere.position.copy(ctrlLeft);
-      leftSphere.name = 'Marker_CTRL_GAUCHE';
-      group.add(leftSphere);
-    }
-    
-    // === CTRL DROIT (vert) ===
-    const ctrlRight = geometry.getPoint('CTRL_DROIT');
-    if (ctrlRight) {
-      const rightMaterial = new THREE.MeshStandardMaterial({
-        color: COLOR_GREEN,
-        emissive: 0x00aa00,
-        roughness: 0.5,
-        metalness: 0.3
-      });
-      const rightSphere = new THREE.Mesh(sphereGeometry, rightMaterial);
-      rightSphere.position.copy(ctrlRight);
-      rightSphere.name = 'Marker_CTRL_DROIT';
-      group.add(rightSphere);
-    }
-  }
+
   
   /**
    * Crée un mesh wireframe simple (utilisé pour les lignes de vol)

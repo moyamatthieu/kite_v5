@@ -20,28 +20,36 @@ import { GeometryComponent, TransformComponent, VisualComponent } from '../compo
  * Positions mises à jour par BridleRenderSystem en coordonnées MONDE.
  */
 export class BridleFactory {
+  // Constante pour la couleur des brides
+  private static readonly BRIDLE_COLOR = 0x333333; // Gris foncé
+  private static readonly BRIDLE_OPACITY = 0.8;
+
+  // Liste des IDs des bridles à créer
+  private static readonly BRIDLE_IDS = [
+    'bridle-ctrl-gauche-nez',
+    'bridle-ctrl-gauche-inter',
+    'bridle-ctrl-gauche-centre',
+    'bridle-ctrl-droit-nez',
+    'bridle-ctrl-droit-inter',
+    'bridle-ctrl-droit-centre'
+  ];
+
   /**
    * Crée toutes les 6 entités brides
+   * 
+   * @returns Tableau des 6 entités bridles
    */
   static createAll(): Entity[] {
-    return [
-      this.createBridle('bridle-ctrl-gauche-nez', 0x333333),
-      this.createBridle('bridle-ctrl-gauche-inter', 0x333333),
-      this.createBridle('bridle-ctrl-gauche-centre', 0x333333),
-      this.createBridle('bridle-ctrl-droit-nez', 0x333333),
-      this.createBridle('bridle-ctrl-droit-inter', 0x333333),
-      this.createBridle('bridle-ctrl-droit-centre', 0x333333)
-    ];
+    return this.BRIDLE_IDS.map(id => this.createBridle(id));
   }
 
   /**
    * Crée une entité bridle individuelle
    *
    * @param id ID unique de la bridle
-   * @param color Couleur de la bridle (hex)
-   * @returns Entité bridle
+   * @returns Entité bridle avec tous les composants nécessaires
    */
-  private static createBridle(id: string, color: number): Entity {
+  private static createBridle(id: string): Entity {
     const entity = new Entity(id);
 
     // === TRANSFORM (requis pour RenderSystem) ===
@@ -59,10 +67,10 @@ export class BridleFactory {
     entity.addComponent(geometry);
 
     // === VISUAL ===
-    // Les brides sont affichées en gris foncé
+    // Les brides sont affichées en gris foncé avec légère transparence
     entity.addComponent(new VisualComponent({
-      color,
-      opacity: 0.8
+      color: this.BRIDLE_COLOR,
+      opacity: this.BRIDLE_OPACITY
     }));
 
     return entity;

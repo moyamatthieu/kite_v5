@@ -36,9 +36,9 @@ export const CONFIG = {
   
   // === BRIDES ===
   bridles: {
-    nez: 0.65, // m
-    inter: 0.65, // m
-    centre: 0.65, // m
+    nez: 0.80, // m
+    inter: 1, // m
+    centre: 1, // m
     color: 0xff0000 // Rouge
   },
   
@@ -71,7 +71,7 @@ export const CONFIG = {
   // === PHYSIQUE ===
   physics: {
     gravity: 9.81, // m/s²
-    linearDamping: 0.8,
+    linearDamping: 0.5,
     angularDamping: 0.5
   },
   

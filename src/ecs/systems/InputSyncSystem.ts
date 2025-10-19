@@ -115,38 +115,42 @@ export class InputSyncSystem extends System {
    * Met à jour la longueur de la bride nez du kite
    */
   private updateBridleNez(entityManager: EntityManager, newLength: number): void {
-    const kite = entityManager.getEntity('kite');
-    if (!kite) return;
-
-    const bridle = kite.getComponent('bridle') as any;
-    if (bridle && bridle.lengths) {
-      bridle.lengths.nez = newLength;
-    }
+    this.updateBridleLength(entityManager, 'nez', newLength);
   }
 
   /**
    * Met à jour la longueur de la bride inter du kite
    */
   private updateBridleInter(entityManager: EntityManager, newLength: number): void {
-    const kite = entityManager.getEntity('kite');
-    if (!kite) return;
-
-    const bridle = kite.getComponent('bridle') as any;
-    if (bridle && bridle.lengths) {
-      bridle.lengths.inter = newLength;
-    }
+    this.updateBridleLength(entityManager, 'inter', newLength);
   }
 
   /**
    * Met à jour la longueur de la bride centre du kite
    */
   private updateBridleCentre(entityManager: EntityManager, newLength: number): void {
+    this.updateBridleLength(entityManager, 'centre', newLength);
+  }
+
+  /**
+   * Met à jour une longueur de bride (nez, inter ou centre)
+   * Méthode interne partagée pour éviter la duplication
+   * 
+   * @param entityManager Manager des entités
+   * @param bridleType Type de bride: 'nez' | 'inter' | 'centre'
+   * @param newLength Nouvelle longueur en mètres
+   */
+  private updateBridleLength(
+    entityManager: EntityManager,
+    bridleType: 'nez' | 'inter' | 'centre',
+    newLength: number
+  ): void {
     const kite = entityManager.getEntity('kite');
     if (!kite) return;
 
     const bridle = kite.getComponent('bridle') as any;
     if (bridle && bridle.lengths) {
-      bridle.lengths.centre = newLength;
+      bridle.lengths[bridleType] = newLength;
     }
   }
 

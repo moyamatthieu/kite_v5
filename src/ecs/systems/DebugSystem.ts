@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { Entity } from '../core/Entity';

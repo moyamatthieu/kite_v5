@@ -119,7 +119,7 @@ export class AeroSystem extends System {
         // La portance monte le kite, la traînée le tire d'avant en arrière
         
         // Assurer que la normale pointe VERS LE VENT (hors de la surface)
-        let surfaceNormal = sample.normal.clone();
+        const surfaceNormal = sample.normal.clone();
         if (surfaceNormal.dot(localWindDir) < 0) {
           surfaceNormal.negate(); // Inverser si elle pointe loin du vent
         }

@@ -166,7 +166,7 @@ export class BridleConstraintSystem extends System {
     const ex = v12.clone().normalize();
     
     // ey : perpendiculaire à ex, dans le plan contenant p3
-    let ey = new THREE.Vector3().subVectors(v13, ex.clone().multiplyScalar(v13.dot(ex)));
+    const ey = new THREE.Vector3().subVectors(v13, ex.clone().multiplyScalar(v13.dot(ex)));
     ey.normalize();
     
     // ez : complète la base orthonormée
@@ -219,9 +219,9 @@ export class BridleConstraintSystem extends System {
     }
     
     // Prendre z positif pour aller vers l'avant (Z+)
-    let pz = Math.sqrt(pz_squared);
+    const pz = Math.sqrt(pz_squared);
 
-    let solution_local = new THREE.Vector3(px, py, pz);
+    const solution_local = new THREE.Vector3(px, py, pz);
 
     // === Raffinement itératif (Gauss-Newton) pour améliorer la précision ===
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
