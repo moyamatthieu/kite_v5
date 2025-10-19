@@ -5,6 +5,8 @@
  * Priorité 88 (très basse, après le rendu normal).
  */
 
+import * as THREE from 'three';
+
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { Entity } from '../core/Entity';
@@ -131,12 +133,12 @@ export class DebugSystem extends System {
     
     // Afficher les forces de portance et traînée pour chaque face
     physics.faceForces.forEach((faceForce, index) => {
-      // Portance (vert)
+      // Portance (bleu ciel)
       if (faceForce.lift.length() > minForceThreshold) {
         debugComp.addForceArrow(
           faceForce.centroid,
           faceForce.lift.clone().multiplyScalar(scale),
-          0x00ff00, // Vert
+          0x87CEEB, // Bleu ciel
           `lift-face-${index}`
         );
       }
@@ -152,8 +154,33 @@ export class DebugSystem extends System {
       }
     });
 
+    // === Afficher le vent apparent (vert) ===
+    this.displayApparentWind(debugComp, context, transform);
+
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
+  }
+
+  /**
+   * Affiche le vecteur de vent apparent au centre du kite
+   */
+  private displayApparentWind(debugComp: DebugComponent, context: SimulationContext, transform: TransformComponent): void {
+    const windCache = context.windCache as Map<string, any> | undefined;
+    if (!windCache) return;
+
+    const windState = windCache.get('kite');
+    if (!windState || !windState.apparent) return;
+
+    const apparentWind = windState.apparent as THREE.Vector3;
+    if (apparentWind.length() < 0.01) return; // Ignorer si vent trop faible
+
+    // Afficher le vent apparent au centre du kite (vert)
+    debugComp.addForceArrow(
+      transform.position.clone(),
+      apparentWind.clone().multiplyScalar(0.5), // Échelle réduite pour la visibilité
+      0x00ff00, // Vert
+      'apparent-wind'
+    );
   }
 
   dispose(): void {
