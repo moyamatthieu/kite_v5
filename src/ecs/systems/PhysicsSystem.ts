@@ -54,8 +54,10 @@ export class PhysicsSystem extends System {
       const acceleration = physics.forces.clone().multiplyScalar(physics.invMass);
       physics.velocity.add(acceleration.multiplyScalar(deltaTime));
 
-      // Damping linéaire
-      physics.velocity.multiplyScalar(physics.linearDamping);
+      // Damping continu (exponentiel) : v *= exp(-linearDamping × dt)
+      // Au lieu de v *= 0.8 (multiplicatif qui dépend de dt)
+      const dampingFactor = Math.exp(-physics.linearDamping * deltaTime);
+      physics.velocity.multiplyScalar(dampingFactor);
 
       // p_new = p_old + v_new × dt (semi-implicite : utilise nouvelle vélocité)
       const deltaPos = physics.velocity.clone().multiplyScalar(deltaTime);
