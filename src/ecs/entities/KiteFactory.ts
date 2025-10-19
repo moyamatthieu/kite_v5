@@ -76,8 +76,8 @@ export class KiteFactory {
     entity.addComponent(new PhysicsComponent({
       mass: mass,
       inertia,
-      linearDamping: 0.98,  // Réduit pour permettre le mouvement
-      angularDamping: 0.95, // Réduit pour rotation fluide
+      linearDamping: CONFIG.physics.linearDamping,  // Utilise la config (peut être modifié via UI)
+      angularDamping: CONFIG.physics.angularDamping,
       isKinematic: false    // ✅ DYNAMIQUE : Le kite est libre de bouger
     }));
   }
