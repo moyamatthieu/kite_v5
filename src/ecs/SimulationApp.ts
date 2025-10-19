@@ -33,6 +33,7 @@ import {
 import { CONFIG } from './config/Config';
 import type { SimulationContext } from './core/System';
 import type { RenderSystem as RenderSystemType } from './systems/RenderSystem';
+import type { DebugSystem as DebugSystemType } from './systems/DebugSystem';
 
 // Constantes de simulation
 const MAX_DELTA_TIME = 0.05; // 50ms cap pour stabilité
@@ -275,8 +276,6 @@ export class SimulationApp {
         inputComp.isPaused = wasPaused;
       }
     }
-    
-    console.log(`🔄 Reset complet - Simulation ${wasPaused ? 'en pause' : 'en cours'}`);
   }
   
   /**

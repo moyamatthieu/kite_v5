@@ -76,24 +76,12 @@ export class RenderSystem extends System {
       if (!this.addedMeshes.has(mesh.object3D.uuid)) {
         this.scene.add(mesh.object3D);
         this.addedMeshes.add(mesh.object3D.uuid);
-        
-        // Debug première position du kite
-        if (entity.id === 'kite') {
-          console.log('🎨 [RenderSystem] Kite mesh ajouté à la scène');
-          console.log('  TransformComponent position:', transform.position);
-          console.log('  Mesh position (avant copie):', mesh.object3D.position);
-        }
       }
-      
+
       // Synchroniser transform
       mesh.object3D.position.copy(transform.position);
       mesh.object3D.quaternion.copy(transform.quaternion);
       mesh.object3D.scale.copy(transform.scale);
-      
-      // Debug après synchronisation (première frame seulement)
-      if (entity.id === 'kite' && context.totalTime < 0.1) {
-        console.log('🎨 [RenderSystem] Kite position synchronisée:', mesh.object3D.position);
-      }
     });
     
     // Rendre la frame
