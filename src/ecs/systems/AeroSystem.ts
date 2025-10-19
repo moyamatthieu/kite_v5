@@ -99,9 +99,10 @@ export class AeroSystem extends System {
 
         const localWindDir = localApparentWind.clone().normalize();
 
-        // 3. Angle d'attaque local
-        const chord = new THREE.Vector3(1, 0, 0).applyQuaternion(transform.quaternion);
-        const dotProduct = chord.dot(localWindDir);
+        // 3. Angle d'attaque local - calculé entre la normale du panneau et le vent
+        // (FIX audit 19/10/2025: au lieu d'une corde arbitraire)
+        let surfaceNormal = sample.normal.clone();
+        const dotProduct = surfaceNormal.dot(localWindDir);
         const alpha = Math.asin(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
 
         // 4. Coefficients aéro locaux
@@ -119,7 +120,6 @@ export class AeroSystem extends System {
         // La portance monte le kite, la traînée le tire d'avant en arrière
         
         // Assurer que la normale pointe VERS LE VENT (hors de la surface)
-        const surfaceNormal = sample.normal.clone();
         if (surfaceNormal.dot(localWindDir) < 0) {
           surfaceNormal.negate(); // Inverser si elle pointe loin du vent
         }
