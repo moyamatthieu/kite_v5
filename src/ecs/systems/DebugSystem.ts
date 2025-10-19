@@ -19,7 +19,7 @@ import { RenderSystem } from './RenderSystem';
 
 export class DebugSystem extends System {
   private inputComponent: InputComponent | null = null;
-  private renderSystem: RenderSystem | null = null;
+  renderSystem: RenderSystem | null = null; // Public pour SimulationApp
   private debugEntity: Entity | null = null;
   private prevDebugMode = false;
   private lastLogTime = 0;

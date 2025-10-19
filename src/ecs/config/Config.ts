@@ -58,7 +58,7 @@ export const CONFIG = {
   
   // === VENT ===
   wind: {
-    speed: 7, // m/s (~25 km/h - bon pour le vol du kite)
+    speed: 18, // m/s (~25 km/h - bon pour le vol du kite)
     direction: 270 // degrés (270 = -Z = Nord)
   },
   

@@ -42,24 +42,18 @@ export class KiteFactory {
    * Ajoute le composant Transform avec position et orientation initiales
    */
   private static addTransformComponent(entity: Entity, position: THREE.Vector3): void {
-    console.log('📍 [KiteFactory] addTransformComponent called with position:', position);
-    
     const orientation = MathUtils.quaternionFromEuler(
       CONFIG.initialization.kiteOrientation.pitch,
       CONFIG.initialization.kiteOrientation.yaw,
       CONFIG.initialization.kiteOrientation.roll
     );
-    
+
     const clonedPosition = position.clone();
-    console.log('📍 [KiteFactory] Cloned position:', clonedPosition);
-    
+
     entity.addComponent(new TransformComponent({
       position: clonedPosition,
       quaternion: orientation
     }));
-    
-    const transform = entity.getComponent<TransformComponent>('transform');
-    console.log('📍 [KiteFactory] TransformComponent created with position:', transform?.position);
   }
 
   /**
@@ -78,12 +72,7 @@ export class KiteFactory {
       0, I, 0,
       0, 0, I
     );
-    
-    console.log('[KiteFactory] Creating physics with:');
-    console.log('  mass:', mass);
-    console.log('  inertia (simple sphere):', I);
-    console.log('  invMass:', 1/mass);
-    
+
     entity.addComponent(new PhysicsComponent({
       mass: mass,
       inertia,
