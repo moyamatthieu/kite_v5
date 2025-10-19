@@ -58,7 +58,7 @@ export const CONFIG = {
     // Multiplicateurs pour tuning (UI)
     liftScale: 1.0, // Multiplicateur de portance (0-2)
     dragScale: 1.0, // Multiplicateur de traînée (0-2)
-    forceSmoothing: 0.8 // Lissage temporel des forces (0-1)
+    forceSmoothing: 0.05 // Lissage temporel des forces (0-1)
   },
   
   // === VENT ===
@@ -112,7 +112,7 @@ export const CONFIG = {
     cameraDistance: 25, // m
     cameraHeight: 10, // m
     cameraTarget: new THREE.Vector3(0, 5, 8), // Point visé
-    meshSubdivision: 2 // Niveau de subdivision du mesh du kite (0-4)
+    meshSubdivision: 0 // Niveau de subdivision du mesh du kite (0-4)
   },
   
   // === DEBUG ===

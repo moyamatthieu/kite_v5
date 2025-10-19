@@ -158,9 +158,27 @@ export class AeroSystem extends System {
           centroid: sample.centroid.clone(),
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
-          gravity: gravityPerFace.clone()
+          gravity: gravityPerFace.clone(),
+          apparentWind: localApparentWind.clone()
         });
       });
+
+      // ========================================================================
+      // LISSAGE TEMPOREL DES FORCES (optionnel, contrôlé par forceSmoothing)
+      // ========================================================================
+      if (forceSmoothing > 0) {
+        const prevForce = this.previousForces.get(kite.id) ?? physics.forces.clone();
+        const prevTorque = this.previousTorques.get(kite.id) ?? physics.torques.clone();
+
+        // Interpolation linéaire : newValue = (1-α) × newValue + α × oldValue
+        // forceSmoothing = α (0 = pas de lissage, 1 = lissage maximal)
+        physics.forces.lerp(prevForce, forceSmoothing);
+        physics.torques.lerp(prevTorque, forceSmoothing);
+
+        // Stocker pour la prochaine frame
+        this.previousForces.set(kite.id, physics.forces.clone());
+        this.previousTorques.set(kite.id, physics.torques.clone());
+      }
 
       // ========================================================================
       // (Gravité n'est plus appliquée globalement - elle l'est par face ci-dessus)

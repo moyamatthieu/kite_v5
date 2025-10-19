@@ -252,11 +252,17 @@ export class SimulationApp {
   async reset(): Promise<void> {
     // Sauvegarder l'état pause AVANT de reset
     const wasPaused = this.paused;
-    
+
     // Nettoyer l'état du rendu AVANT de supprimer les entités
     const renderSystem = this.systemManager.getSystem('RenderSystem') as any;
     if (renderSystem && renderSystem.resetRenderState) {
       renderSystem.resetRenderState();
+    }
+
+    // Nettoyer l'état du debug AVANT de supprimer les entités
+    const debugSystem = this.systemManager.getSystem('DebugSystem') as any;
+    if (debugSystem && debugSystem.resetDebugState) {
+      debugSystem.resetDebugState();
     }
     
     // Supprimer uniquement les entités (pas les systèmes pour conserver les event listeners)

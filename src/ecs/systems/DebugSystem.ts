@@ -162,38 +162,23 @@ export class DebugSystem extends System {
           `gravity-face-${index}`
         );
       }
-    });
 
-    // === Afficher le vent apparent (vert) ===
-    this.displayApparentWind(debugComp, context, transform);
+      // Vent apparent par face (vert)
+      if (faceForce.apparentWind.length() > minForceThreshold) {
+        debugComp.addForceArrow(
+          faceForce.centroid,
+          faceForce.apparentWind.clone().multiplyScalar(0.05), // Échelle réduite pour visibilité
+          0x00ff00, // Vert
+          `apparent-wind-face-${index}`
+        );
+      }
+    });
 
     // === Afficher les tensions des lignes (magenta) ===
     this.displayLineTensions(debugComp, context, kiteEntity, scale);
 
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
-  }
-
-  /**
-   * Affiche le vecteur de vent apparent au centre du kite
-   */
-  private displayApparentWind(debugComp: DebugComponent, context: SimulationContext, transform: TransformComponent): void {
-    const windCache = context.windCache as Map<string, any> | undefined;
-    if (!windCache) return;
-
-    const windState = windCache.get('kite');
-    if (!windState || !windState.apparent) return;
-
-    const apparentWind = windState.apparent as THREE.Vector3;
-    if (apparentWind.length() < 0.01) return; // Ignorer si vent trop faible
-
-    // Afficher le vent apparent au centre du kite (vert)
-    debugComp.addForceArrow(
-      transform.position.clone(),
-      apparentWind.clone().multiplyScalar(0.5), // Échelle réduite pour la visibilité
-      0x00ff00, // Vert
-      'apparent-wind'
-    );
   }
 
   /**
@@ -255,6 +240,31 @@ export class DebugSystem extends System {
           );
         }
       }
+    }
+  }
+
+  /**
+   * Réinitialise l'état du debug (appelé lors d'un reset de simulation)
+   * Nettoie tous les vecteurs de debug et retire le groupe de la scène
+   */
+  resetDebugState(): void {
+    if (!this.debugEntity || !this.renderSystem) return;
+
+    const debugComp = this.debugEntity.getComponent('debug') as DebugComponent | null;
+    if (debugComp) {
+      console.log('🐛 [DebugSystem] Resetting debug state...');
+
+      // Nettoyer toutes les flèches
+      debugComp.clearArrows();
+
+      // Retirer le groupe de la scène
+      if (debugComp.debugGroup.parent) {
+        this.renderSystem.scene.remove(debugComp.debugGroup);
+        console.log('🐛 [DebugSystem] DebugGroup removed from scene');
+      }
+
+      // Réinitialiser le flag prevDebugMode pour forcer la ré-ajout si debug activé
+      this.prevDebugMode = false;
     }
   }
 
