@@ -23,7 +23,6 @@ import { GeometryComponent } from '../components/GeometryComponent';
 const GROUND_Y = 0;
 const EPSILON = 0.001;
 const PRIORITY = 40; // AVANT PhysicsSystem (50), pour calcul des forces dans la même frame
-const MAX_EXTENSION_RATIO = 1.5; // Lignes peuvent s'étirer max à 150% de longueur repos
 
 export class ConstraintSystem extends System {
   constructor() {
@@ -122,33 +121,10 @@ export class ConstraintSystem extends System {
     }
 
     const toBar = barPointWorld.clone().sub(kitePointWorld);
-    let distance = toBar.length();
-
-    // === LIMITER LA DISTANCE PHYSIQUE ===
-    // Empêcher les lignes de s'étirer au-delà d'une limite maximale
-    // (150% de la longueur de repos)
-    const maxDistance = lineComponent.restLength * MAX_EXTENSION_RATIO;
-    
-    if (distance > maxDistance) {
-      // Ramener le kite à la distance maximale
-      const excessDistance = distance - maxDistance;
-      const direction = toBar.normalize();
-      const correction = direction.multiplyScalar(excessDistance);
-      
-      // Appliquer la correction au kite (direction de la barre)
-      kiteTransform.position.add(correction);
-      
-      // Réappliquer la vélocité en projetant seulement la composante perpendiculaire
-      const radialComponent = kitePhysics.velocity.dot(direction);
-      if (radialComponent > 0) {
-        kitePhysics.velocity.sub(direction.multiplyScalar(radialComponent));
-      }
-      
-      distance = maxDistance;
-      console.warn(`🔗 Ligne clippée à distance max: ${distance.toFixed(3)}m (longueur repos: ${lineComponent.restLength}m)`);
-    }
+    const distance = toBar.length();
 
     lineComponent.currentLength = distance;
+    lineComponent.state.currentLength = distance;
 
     if (distance <= lineComponent.restLength) {
       lineComponent.state.isTaut = false;
@@ -158,7 +134,7 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    const direction = distance > EPSILON ? toBar.multiplyScalar(1 / distance) : new THREE.Vector3();
+    const direction = distance > EPSILON ? toBar.clone().normalize() : new THREE.Vector3();
     const extension = distance - lineComponent.restLength;
 
     lineComponent.state.isTaut = true;
@@ -186,33 +162,11 @@ export class ConstraintSystem extends System {
     const relativeVelocity = kiteVelocityAtAttachment.clone().sub(barVelocityAtAttachment);
     const radialVelocity = relativeVelocity.dot(direction);
 
-    // Force de rappel : F = k × extension + damping × velocity³
-    // Amortissement au cube pour meilleure dissipation des oscillations
-    // Le cube augmente dramatiquement la dissipation aux vitesses élevées
-    // tout en restant faible aux vitesses faibles
+    // Force de rappel : F = k × extension + damping × velocity
+    // (modèle ressort-amortisseur classique)
     const springForce = lineComponent.stiffness * extension;
-    const dampingForce = lineComponent.damping * Math.pow(Math.abs(radialVelocity), 3) * Math.sign(radialVelocity);
-    let tensionMagnitude = springForce + dampingForce;
-
-    // === CLIPPING DE LA TENSION MAXIMALE ===
-    // Limiter la tension pour éviter instabilités numériques
-    // et simuler la rupture/comportement réaliste de la ligne
-    if (tensionMagnitude > lineComponent.maxTension) {
-      console.warn(`⚠️ Tension ligne > max (${tensionMagnitude.toFixed(2)} > ${lineComponent.maxTension}N)`);
-      tensionMagnitude = lineComponent.maxTension;
-    }
-
-    // === CLIPPING DE L'EXTENSION MAXIMALE ===
-    // Les lignes ne peuvent pas s'étirer au-delà d'une limite raisonnable
-    // Multiplicateur max d'extension (ex: 1.5 = 150% de la longueur de repos)
-    const maxExtension = lineComponent.restLength * MAX_EXTENSION_RATIO;
-    if (extension > maxExtension) {
-      console.warn(`⚠️ Extension ligne > max (${extension.toFixed(3)} > ${maxExtension.toFixed(3)}m)`);
-      // Appliquer la force maximale seulement
-      tensionMagnitude = lineComponent.stiffness * maxExtension + dampingForce;
-      // Limiter à nouveau si nécessaire
-      tensionMagnitude = Math.min(tensionMagnitude, lineComponent.maxTension);
-    }
+    const dampingForce = lineComponent.damping * radialVelocity;
+    const tensionMagnitude = springForce + dampingForce;
 
     // Stocker la tension pour debug
     lineComponent.currentTension = Math.max(0, tensionMagnitude);

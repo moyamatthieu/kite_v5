@@ -28,17 +28,17 @@ export const CONFIG = {
   // === LIGNES ===
   lines: {
     length: 15, // m - Longueur réaliste des lignes de vol
-    stiffness: 1, // N/m - Très souple pour kite léger (120g = 1.2N)
-    damping: 0.99, // N·s/m - Amortissement léger
+    stiffness: 500, // N/m - Rigidité réaliste (lignes quasi-inextensibles)
+    damping: 25, // N·s/m - Amortissement modéré pour stabilité
     maxTension: 1000, // N - Tension max ~8× le poids
     color: 0x0000ff // Bleu
   },
   
   // === BRIDES ===
   bridles: {
-    nez: 0.92, // m
-    inter: 1, // m
-    centre: 1, // m
+    nez: 0.65, // m
+    inter: 0.65, // m
+    centre: 0.65, // m
     color: 0xff0000 // Rouge
   },
   
