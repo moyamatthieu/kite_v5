@@ -16,6 +16,7 @@ import { PhysicsComponent } from '../components/PhysicsComponent';
 import { KiteComponent } from '../components/KiteComponent';
 import { AerodynamicsComponent, AeroSurfaceDescriptor } from '../components/AerodynamicsComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
+import { InputComponent } from '../components/InputComponent';
 
 import { WindState } from './WindSystem';
 
@@ -33,7 +34,11 @@ interface SurfaceSample {
 
 export class AeroSystem extends System {
   private readonly gravity = new THREE.Vector3(0, GRAVITY_ACCELERATION, 0); // Y est vertical dans Three.js
-  
+
+  // Lissage temporel des forces (pour éviter les oscillations brusques)
+  private previousForces = new Map<string, THREE.Vector3>(); // entityId -> force lissée
+  private previousTorques = new Map<string, THREE.Vector3>(); // entityId -> couple lissé
+
   constructor() {
     const PRIORITY = 30;
     super('AeroSystem', PRIORITY);
@@ -44,6 +49,16 @@ export class AeroSystem extends System {
     const windCache = context.windCache as Map<string, WindState> | undefined;
 
     if (!windCache) return;
+
+    // Récupérer les paramètres UI (liftScale, dragScale, forceSmoothing)
+    const inputEntities = entityManager.query(['Input']);
+    const inputComp = inputEntities.length > 0
+      ? inputEntities[0].getComponent<InputComponent>('Input')
+      : null;
+
+    const liftScale = inputComp?.liftScale ?? 1.0;
+    const dragScale = inputComp?.dragScale ?? 1.0;
+    const forceSmoothing = inputComp?.forceSmoothing ?? 0.0;
 
     // Pour chaque kite
     const kites = entityManager.query(['kite', 'transform', 'physics', 'aerodynamics', 'geometry']);
@@ -96,53 +111,60 @@ export class AeroSystem extends System {
         // 5. Pression dynamique locale
         const q = DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
 
-        // 6. ✨ MAKANI-INSPIRED: Directions de portance et traînée
-        // En aérodynamique standard :
-        // - Drag = parallèle au vent (direction du vent apparent)
-        // - Lift = perpendiculaire au vent, déterminé par la surface normale
-        // 
-        // Formule vectorielle (règle de la main droite) :
-        // dragDir = vent normalisé
-        // liftDir = vent × normale (perpendiculaire au plan vent-normale)
-        const dragDir = localWindDir.clone();
+        // 6. ✨ CERF-VOLANT PHYSICS: Forces perpendiculaires et parallèles à la surface
+        // Pour un cerf-volant (pas un avion) :
+        // - Lift = perpendiculaire à la surface (along the NORMAL)
+        // - Drag = parallèle au vent apparent
+        //
+        // La portance monte le kite, la traînée le tire d'avant en arrière
         
-        // Calculer lift perpendiculaire au vent, utilisant la normale réelle de la surface
-        // lift = (wind × normal) × wind = composante de normal perpendiculaire au wind
-        // Variante plus claire : lift est dans la direction perpendiculaire au wind, 
-        // dans le plan défini par (wind, normal)
-        const liftDirRaw = new THREE.Vector3().crossVectors(dragDir, sample.normal);
-        const liftDir = liftDirRaw.lengthSq() > 0.0001 
-          ? liftDirRaw.normalize() 
-          : sample.normal.clone().sub(dragDir.clone().multiplyScalar(dragDir.dot(sample.normal))).normalize();
+        // Assurer que la normale pointe VERS LE VENT (hors de la surface)
+        let surfaceNormal = sample.normal.clone();
+        if (surfaceNormal.dot(localWindDir) < 0) {
+          surfaceNormal.negate(); // Inverser si elle pointe loin du vent
+        }
+        
+        // === LIFT (Portance) : perpendiculaire à la surface ===
+        // Le coefficient de portance dépend de l'angle d'attaque par rapport au vent
+        // mais la DIRECTION est toujours la normale de la surface
+        const liftDir = surfaceNormal.clone(); // Perpendiculaire à la surface
+        
+        // === DRAG (Traînée) : parallèle au vent ===
+        // Tire le kite dans la direction du vent apparent
+        const dragDir = localWindDir.clone();
 
-        // 7. Forces locales avec orientation correcte
-        const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area);
-        const panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area);
+        // 7. Forces locales avec orientation correcte + application des scales UI
+        const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
+        const panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
 
-        // 8. ✨ APPLICATION DISTRIBUÉE : Appliquer forces directement par face
+        // 8. ✨ GRAVITÉ DISTRIBUÉE PAR FACE ===
+        // La gravité est répartie sur chaque face proportionnellement à son aire
+        const gravityPerFace = this.gravity.clone().multiplyScalar((physics.mass * sample.area) / kiteComp.surfaceArea);
+
+        // 9. ✨ APPLICATION DISTRIBUÉE : Appliquer forces directement par face
         // Chaque face génère son propre couple via le bras de levier
-        const panelForce = panelLift.clone().add(panelDrag);
+        const panelForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
         
         this.addForce(physics, panelLift);
         this.addForce(physics, panelDrag);
+        this.addForce(physics, gravityPerFace);
         
         // Couple = bras de levier × force (déjà calculé au début pour la vitesse)
         const panelTorque = leverArm.clone().cross(panelForce);
         this.addTorque(physics, panelTorque);
 
-        // 9. Stockage pour visualisation debug
+        // 10. Stockage pour visualisation debug
         physics.faceForces.push({
           centroid: sample.centroid.clone(),
           lift: panelLift.clone(),
-          drag: panelDrag.clone()
+          drag: panelDrag.clone(),
+          gravity: gravityPerFace.clone()
         });
       });
 
       // ========================================================================
-      // GRAVITÉ - Force globale appliquée au centre de masse
+      // (Gravité n'est plus appliquée globalement - elle l'est par face ci-dessus)
       // ========================================================================
-      const gravityForce = this.gravity.clone().multiplyScalar(physics.mass);
-      this.addForce(physics, gravityForce);
     });
   }
 

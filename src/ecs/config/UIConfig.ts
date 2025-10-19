@@ -1,46 +1,171 @@
 /**
- * UIConfig.ts - Configuration des valeurs par défaut de l'interface utilisateur
+ * UIConfig.ts - Métadonnées pour l'interface utilisateur
+ *
+ * Ce fichier contient UNIQUEMENT les métadonnées UI (min, max, step, labels).
+ * Toutes les valeurs par défaut proviennent de Config.ts (source unique de vérité).
  */
 
-export const UIConfig = {
+import { CONFIG } from './Config';
+
+/**
+ * Métadonnées UI pour les contrôles (sliders, inputs, etc.)
+ * N'utiliser que pour définir les limites et le comportement des contrôles.
+ */
+export const UI_METADATA = {
   wind: {
-    defaultSpeed: 10, // m/s
-    defaultDirection: 270, // degrés
-    defaultTurbulence: 0, // % (0 pour stabilité initiale)
-    minSpeed: 0,
-    maxSpeed: 30,
-    minTurbulence: 0,
-    maxTurbulence: 100
+    speed: {
+      min: 0,
+      max: 30,
+      step: 0.5,
+      unit: 'm/s',
+      label: 'Vitesse du vent'
+    },
+    direction: {
+      min: 0,
+      max: 359,
+      step: 1,
+      unit: '°',
+      label: 'Direction du vent'
+    },
+    turbulence: {
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      label: 'Turbulence'
+    }
   },
 
   lines: {
-    defaultLength: 150, // m
-    minLength: 20,
-    maxLength: 300,
+    length: {
+      min: 5,
+      max: 300,
+      step: 5,
+      unit: 'm',
+      label: 'Longueur des lignes'
+    },
     bridles: {
-      nez: 1.5,
-      inter: 2.0,
-      centre: 2.5,
-      min: 0.5,
-      max: 5
+      nez: {
+        min: 0.5,
+        max: 5,
+        step: 0.1,
+        unit: 'm',
+        label: 'Bride nez'
+      },
+      inter: {
+        min: 0.5,
+        max: 5,
+        step: 0.1,
+        unit: 'm',
+        label: 'Bride inter'
+      },
+      centre: {
+        min: 0.5,
+        max: 5,
+        step: 0.1,
+        unit: 'm',
+        label: 'Bride centre'
+      }
     }
   },
 
   physics: {
-    defaultLinearDamping: 0.5,
-    defaultAngularDamping: 0.5,
-    defaultMeshSubdivision: 2,
-    linearDampingRange: [0, 1],
-    angularDampingRange: [0, 1],
-    meshSubdivisionRange: [0, 4]
+    linearDamping: {
+      min: 0,
+      max: 1,
+      step: 0.05,
+      unit: '',
+      label: 'Amortissement linéaire'
+    },
+    angularDamping: {
+      min: 0,
+      max: 1,
+      step: 0.05,
+      unit: '',
+      label: 'Amortissement angulaire'
+    }
   },
 
   aerodynamics: {
-    defaultLiftScale: 1.0,
-    defaultDragScale: 1.0,
-    defaultForceSmoothing: 0.8,
-    liftScaleRange: [0, 2],
-    dragScaleRange: [0, 2],
-    forceSmoothingRange: [0, 1]
+    liftScale: {
+      min: 0,
+      max: 2,
+      step: 0.1,
+      unit: '',
+      label: 'Échelle de portance'
+    },
+    dragScale: {
+      min: 0,
+      max: 2,
+      step: 0.1,
+      unit: '',
+      label: 'Échelle de traînée'
+    },
+    forceSmoothing: {
+      min: 0,
+      max: 1,
+      step: 0.05,
+      unit: '',
+      label: 'Lissage des forces'
+    }
+  },
+
+  render: {
+    meshSubdivision: {
+      min: 0,
+      max: 4,
+      step: 1,
+      unit: '',
+      label: 'Subdivision du mesh'
+    }
   }
 };
+
+/**
+ * Valeurs par défaut pour l'UI - TOUJOURS importées depuis Config.ts
+ * Ces getters garantissent que l'UI affiche les valeurs actuelles de la simulation.
+ */
+export const UI_DEFAULTS = {
+  wind: {
+    get speed() { return CONFIG.wind.speed; },
+    get direction() { return CONFIG.wind.direction; },
+    get turbulence() { return CONFIG.wind.turbulence; }
+  },
+
+  lines: {
+    get length() { return CONFIG.lines.length; },
+    bridles: {
+      get nez() { return CONFIG.bridles.nez; },
+      get inter() { return CONFIG.bridles.inter; },
+      get centre() { return CONFIG.bridles.centre; }
+    }
+  },
+
+  physics: {
+    get linearDamping() { return CONFIG.physics.linearDamping; },
+    get angularDamping() { return CONFIG.physics.angularDamping; }
+  },
+
+  aerodynamics: {
+    get liftScale() { return CONFIG.aero.liftScale; },
+    get dragScale() { return CONFIG.aero.dragScale; },
+    get forceSmoothing() { return CONFIG.aero.forceSmoothing; }
+  },
+
+  render: {
+    get meshSubdivision() { return CONFIG.render.meshSubdivision; }
+  }
+};
+
+/**
+ * Helper pour récupérer une valeur de configuration avec métadonnées
+ */
+export function getUIControl(category: string, field: string) {
+  const metadata = (UI_METADATA as any)[category]?.[field];
+  const defaultValue = (UI_DEFAULTS as any)[category]?.[field];
+
+  return {
+    value: defaultValue,
+    ...metadata
+  };
+}

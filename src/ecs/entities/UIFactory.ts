@@ -8,16 +8,33 @@ import { CONFIG } from '../config/Config';
 export class UIFactory {
   public static create(): Entity {
     const uiEntity = new Entity('ui');
-    
-    // CONFIG.wind.speed est déjà en m/s, pas besoin de conversion
+
     uiEntity.addComponent(
       new InputComponent({
-        lineLength: 150,
-        windSpeed: CONFIG.wind.speed, // Lecture depuis CONFIG.wind.speed (déjà en m/s)
-        windDirection: CONFIG.wind.direction, // Lecture depuis CONFIG.wind.direction
-        windTurbulence: 0, // 0% de turbulence pour stabilité initiale
-        isPaused: !CONFIG.simulation.autoStart, // Lecture depuis la config (autoStart: true => isPaused: false)
-        debugMode: CONFIG.debug.enabled, // Lecture depuis la config
+        // === Vent ===
+        windSpeed: CONFIG.wind.speed,
+        windDirection: CONFIG.wind.direction,
+        windTurbulence: CONFIG.wind.turbulence,
+
+        // === Lignes ===
+        lineLength: CONFIG.lines.length,
+        bridleNez: CONFIG.bridles.nez,
+        bridleInter: CONFIG.bridles.inter,
+        bridleCentre: CONFIG.bridles.centre,
+
+        // === Physique ===
+        linearDamping: CONFIG.physics.linearDamping,
+        angularDamping: CONFIG.physics.angularDamping,
+        meshSubdivisionLevel: CONFIG.render.meshSubdivision,
+
+        // === Aérodynamique ===
+        liftScale: CONFIG.aero.liftScale,
+        dragScale: CONFIG.aero.dragScale,
+        forceSmoothing: CONFIG.aero.forceSmoothing,
+
+        // === État ===
+        isPaused: !CONFIG.simulation.autoStart,
+        debugMode: CONFIG.debug.enabled,
       })
     );
 

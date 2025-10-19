@@ -32,6 +32,7 @@ export class PhysicsComponent extends Component {
     centroid: THREE.Vector3;
     lift: THREE.Vector3;
     drag: THREE.Vector3;
+    gravity: THREE.Vector3;
   }>;
   
   // Damping (friction)

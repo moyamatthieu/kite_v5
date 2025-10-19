@@ -2,6 +2,7 @@
  * index.ts - Exports de tous les systèmes
  */
 
+export { InputSyncSystem } from './InputSyncSystem';
 export { InputSystem } from './InputSystem';
 export { WindSystem } from './WindSystem';
 export type { WindState } from './WindSystem';

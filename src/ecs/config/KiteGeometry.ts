@@ -29,7 +29,7 @@ export class KiteGeometry {
     points.set('SPINE_BAS', new THREE.Vector3(0, 0, 0));
     points.set('NEZ', new THREE.Vector3(0, height, 0));
     points.set('BORD_GAUCHE', new THREE.Vector3(-width / 2, 0, 0));
-    points.set('BORD_DROIT', new THREE.Vector3(width / 2, 0));
+    points.set('BORD_DROIT', new THREE.Vector3(width / 2, 0, 0));
     
     // CENTRE (25% de la hauteur depuis la base)
     const centreY = height * 0.25;

@@ -6,15 +6,15 @@
  */
 
 import * as THREE from 'three';
-
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { Entity } from '../core/Entity';
-
 import { InputComponent } from '../components/InputComponent';
 import { DebugComponent } from '../components/DebugComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { TransformComponent } from '../components/TransformComponent';
+import { LineComponent } from '../components/LineComponent';
+import { GeometryComponent } from '../components/GeometryComponent';
 import { DebugFactory } from '../entities/DebugFactory';
 
 import { RenderSystem } from './RenderSystem';
@@ -131,7 +131,7 @@ export class DebugSystem extends System {
     const scale = 0.5; // Facteur d'échelle pour la visibilité
     const minForceThreshold = 0.001; // Seuil réduit pour le debug
     
-    // Afficher les forces de portance et traînée pour chaque face
+    // Afficher les forces de portance, traînée et gravité pour chaque face
     physics.faceForces.forEach((faceForce, index) => {
       // Portance (bleu ciel)
       if (faceForce.lift.length() > minForceThreshold) {
@@ -152,10 +152,23 @@ export class DebugSystem extends System {
           `drag-face-${index}`
         );
       }
+
+      // Gravité par face (jaune)
+      if (faceForce.gravity.length() > minForceThreshold) {
+        debugComp.addForceArrow(
+          faceForce.centroid,
+          faceForce.gravity.clone().multiplyScalar(scale),
+          0xffff00, // Jaune
+          `gravity-face-${index}`
+        );
+      }
     });
 
     // === Afficher le vent apparent (vert) ===
     this.displayApparentWind(debugComp, context, transform);
+
+    // === Afficher les tensions des lignes (magenta) ===
+    this.displayLineTensions(debugComp, context, kiteEntity, scale);
 
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
@@ -181,6 +194,68 @@ export class DebugSystem extends System {
       0x00ff00, // Vert
       'apparent-wind'
     );
+  }
+
+  /**
+   * Affiche les vecteurs de tension des lignes aux points d'attache
+   */
+  private displayLineTensions(debugComp: DebugComponent, context: SimulationContext, kiteEntity: any, scale: number): void {
+    const { entityManager } = context;
+
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
+    const controlBar = entityManager.getEntity('controlBar');
+
+    if (!controlBar) return;
+
+    const kiteGeometry = kiteEntity.getComponent('geometry') as GeometryComponent | null;
+    const barGeometry = controlBar.getComponent('geometry') as GeometryComponent | null;
+
+    if (!kiteGeometry || !barGeometry) return;
+
+    // Tension ligne gauche
+    if (leftLine) {
+      const lineComp = leftLine.getComponent('line') as LineComponent | null;
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+        const kitePoint = kiteGeometry.getPointWorld('CTRL_GAUCHE', kiteEntity);
+        const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
+
+        if (kitePoint && barPoint) {
+          const direction = barPoint.clone().sub(kitePoint).normalize();
+          const tensionVector = direction.multiplyScalar(lineComp.currentTension);
+
+          // Afficher la tension (magenta)
+          debugComp.addForceArrow(
+            kitePoint.clone(),
+            tensionVector.clone().multiplyScalar(scale),
+            0xff00ff, // Magenta
+            'tension-left'
+          );
+        }
+      }
+    }
+
+    // Tension ligne droite
+    if (rightLine) {
+      const lineComp = rightLine.getComponent('line') as LineComponent | null;
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+        const kitePoint = kiteGeometry.getPointWorld('CTRL_DROIT', kiteEntity);
+        const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
+
+        if (kitePoint && barPoint) {
+          const direction = barPoint.clone().sub(kitePoint).normalize();
+          const tensionVector = direction.multiplyScalar(lineComp.currentTension);
+
+          // Afficher la tension (magenta)
+          debugComp.addForceArrow(
+            kitePoint.clone(),
+            tensionVector.clone().multiplyScalar(scale),
+            0xff00ff, // Magenta
+            'tension-right'
+          );
+        }
+      }
+    }
   }
 
   dispose(): void {

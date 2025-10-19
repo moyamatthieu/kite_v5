@@ -27,7 +27,7 @@ export const CONFIG = {
   
   // === LIGNES ===
   lines: {
-    length: 16, // m - Distance initiale kite-barre = 18m, donc lignes légèrement tendues au départ
+    length: 15, // m - Longueur réaliste des lignes de vol
     stiffness: 2, // N/m - Très souple pour kite léger (120g = 1.2N)
     damping: 0.5, // N·s/m - Amortissement léger
     maxTension: 10, // N - Tension max ~8× le poids
@@ -45,21 +45,27 @@ export const CONFIG = {
   // === AÉRODYNAMIQUE ===
   aero: {
     airDensity: 1.225, // kg/m³ (niveau mer, 15°C)
-    
+
     // Coefficients pour delta (VALEURS RÉALISTES CERF-VOLANT)
     CL0: 0.0, // CL à alpha = 0
     CLAlpha: 0.105, // dCL/dα (par degré) - Augmenté pour valeur réaliste kite
     alpha0: -2, // Angle portance nulle (deg) - Légèrement négatif pour profil cambré
     alphaOptimal: 12, // Angle optimal (deg) - Réduit pour éviter décrochage
-    
+
     CD0: 0.08, // Traînée parasite - Augmentée (kite moins aérodynamique qu'une aile)
-    CM: -0.05 // Moment de tangage - Réduit pour moins d'instabilité
+    CM: -0.05, // Moment de tangage - Réduit pour moins d'instabilité
+
+    // Multiplicateurs pour tuning (UI)
+    liftScale: 1.0, // Multiplicateur de portance (0-2)
+    dragScale: 1.0, // Multiplicateur de traînée (0-2)
+    forceSmoothing: 0.8 // Lissage temporel des forces (0-1)
   },
   
   // === VENT ===
   wind: {
-    speed: 20, // m/s (~72 km/h - vent fort pour test)
-    direction: 270 // degrés (270 = -Z = Nord)
+    speed: 7, // m/s (~25 km/h - bon pour le vol du kite)
+    direction: 270, // degrés (270 = -Z = Nord)
+    turbulence: 0 // % (0-100) - Variations aléatoires du vent
   },
   
   // === PHYSIQUE ===
@@ -105,7 +111,8 @@ export const CONFIG = {
   render: {
     cameraDistance: 25, // m
     cameraHeight: 10, // m
-    cameraTarget: new THREE.Vector3(0, 5, 8) // Point visé
+    cameraTarget: new THREE.Vector3(0, 5, 8), // Point visé
+    meshSubdivision: 2 // Niveau de subdivision du mesh du kite (0-4)
   },
   
   // === DEBUG ===

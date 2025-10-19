@@ -15,6 +15,7 @@ import { TransformComponent } from './components/TransformComponent';
 import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory } from './entities';
 import { DebugFactory } from './entities/DebugFactory';
 import {
+  InputSyncSystem,
   InputSystem,
   WindSystem,
   AeroSystem,
@@ -138,6 +139,7 @@ export class SimulationApp {
     this.systemManager.add(
       new CameraControlsSystem(renderSystem.getCanvas(), camera)
     ); // Priority 1 (bis)
+    this.systemManager.add(new InputSyncSystem()); // Priority 5 - Synchronise UI → Composants
     this.systemManager.add(new InputSystem()); // Priority 10
     this.systemManager.add(new WindSystem()); // Priority 20
     this.systemManager.add(new AeroSystem()); // Priority 30

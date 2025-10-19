@@ -5,6 +5,7 @@ import { PhysicsComponent } from '../components/PhysicsComponent';
 import { TransformComponent } from '../components/TransformComponent';
 import { Entity } from '../core/Entity';
 import { Logger } from '../utils/Logging';
+import { UI_METADATA } from '../config/UIConfig';
 
 // Constantes UI
 const PRIORITY = 90;
@@ -61,90 +62,92 @@ export class UISystem extends System {
 
   // eslint-disable-next-line max-lines-per-function
   private initUI(): void {
-    // Configuration de tous les sliders (longue liste déclarative)
+    const meta = UI_METADATA;
+
+    // Configuration de tous les sliders - Utilise UI_METADATA pour min/max/step
     const sliders: SliderConfig[] = [
       // === Vent ===
       {
         id: 'wind-speed-slider',
-        min: 0,
-        max: 30,
-        step: 0.5,
-        formatter: (v) => `${v.toFixed(1)} m/s`,
+        min: meta.wind.speed.min,
+        max: meta.wind.speed.max,
+        step: meta.wind.speed.step,
+        formatter: (v) => `${v.toFixed(1)} ${meta.wind.speed.unit}`,
         property: 'windSpeed'
       },
       {
         id: 'wind-direction-slider',
-        min: 0,
-        max: 360,
-        step: 1,
-        formatter: (v) => `${v.toFixed(0)}°`,
+        min: meta.wind.direction.min,
+        max: meta.wind.direction.max,
+        step: meta.wind.direction.step,
+        formatter: (v) => `${v.toFixed(0)}${meta.wind.direction.unit}`,
         property: 'windDirection'
       },
       {
         id: 'wind-turbulence-slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        formatter: (v) => `${v.toFixed(0)}%`,
+        min: meta.wind.turbulence.min,
+        max: meta.wind.turbulence.max,
+        step: meta.wind.turbulence.step,
+        formatter: (v) => `${v.toFixed(0)}${meta.wind.turbulence.unit}`,
         property: 'windTurbulence'
       },
 
       // === Lignes ===
       {
         id: 'line-length-slider',
-        min: 20,
-        max: 300,
-        step: 1,
-        formatter: (v) => `${v.toFixed(0)}m`,
+        min: meta.lines.length.min,
+        max: meta.lines.length.max,
+        step: meta.lines.length.step,
+        formatter: (v) => `${v.toFixed(0)}${meta.lines.length.unit}`,
         property: 'lineLength'
       },
       {
         id: 'bridle-nez-slider',
-        min: 0.5,
-        max: 5,
-        step: 0.1,
-        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}m`,
+        min: meta.lines.bridles.nez.min,
+        max: meta.lines.bridles.nez.max,
+        step: meta.lines.bridles.nez.step,
+        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}${meta.lines.bridles.nez.unit}`,
         property: 'bridleNez'
       },
       {
         id: 'bridle-inter-slider',
-        min: 0.5,
-        max: 5,
-        step: 0.1,
-        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}m`,
+        min: meta.lines.bridles.inter.min,
+        max: meta.lines.bridles.inter.max,
+        step: meta.lines.bridles.inter.step,
+        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}${meta.lines.bridles.inter.unit}`,
         property: 'bridleInter'
       },
       {
         id: 'bridle-centre-slider',
-        min: 0.5,
-        max: 5,
-        step: 0.1,
-        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}m`,
+        min: meta.lines.bridles.centre.min,
+        max: meta.lines.bridles.centre.max,
+        step: meta.lines.bridles.centre.step,
+        formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_POSITION)}${meta.lines.bridles.centre.unit}`,
         property: 'bridleCentre'
       },
 
       // === Physique ===
       {
         id: 'linear-damping-slider',
-        min: 0,
-        max: 1,
-        step: 0.01,
+        min: meta.physics.linearDamping.min,
+        max: meta.physics.linearDamping.max,
+        step: meta.physics.linearDamping.step,
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'linearDamping'
       },
       {
         id: 'angular-damping-slider',
-        min: 0,
-        max: 1,
-        step: 0.01,
+        min: meta.physics.angularDamping.min,
+        max: meta.physics.angularDamping.max,
+        step: meta.physics.angularDamping.step,
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'angularDamping'
       },
       {
         id: 'mesh-subdivision-slider',
-        min: 0,
-        max: 4,
-        step: 1,
+        min: meta.render.meshSubdivision.min,
+        max: meta.render.meshSubdivision.max,
+        step: meta.render.meshSubdivision.step,
         formatter: (v) => {
           const TRIANGLES_BASE = 4;
           const level = Math.floor(v);
@@ -157,25 +160,25 @@ export class UISystem extends System {
       // === Aérodynamique ===
       {
         id: 'lift-scale-slider',
-        min: 0,
-        max: 2,
-        step: 0.1,
+        min: meta.aerodynamics.liftScale.min,
+        max: meta.aerodynamics.liftScale.max,
+        step: meta.aerodynamics.liftScale.step,
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'liftScale'
       },
       {
         id: 'drag-scale-slider',
-        min: 0,
-        max: 2,
-        step: 0.1,
+        min: meta.aerodynamics.dragScale.min,
+        max: meta.aerodynamics.dragScale.max,
+        step: meta.aerodynamics.dragScale.step,
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'dragScale'
       },
       {
         id: 'force-smoothing-slider',
-        min: 0,
-        max: 1,
-        step: 0.1,
+        min: meta.aerodynamics.forceSmoothing.min,
+        max: meta.aerodynamics.forceSmoothing.max,
+        step: meta.aerodynamics.forceSmoothing.step,
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'forceSmoothing'
       }
