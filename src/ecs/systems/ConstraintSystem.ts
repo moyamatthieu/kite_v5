@@ -162,10 +162,12 @@ export class ConstraintSystem extends System {
     const relativeVelocity = kiteVelocityAtAttachment.clone().sub(barVelocityAtAttachment);
     const radialVelocity = relativeVelocity.dot(direction);
 
-    // Force de rappel : F = k × extension + damping × velocity
-    // (modèle ressort-amortisseur classique)
+    // Force de rappel : F = k × extension + damping × velocity³
+    // Amortissement au cube pour meilleure dissipation des oscillations
+    // Le cube augmente dramatiquement la dissipation aux vitesses élevées
+    // tout en restant faible aux vitesses faibles
     const springForce = lineComponent.stiffness * extension;
-    const dampingForce = lineComponent.damping * radialVelocity;
+    const dampingForce = lineComponent.damping * Math.pow(Math.abs(radialVelocity), 3) * Math.sign(radialVelocity);
     const tensionMagnitude = springForce + dampingForce;
 
     // Stocker la tension pour debug
