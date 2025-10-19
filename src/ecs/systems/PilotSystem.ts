@@ -1,92 +1,222 @@
 /**
- * PilotSystem.ts - Système ECS pour la gestion du pilote
- *
+ * PilotSystem.ts - Système de calcul du retour haptique pour le pilote
+ * 
  * Responsabilités :
- *   - Gère l'entité du pilote (position, rotation, visuel)
- *   - Met à jour la position du pilote relative à la barre de contrôle
- *
+ * - Lit les tensions des lignes depuis les LineComponent
+ * - Calcule les tensions filtrées pour un feedback lisse
+ * - Détecte l'asymétrie et le côté dominant
+ * - Calcule les deltas de tension
+ * - Détermine l'état du vol
+ * 
  * Architecture ECS :
- *   - Opère sur une PilotEntity avec TransformComponent et MeshComponent
- *   - Met à jour la position basée sur la position de la barre de contrôle
+ * - Opère sur l'entité pilote avec PilotComponent
+ * - Lit les données des lignes (LineComponent)
+ * - S'exécute après ConstraintSystem (qui calcule les tensions)
+ * 
+ * Référence Makani :
+ * - Les tensions sont calculées par ConstraintSystem
+ * - Ce système se concentre sur le traitement du feedback
  */
 
-import * as THREE from "three";
-import { BaseSimulationSystem, SimulationContext } from '@ecs/base/BaseSimulationSystem';
-import { Entity } from '@base/Entity';
-import { TransformComponent } from '@ecs/components/TransformComponent';
-import { MeshComponent } from '@ecs/components/MeshComponent';
-import { Logger } from '@ecs/utils/Logging';
+import * as THREE from 'three';
 
-export class PilotSystem extends BaseSimulationSystem {
-  private logger: Logger;
-  private pilotEntity: Entity | null = null;
-  private controlBarPosition: THREE.Vector3 = new THREE.Vector3();
+import { System } from '../core/System';
+import type { EntityManager } from '../core/EntityManager';
+import type { SimulationContext } from '../core/System';
+import { PilotComponent } from '../components/PilotComponent';
+import { LineComponent } from '../components/LineComponent';
+import { TransformComponent } from '../components/TransformComponent';
+import { PhysicsComponent } from '../components/PhysicsComponent';
 
+export class PilotSystem extends System {
   constructor() {
-    super('PilotSystem', 6); // Ordre 6 - après ControlBarSystem (5)
-    this.logger = Logger.getInstance();
+    // S'exécute après ConstraintSystem (priorité 50)
+    super('PilotSystem', 55);
   }
-
-  async initialize(): Promise<void> {
-    this.logger.info("PilotSystem initialized", "PilotSystem");
-    
-    // Synchroniser la position initiale du pilote avec le mesh Three.js
-    if (this.pilotEntity) {
-      const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
-      const mesh = this.pilotEntity.getComponent<MeshComponent>('mesh');
-
-      if (mesh && transform) {
-        this.logger.debug(`  Syncing pilot position: (${transform.position.x}, ${transform.position.y}, ${transform.position.z})`, "PilotSystem");
-        mesh.syncToObject3D({
-          position: transform.position,
-          quaternion: transform.quaternion,
-          scale: transform.scale
-        });
-      }
-    }
-
-    this.logger.info('PilotSystem initialized', 'PilotSystem');
+  
+  async initialize(_entityManager: EntityManager): Promise<void> {
+    // Pas d'initialisation spécifique nécessaire
   }
+  
+  update(context: SimulationContext): void {
+    const { entityManager, deltaTime } = context;
 
-  reset(): void {
-    this.controlBarPosition.set(0, 0, 0);
-    this.logger.info('PilotSystem reset', 'PilotSystem');
-  }
+    const pilotComp = this.getPilotComponent(entityManager);
+    if (!pilotComp) return;
 
-  dispose(): void {
-    this.pilotEntity = null;
-    this.logger.info('PilotSystem disposed', 'PilotSystem');
+    const lineComponents = this.getLineComponents(entityManager);
+    if (!lineComponents) return;
+
+    this.updateRawTensions(pilotComp, lineComponents);
+    this.applyTensionFiltering(pilotComp);
+    this.calculateAsymmetry(pilotComp);
+    this.detectDominantSide(pilotComp);
+    this.calculateTensionDeltas(pilotComp, deltaTime);
+    this.updateFlightState(pilotComp);
+
+    // Le pilote maintient la barre de contrôle
+    this.applyPilotGrip(entityManager);
+
+    pilotComp.lastUpdateTime = performance.now();
   }
 
   /**
-   * Configure l'entité pilote
+   * Récupère le composant pilote
    */
-  setPilotEntity(entity: Entity): void {
-    this.pilotEntity = entity;
-  }  /**
-   * Met à jour la position de référence de la barre de contrôle
-   */
-  setControlBarPosition(position: THREE.Vector3): void {
-    this.controlBarPosition.copy(position);
+  private getPilotComponent(entityManager: EntityManager): PilotComponent | null {
+    const pilot = entityManager.getEntity('pilot');
+    return pilot?.getComponent<PilotComponent>('pilot') ?? null;
   }
 
-  update(_context: SimulationContext): void {
-    if (!this.pilotEntity) return;
+  /**
+   * Récupère les composants de ligne
+   */
+  private getLineComponents(entityManager: EntityManager): { left: LineComponent; right: LineComponent } | null {
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
+    
+    if (!leftLine || !rightLine) return null;
+    
+    const left = leftLine.getComponent<LineComponent>('line');
+    const right = rightLine.getComponent<LineComponent>('line');
+    
+    if (!left || !right) return null;
+    
+    return { left, right };
+  }
 
-    // Le pilote reste à (0, 0, 0) - pas besoin de mise à jour
-    // La position du pilote ne change jamais dans le système de coordonnées monde
+  /**
+   * Met à jour les tensions brutes depuis les lignes
+   */
+  private updateRawTensions(
+    pilotComp: PilotComponent, 
+    lines: { left: LineComponent; right: LineComponent }
+  ): void {
+    pilotComp.leftHandRawTension = lines.left.currentTension;
+    pilotComp.rightHandRawTension = lines.right.currentTension;
+  }
 
-    // Synchroniser avec le mesh Three.js (pour les autres transformations éventuelles)
-    const transform = this.pilotEntity.getComponent<TransformComponent>('transform');
-    const mesh = this.pilotEntity.getComponent<MeshComponent>('mesh');
+  /**
+   * Applique un filtre passe-bas exponentiel aux tensions
+   */
+  private applyTensionFiltering(pilotComp: PilotComponent): void {
+    const alpha = pilotComp.filteringFactor;
+    
+    pilotComp.leftHandFilteredTension += alpha * (
+      pilotComp.leftHandRawTension - pilotComp.leftHandFilteredTension
+    );
+    pilotComp.rightHandFilteredTension += alpha * (
+      pilotComp.rightHandRawTension - pilotComp.rightHandFilteredTension
+    );
+  }
 
-    // Synchroniser avec le mesh Three.js si transform est défini
-    if (transform && mesh) {
-      mesh.syncToObject3D({
-        position: transform.position,
-        quaternion: transform.quaternion,
-        scale: transform.scale
-      });
+  /**
+   * Calcule l'asymétrie de tension entre les deux mains
+   */
+  private calculateAsymmetry(pilotComp: PilotComponent): void {
+    const totalTension = pilotComp.leftHandFilteredTension + pilotComp.rightHandFilteredTension;
+    const MIN_TENSION_THRESHOLD = 0.1;
+    
+    if (totalTension > MIN_TENSION_THRESHOLD) {
+      const diff = Math.abs(pilotComp.leftHandFilteredTension - pilotComp.rightHandFilteredTension);
+      pilotComp.asymmetry = (diff / totalTension) * 100;
+    } else {
+      pilotComp.asymmetry = 0;
     }
+    
+    pilotComp.totalFeedbackMagnitude = totalTension / 2;
+  }
+
+  /**
+   * Détecte le côté dominant basé sur la différence de tension
+   */
+  private detectDominantSide(pilotComp: PilotComponent): void {
+    const tensionDiff = pilotComp.leftHandFilteredTension - pilotComp.rightHandFilteredTension;
+    const DOMINANCE_THRESHOLD = 5; // 5N
+    
+    if (Math.abs(tensionDiff) < DOMINANCE_THRESHOLD) {
+      pilotComp.dominantSide = 'neutral';
+    } else if (tensionDiff > 0) {
+      pilotComp.dominantSide = 'left';
+    } else {
+      pilotComp.dominantSide = 'right';
+    }
+  }
+
+  /**
+   * Calcule les variations de tension (dérivée)
+   */
+  private calculateTensionDeltas(pilotComp: PilotComponent, deltaTime: number): void {
+    if (deltaTime <= 0) return;
+    
+    const prevLeftRaw = pilotComp.leftHandRawTension;
+    const prevRightRaw = pilotComp.rightHandRawTension;
+    
+    pilotComp.leftHandTensionDelta = (pilotComp.leftHandRawTension - prevLeftRaw) / deltaTime;
+    pilotComp.rightHandTensionDelta = (pilotComp.rightHandRawTension - prevRightRaw) / deltaTime;
+  }
+  
+  /**
+   * Applique la force du pilote qui maintient la barre de contrôle
+   * Le pilote agit comme un ressort-amortisseur pour garder la barre en position
+   */
+  private applyPilotGrip(entityManager: EntityManager): void {
+    const controlBar = entityManager.getEntity('controlBar');
+    if (!controlBar) return;
+
+    const barTransform = controlBar.getComponent<TransformComponent>('transform');
+    const barPhysics = controlBar.getComponent<PhysicsComponent>('physics');
+
+    if (!barTransform || !barPhysics || barPhysics.isKinematic) return;
+
+    // Position cible de la barre (position du pilote)
+    const targetPosition = new THREE.Vector3(0, 1.5, 0);
+
+    // Force de rappel : F = -k × (x - x0) - c × v
+    // Le pilote résiste au déplacement de la barre
+    const displacement = barTransform.position.clone().sub(targetPosition);
+    const PILOT_STIFFNESS = 300; // N/m - Résistance du bras du pilote
+    const PILOT_DAMPING = 40; // Ns/m - Amortissement du mouvement
+
+    const springForce = displacement.multiplyScalar(-PILOT_STIFFNESS);
+    const dampingForce = barPhysics.velocity.clone().multiplyScalar(-PILOT_DAMPING);
+
+    barPhysics.forces.add(springForce);
+    barPhysics.forces.add(dampingForce);
+  }
+
+  /**
+   * Détermine l'état du vol basé sur les tensions et l'asymétrie
+   */
+  private updateFlightState(pilotComp: PilotComponent): void {
+    const avgTension = pilotComp.totalFeedbackMagnitude;
+    const asymmetry = pilotComp.asymmetry;
+    
+    // Seuils (à calibrer selon le modèle physique)
+    const idleThreshold = 10; // N
+    const poweredThreshold = 30; // N
+    const turningAsymmetryThreshold = 20; // %
+    const stallThreshold = 5; // N
+    
+    if (avgTension < stallThreshold) {
+      pilotComp.state = 'stall';
+    } else if (avgTension < idleThreshold) {
+      pilotComp.state = 'idle';
+    } else if (asymmetry > turningAsymmetryThreshold) {
+      // En virage
+      pilotComp.state = pilotComp.dominantSide === 'left' ? 'turning_left' : 'turning_right';
+    } else if (avgTension > poweredThreshold) {
+      pilotComp.state = 'powered';
+    } else {
+      pilotComp.state = 'idle';
+    }
+  }
+  
+  reset(): void {
+    // Rien à réinitialiser au niveau du système
+  }
+  
+  dispose(): void {
+    // Rien à disposer
   }
 }

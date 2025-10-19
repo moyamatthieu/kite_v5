@@ -1,16 +1,9 @@
 /**
- * index.ts - Export centralisé des gestionnaires et factories d'entités
+ * index.ts - Exports des factories
  */
 
-// === Entity Management ===
-export { EntityManager } from './EntityManager';
-export { EntityBuilder, type TransformOptions, type MeshOptions, type EntityWithMeshOptions } from './EntityBuilder';
-
-// === Factories ===
-export {
-  KiteEntityFactory,
-  LineEntityFactory,
-  ControlBarEntityFactory,
-  ControlPointEntityFactory,
-  PilotEntityFactory,
-} from './factories';
+export { KiteFactory } from './KiteFactory';
+export { LineFactory } from './LineFactory';
+export { ControlBarFactory } from './ControlBarFactory';
+export { PilotFactory } from './PilotFactory';
+export { UIFactory } from './UIFactory';

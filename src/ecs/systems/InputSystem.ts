@@ -1,242 +1,80 @@
 /**
- * InputSystem.ts - Système de gestion des entrées utilisateur
+ * InputSystem.ts - Gestion des entrées clavier
+ * 
+ * Lit le clavier et modifie les positions des handles de la barre de contrôle.
+ * Priorité 10 (exécuté en premier).
  */
 
 import * as THREE from 'three';
-import { BaseSimulationSystem, SimulationContext } from '@base/BaseSimulationSystem';
-import { Logger } from '@utils/Logging';
 
-export interface InputState {
-  // Entrées analogiques (normalisées -1 à 1)
-  barPosition: number; // Position de la barre (-1: tirée gauche, 0: neutre, 1: tirée droite)
-  barVelocity: number; // Vitesse de mouvement de la barre
+import { System, SimulationContext } from '../core/System';
+import { TransformComponent } from '../components/TransformComponent';
 
-  // Entrées numériques
-  resetPressed: boolean;
-  debugTogglePressed: boolean;
-}
-
-export interface InputConfig {
-  barSmoothingEnabled: boolean;
-  barSmoothingFactor: number; // Facteur de lissage (0-1, plus proche de 1 = plus lisse)
-  deadzone: number; // Zone morte pour éviter les oscillations
-  maxBarSpeed: number; // Vitesse maximale de changement de la barre
-  keyboardEnabled: boolean;
-  mouseEnabled: boolean;
-}
-
-export class InputSystem extends BaseSimulationSystem {
-  private inputState: InputState = {
-    barPosition: 0,
-    barVelocity: 0,
-    resetPressed: false,
-    debugTogglePressed: false,
-  };
-
-  private config: InputConfig;
-
-  // Gestion des événements
-  private keyStates = new Map<string, boolean>();
-  private mousePosition = new THREE.Vector2();
-  private mouseButtons = new Map<number, boolean>();
-
-  constructor(config: Partial<InputConfig> = {}) {
-    super('InputSystem', 1); // Haute priorité (traité en premier)
-
-    this.config = {
-      barSmoothingEnabled: true,
-      barSmoothingFactor: 0.92, // Plus élevé = plus smooth (0-1)
-      deadzone: 0.05,
-      maxBarSpeed: 2.0, // unités par seconde
-      keyboardEnabled: true,
-      mouseEnabled: true,
-      ...config
-    };
-
-    this.setupEventListeners();
+export class InputSystem extends System {
+  private keys: Set<string> = new Set();
+  private barRotation: number = 0; // Rotation actuelle de la barre (-1 à +1)
+  
+  // Configuration
+  private rotationSpeed: number = 2.0; // degrés/seconde
+  private maxRotation: number = 45; // degrés max
+  private handleSpacing: number = 0.45; // Distance entre handles (m)
+  
+  constructor() {
+    super('InputSystem', 10);
   }
-
-  initialize(): Promise<void> {
-    Logger.getInstance().info('InputSystem initialized', 'InputSystem');
-    return Promise.resolve();
+  
+  initialize(): void {
+    // Écoute clavier
+    window.addEventListener('keydown', (e) => this.keys.add(e.key.toLowerCase()));
+    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
   }
-
-  reset(): void {
-    this.inputState = {
-      barPosition: 0,
-      barVelocity: 0,
-      resetPressed: false,
-      debugTogglePressed: false,
-    };
-    this.keyStates.clear();
-    this.mouseButtons.clear();
+  
+  update(context: SimulationContext): void {
+    const { deltaTime, entityManager } = context;
+    
+    // Récupérer la barre de contrôle
+    const controlBar = entityManager.getEntity('controlBar');
+    if (!controlBar) return;
+    
+    const transform = controlBar.getComponent<TransformComponent>('transform');
+    if (!transform) return;
+    
+    // Gérer rotation avec flèches ou Q/D
+    if (this.keys.has('arrowleft') || this.keys.has('q')) {
+      this.barRotation = Math.max(-this.maxRotation, this.barRotation - this.rotationSpeed * deltaTime);
+    }
+    if (this.keys.has('arrowright') || this.keys.has('d')) {
+      this.barRotation = Math.min(this.maxRotation, this.barRotation + this.rotationSpeed * deltaTime);
+    }
+    
+    // Retour au centre (touche S ou espace)
+    if (this.keys.has('s') || this.keys.has(' ')) {
+      const returnSpeed = this.rotationSpeed * 2;
+      if (Math.abs(this.barRotation) < returnSpeed * deltaTime) {
+        this.barRotation = 0;
+      } else {
+        this.barRotation -= Math.sign(this.barRotation) * returnSpeed * deltaTime;
+      }
+    }
+    
+    // Appliquer rotation à la barre (autour de Z)
+    const rotationRad = this.barRotation * Math.PI / 180;
+    const zAxis = new THREE.Vector3(0, 0, 1);
+    transform.quaternion.setFromAxisAngle(zAxis, rotationRad);
+    
+    // Mettre à jour positions des handles (gauche/droite de la barre)
+    // Les handles sont stockés dans la géométrie de la barre
+    // (L'application de la rotation est automatique via le TransformComponent)
   }
-
+  
   dispose(): void {
-    if (typeof window === 'undefined') return;
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
-    window.removeEventListener('keyup', this.onKeyUp.bind(this));
-    window.removeEventListener('mousemove', this.onMouseMove.bind(this));
-    window.removeEventListener('mousedown', this.onMouseDown.bind(this));
-    window.removeEventListener('mouseup', this.onMouseUp.bind(this));
+    this.keys.clear();
   }
-
-  update(_context: SimulationContext): void {
-    // Mettre à jour l'état des entrées
-    this.updateKeyboardInput();
-    this.updateMouseInput();
-
-    // Calculer la position de la barre avec lissage
-    this.updateBarPosition(_context.deltaTime);
-
-    // Mettre à jour les états des boutons (pulse)
-    this.updateButtonStates();
-
-    // Log supprimé - trop verbeux
-  }
-
+  
   /**
-   * Configure les écouteurs d'événements
+   * Récupère la rotation actuelle de la barre (pour debug/UI)
    */
-  private setupEventListeners(): void {
-    if (typeof window === 'undefined') return;
-
-    // Écouteurs clavier
-    if (this.config.keyboardEnabled) {
-      window.addEventListener('keydown', this.onKeyDown.bind(this));
-      window.addEventListener('keyup', this.onKeyUp.bind(this));
-    }
-
-    // Écouteurs souris
-    if (this.config.mouseEnabled) {
-      window.addEventListener('mousemove', this.onMouseMove.bind(this));
-      window.addEventListener('mousedown', this.onMouseDown.bind(this));
-      window.addEventListener('mouseup', this.onMouseUp.bind(this));
-    }
-  }
-
-  /**
-   * Gestionnaire d'événement clavier (appui)
-   */
-  private onKeyDown(event: KeyboardEvent): void {
-    this.keyStates.set(event.code, true);
-
-    // Empêcher le comportement par défaut pour certaines touches
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyR'].includes(event.code)) {
-      event.preventDefault();
-    }
-  }
-
-  /**
-   * Gestionnaire d'événement clavier (relâchement)
-   */
-  private onKeyUp(event: KeyboardEvent): void {
-    this.keyStates.set(event.code, false);
-  }
-
-  /**
-   * Gestionnaire de mouvement de souris
-   */
-  private onMouseMove(event: MouseEvent): void {
-    this.mousePosition.set(event.clientX, event.clientY);
-  }
-
-  /**
-   * Gestionnaire d'appui souris
-   */
-  private onMouseDown(event: MouseEvent): void {
-    this.mouseButtons.set(event.button, true);
-  }
-
-  /**
-   * Gestionnaire de relâchement souris
-   */
-  private onMouseUp(event: MouseEvent): void {
-    this.mouseButtons.set(event.button, false);
-  }
-
-  /**
-   * Met à jour les entrées clavier
-   */
-  private updateKeyboardInput(): void {
-    // Contrôle de la barre avec les flèches gauche/droite
-    // Input brut de l'utilisateur (instantané)
-    let rawInput = 0;
-
-    if (this.keyStates.get('ArrowLeft')) {
-      rawInput = -1; // Barre tirée à gauche
-    } else if (this.keyStates.get('ArrowRight')) {
-      rawInput = 1; // Barre tirée à droite
-    }
-
-    // Appliquer la zone morte
-    if (Math.abs(rawInput) < this.config.deadzone) {
-      rawInput = 0;
-    }
-
-    // Stocker l'input brut (sans smoothing)
-    // Le smoothing sera fait dans ControlBarSystem
-    this.inputState.barPosition = rawInput;
-
-    // Boutons pulse
-    this.inputState.resetPressed = this.keyStates.get('KeyR') || false;
-    this.inputState.debugTogglePressed = this.keyStates.get('KeyD') || false;
-  }
-
-  /**
-   * Met à jour les entrées souris (réservé pour extension future)
-   */
-  private updateMouseInput(): void {
-    // Pour l'instant, la souris n'est pas utilisée pour le contrôle principal
-    // Mais on pourrait l'utiliser pour un contrôle plus fin
-  }
-
-  /**
-   * Met à jour la position de la barre (pas de smoothing ici, fait dans ControlBarSystem)
-   */
-  private updateBarPosition(deltaTime: number): void {
-    // L'input est déjà dans barPosition (brut)
-    // Le smoothing sera appliqué dans ControlBarSystem sur la rotation physique
-
-    // Calculer la vitesse de changement
-    this.inputState.barVelocity = (this.inputState.barPosition - this.inputState.barVelocity) / deltaTime;
-
-    // Limiter la vitesse maximale
-    if (Math.abs(this.inputState.barVelocity) > this.config.maxBarSpeed) {
-      this.inputState.barVelocity = Math.sign(this.inputState.barVelocity) * this.config.maxBarSpeed;
-    }
-  }
-
-  /**
-   * Met à jour les états des boutons (pulse - seulement true pendant un frame)
-   */
-  private updateButtonStates(): void {
-    // Pour l'instant, pas de logique pulse nécessaire car on utilise directement les keyStates
-    // Mais on pourrait implémenter une logique de pulse ici si nécessaire
-  }
-
-  /**
-   * Obtient l'état actuel des entrées
-   */
-  getInputState(): Readonly<InputState> {
-    return this.inputState;
-  }
-
-  /**
-   * Force une position de barre (pour debug ou automation)
-   */
-  setBarPosition(position: number): void {
-    this.inputState.barPosition = THREE.MathUtils.clamp(position, -1, 1);
-  }
-
-  /**
-   * Obtient la configuration actuelle
-   */
-  getConfig(): Readonly<InputConfig> {
-    return this.config;
-  }
-
-  getRotationInput(): number {
-    return this.inputState.barPosition;
+  getBarRotation(): number {
+    return this.barRotation;
   }
 }

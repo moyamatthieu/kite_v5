@@ -1,18 +1,19 @@
 /**
- * index.ts - Export centralisé de tous les composants ECS
+ * index.ts - Exports de tous les composants
  */
 
 export { TransformComponent } from './TransformComponent';
-export { MeshComponent } from './MeshComponent';
 export { PhysicsComponent } from './PhysicsComponent';
-export { KiteComponent } from './KiteComponent';
 export { GeometryComponent } from './GeometryComponent';
+export type { GeometryConnection, GeometrySurface } from './GeometryComponent';
 export { VisualComponent } from './VisualComponent';
+export { MeshComponent } from './MeshComponent';
+export { KiteComponent } from './KiteComponent';
+export { LineComponent } from './LineComponent';
 export { BridleComponent } from './BridleComponent';
-export { LineComponent, type LineConfig, type LineAttachments, type LineState } from './LineComponent';
+export type { BridleLengths, BridleTensions } from './BridleComponent';
 export { AerodynamicsComponent } from './AerodynamicsComponent';
-export { ControlPointComponent, type ControlPointConfig, type BridleAttachments } from './ControlPointComponent';
-export { StructureComponent, type PointConnection } from './StructureComponent';
-export { SurfaceComponent } from './SurfaceComponent';
-export { PilotFeedbackComponent } from './PilotFeedbackComponent';
-
+export type { AeroCoefficients, AeroSurfaceDescriptor } from './AerodynamicsComponent';
+export { InputComponent } from './InputComponent';
+export { PilotComponent } from './PilotComponent';
+export { DebugComponent } from './DebugComponent';

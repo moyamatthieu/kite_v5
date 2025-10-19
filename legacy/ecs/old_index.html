@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation de Cerf-volant V8</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 1000;
+        }
+
+        .error {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            z-index: 1001;
+        }
+
+        /* Styles pour l'interface utilisateur */
+        .ui-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            pointer-events: none; /* Ne bloque pas les clics vers le canvas */
+        }
+
+        /* Réactiver les événements pour les éléments interactifs */
+        .ui-panel input,
+        .ui-panel button,
+        .ui-panel select,
+        .ui-panel a {
+            pointer-events: auto;
+        }
+
+        .control-panel {
+            top: 20px;
+            left: 20px;
+            width: 280px;
+        }
+
+        .debug-panel {
+            top: 20px;
+            right: 20px;
+            width: 350px;
+        }
+
+        .ui-panel h3 {
+            margin: 0 0 15px 0;
+            color: #4fc3f7;
+            border-bottom: 1px solid rgba(79, 195, 247, 0.3);
+            padding-bottom: 8px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #333;
+            outline: none;
+            border-radius: 3px;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: right;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .ui-button {
+            padding: 8px 16px;
+            background: #4fc3f7;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .ui-button:hover {
+            background: #29b6f6;
+        }
+
+        .ui-button.active {
+            background: #ff9800;
+        }
+
+        .debug-info {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="app"></div>
+        <div class="loading" id="loading">Chargement de la simulation...</div>
+        <div class="error" id="error"></div>
+        
+        <!-- Panneau de contrôle principal -->
+        <div class="ui-panel control-panel" id="control-panel">
+            <h3>🎮 Contrôles de Simulation</h3>
+            
+            <!-- Contrôles de lecture -->
+            <div class="control-group">
+                <div class="button-group">
+                    <button class="ui-button" id="play-pause">⏸️ Pause</button>
+                    <button class="ui-button" id="reset-sim">🔄 Reset</button>
+                    <button class="ui-button" id="debug-physics">🔍 Debug OFF</button>
+                </div>
+            </div>
+
+            <!-- Contrôles du vent -->
+            <div class="control-group">
+                <label>💨 Vitesse du vent</label>
+                <div class="slider-container">
+                    <input type="range" id="wind-speed" min="0" max="50" value="20" step="1">
+                    <span class="slider-value" id="wind-speed-value">20 km/h</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🧭 Direction du vent</label>
+                <div class="slider-container">
+                    <input type="range" id="wind-direction" min="0" max="360" value="0" step="5">
+                    <span class="slider-value" id="wind-direction-value">0°</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🌪️ Turbulences</label>
+                <div class="slider-container">
+                    <input type="range" id="wind-turbulence" min="0" max="100" value="0.001" step="0.001">
+                    <span class="slider-value" id="wind-turbulence-value">0.001%</span>
+                </div>
+            </div>
+
+
+            <div class="control-group" id="vector-controls" style="display: none;">
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-lift-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ff00;">🟢 Portance (Lift)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-drag-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #ff0000;">🔴 Traînée (Drag)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-wind-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ffff;">🔵 Vent Apparent</span>
+                    </label>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Portance/Traînée</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-lift" min="0.01" max="1.0" value="0.2" step="0.01">
+                        <span class="slider-value" id="vector-scale-lift-value">0.20</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Vent Apparent</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-wind" min="0.01" max="0.5" value="0.05" step="0.01">
+                        <span class="slider-value" id="vector-scale-wind-value">0.05</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contrôles des lignes -->
+            <div class="control-group">
+                <label>📏 Longueur des lignes</label>
+                <div class="slider-container">
+                    <input type="range" id="line-length" min="10" max="50" value="15" step="1">
+                    <span class="slider-value" id="line-length-value">15m</span>
+                </div>
+            </div>
+
+            <!-- Contrôles des brides -->
+            <div class="control-group">
+                <label>🪃 Bride NEZ→CTRL</label>
+                <div class="slider-container">
+                    <input type="range" id="bridle-nez" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-nez-value">0.65m</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🪃 Bride INTER→CTRL</label>
+                <div class="slider-container">
+                    <input type="range" id="bridle-inter" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-inter-value">0.65m</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🪃 Bride CENTRE→CTRL</label>
+                <div class="slider-container">
+                    <input type="range" id="bridle-centre" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-centre-value">0.65m</span>
+                </div>
+            </div>
+
+            <!-- Amortissements -->
+            <div class="control-group">
+                <label>🔄 Amortissement linéaire</label>
+                <div class="slider-container">
+                    <input type="range" id="linear-damping" min="0" max="1" value="0.2" step="0.01">
+                    <span class="slider-value" id="linear-damping-value">0.20</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🔄 Amortissement angulaire</label>
+                <div class="slider-container">
+                    <input type="range" id="angular-damping" min="0" max="1" value="1.0" step="0.01">
+                    <span class="slider-value" id="angular-damping-value">1.00</span>
+                </div>
+            </div>
+
+            <!-- 🔧 Contrôle du niveau de subdivision du maillage -->
+            <div class="control-group">
+                <label>🔺 Niveau Maillage</label>
+                <div class="slider-container">
+                    <input type="range" id="mesh-subdivision-level" min="0" max="4" value="2" step="1">
+                    <span class="slider-value" id="mesh-subdivision-level-value">2 (64 triangles)</span>
+                </div>
+            </div>
+
+            <!-- Contrôles aérodynamiques -->
+            <div class="control-group">
+                <label>🪁 Portance (Lift Scale)</label>
+                <div class="slider-container">
+                    <input type="range" id="lift-scale" min="0.1" max="2.0" value="1.2" step="0.1">
+                    <span class="slider-value" id="lift-scale-value">1.2</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🌬️ Traînée (Drag Scale)</label>
+                <div class="slider-container">
+                    <input type="range" id="drag-scale" min="0.1" max="2.0" value="1.2" step="0.1">
+                    <span class="slider-value" id="drag-scale-value">1.2</span>
+                </div>
+            </div>
+
+            <!-- Contrôle du lissage des forces physiques -->
+            <div class="control-group">
+                <label>🔄 Lissage des Forces</label>
+                <div class="slider-container">
+                    <input type="range" id="force-smoothing" min="0.0" max="1.0" value="0.8" step="0.05">
+                    <span class="slider-value" id="force-smoothing-value">0.80</span>
+                </div>
+            </div>
+
+            <!-- Contrôles de Logging -->
+            <div class="control-group">
+                <label>📋 Configuration Logging</label>
+                
+                <!-- Niveau de log -->
+                <div style="margin: 10px 0;">
+                    <label for="log-level" style="font-size: 12px;">Niveau de log:</label>
+                    <select id="log-level" style="margin-left: 8px; padding: 2px;">
+                        <option value="0">DEBUG</option>
+                        <option value="1" selected>INFO</option>
+                        <option value="2">WARN</option>
+                        <option value="3">ERROR</option>
+                    </select>
+                </div>
+
+                <!-- Configurations prédéfinies -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-dev" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">🚀 Dev</button>
+                        <button id="log-prod" style="padding: 4px 8px; font-size: 11px; background: #FF9800; color: white; border: none; border-radius: 3px; cursor: pointer;">🏭 Prod</button>
+                        <button id="log-perf" style="padding: 4px 8px; font-size: 11px; background: #9C27B0; color: white; border: none; border-radius: 3px; cursor: pointer;">⚡ Perf</button>
+                        <button id="log-debug" style="padding: 4px 8px; font-size: 11px; background: #F44336; color: white; border: none; border-radius: 3px; cursor: pointer;">🐛 Debug</button>
+                    </div>
+                </div>
+
+                <!-- Utilitaires -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-stats" style="padding: 4px 8px; font-size: 11px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">📊 Stats</button>
+                        <button id="log-clear" style="padding: 4px 8px; font-size: 11px; background: #607D8B; color: white; border: none; border-radius: 3px; cursor: pointer;">🗑️ Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panneau de debug -->
+        <div class="ui-panel debug-panel" id="debug-panel" style="display: none;">
+            <h3>🔍 Informations de Debug</h3>
+            <div class="debug-info" id="debug-info">
+                Activez le mode debug pour voir les informations...
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+
+    <script>
+        // Gestion des erreurs
+        window.addEventListener('error', (e) => {
+            console.error('Erreur de script:', e.error);
+            const errorDiv = document.getElementById('error');
+            const loadingDiv = document.getElementById('loading');
+
+            loadingDiv.style.display = 'none';
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = `Erreur: ${e.error.message}`;
+        });
+
+        // Masquer le message de chargement une fois le script charg�
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loadingDiv = document.getElementById('loading');
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

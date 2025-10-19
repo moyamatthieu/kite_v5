@@ -1,105 +1,60 @@
 /**
- * LineComponent.ts - Composant ECS pour les lignes de cerf-volant
- *
- * Contient les données physiques et géométriques d'une ligne.
- * Remplace l'objet Line dans l'architecture ECS pure.
+ * LineComponent.ts - Propriétés d'une ligne de cerf-volant
+ * 
+ * Ligne = segment droit rigide avec élasticité simple (loi de Hooke).
+ * Pas de caténaire, pas de masse linéaire, pas de damping complexe.
  */
 
-import * as THREE from 'three';
-import { Component } from '@base/Component';
+import { Component } from '../core/Component';
 
-/**
- * Configuration physique d'une ligne
- */
-export interface LineConfig {
-  /** Longueur au repos (mètres) */
-  length: number;
-  /** Rigidité axiale EA/L (N/m) */
-  stiffness: number;
-  /** Pré-tension minimale (N) */
-  preTension: number;
-  /** Tension maximale avant rupture (N) */
-  maxTension: number;
-  /** Coefficient d'amortissement interne (sans dimension, 0-1) */
-  dampingCoeff: number;
-  /** Masse linéique (kg/m) */
-  linearMass: number;
-}
-
-/**
- * Points d'attache d'une ligne
- */
-export interface LineAttachments {
-  /** Point d'attache au kite */
-  kitePoint: string;
-  /** Point d'attache au pilote/barre */
-  pilotPoint: string;
-}
-
-/**
- * État dynamique d'une ligne
- */
-export interface LineState {
-  /** Tension actuelle (N) */
-  currentTension: number;
-  /** Élongation relative (dimensionless) */
-  strain: number;
-  /** Force appliquée (N) */
-  appliedForce: THREE.Vector3;
-  /** Vitesse d'élongation (m/s) */
-  strainRate: number;
-}
-
-/**
- * Composant contenant les données d'une ligne de cerf-volant
- */
-export class LineComponent implements Component {
+export class LineComponent extends Component {
   readonly type = 'line';
+  
+  /** Longueur maximale (et de repos) de la ligne (mètres) */
+  restLength: number;
 
-  // Configuration physique (modifiable pour ajustements dynamiques)
-  public config: LineConfig;
+  /** Longueur instantanée mesurée (mètres) */
+  currentLength: number;
+  
+  /** Rigidité (N/m) - loi de Hooke : F = k × Δx */
+  stiffness: number;
 
-  // Points d'attache
-  public attachments: LineAttachments;
-
-  // État dynamique
-  public state: LineState;
-
-  // Géométrie (pour rendu et calculs)
-  public segments: THREE.Vector3[] = [];
-
-  constructor(config: LineConfig, attachments: LineAttachments) {
-    this.config = { ...config };
-    this.attachments = { ...attachments };
+  /** Amortissement visqueux (N·s/m) */
+  damping: number;
+  
+  /** Tension maximale admissible (N) */
+  maxTension: number;
+  
+  /** Tension actuelle (N) - calculée par LineSystem */
+  currentTension: number;
+  
+  /** État de la ligne */
+  state: {
+    isTaut: boolean;      // Ligne tendue ou molle ?
+    elongation: number;   // Élongation actuelle (m)
+    strainRatio: number;  // Ratio élongation/longueur
+    currentLength: number; // Longueur instantanée (m)
+  };
+  
+  constructor(options: {
+    length: number;
+    stiffness?: number;
+    damping?: number;
+    maxTension?: number;
+  }) {
+    super();
+    this.restLength = options.length;
+    this.currentLength = options.length;
+    this.stiffness = options.stiffness ?? 500; // 500 N/m par défaut
+    this.damping = options.damping ?? 25; // Amortissement standard
+    this.maxTension = options.maxTension ?? 200; // 200 N max
+    this.currentTension = 0;
+    
     this.state = {
-      currentTension: config.preTension,
-      strain: 0,
-      appliedForce: new THREE.Vector3(),
-      strainRate: 0
+      isTaut: false,
+      elongation: 0,
+      strainRatio: 0,
+      currentLength: options.length
     };
-  }
-
-  /**
-   * Met à jour l'état dynamique de la ligne
-   */
-  updateState(tension: number, strain: number, force: THREE.Vector3, strainRate: number): void {
-    this.state.currentTension = tension;
-    this.state.strain = strain;
-    this.state.appliedForce.copy(force);
-    this.state.strainRate = strainRate;
-  }
-
-  /**
-   * Vérifie si la ligne est rompue
-   */
-  isBroken(): boolean {
-    return this.state.currentTension > this.config.maxTension;
-  }
-
-  /**
-   * Calcule la longueur actuelle de la ligne
-   */
-  getCurrentLength(): number {
-    return this.config.length * (1 + this.state.strain);
   }
 }

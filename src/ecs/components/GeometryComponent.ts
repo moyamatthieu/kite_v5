@@ -1,112 +1,120 @@
 /**
- * GeometryComponent.ts - Composant de géométrie pour objets structurés
- *
- * Contient la définition géométrique pure d'un objet (points, connexions, surfaces)
- * en coordonnées locales. Pas de Three.js - juste des données.
- *
- * Architecture ECS pure : ce composant contient uniquement des données,
- * le RenderSystem créera la géométrie Three.js depuis ces données.
+ * GeometryComponent.ts - Géométrie (points locaux, connexions, surfaces)
+ * 
+ * Stocke la structure géométrique d'un objet en coordonnées locales.
+ * Les CTRL_GAUCHE et CTRL_DROIT sont stockés ici comme points locaux du kite.
+ * 
+ * Architecture ECS pure : données uniquement, pas de logique de transformation.
  */
 
 import * as THREE from 'three';
-import { Component } from '@base/Component';
-import { Logger } from '@utils/Logging';
+
+import { Component } from '../core/Component';
+import { Entity } from '../core/Entity';
+
+import { TransformComponent } from './TransformComponent';
 
 /**
- * Connexion entre deux points (pour frames/structures)
+ * Définition d'une connexion entre deux points
  */
 export interface GeometryConnection {
-  from: string;  // Nom du point de départ
-  to: string;    // Nom du point d'arrivée
+  from: string;
+  to: string;
 }
 
 /**
- * Surface définie par des noms de points
+ * Définition d'une surface (triangle ou quad)
  */
 export interface GeometrySurface {
-  points: string[];  // 3 ou 4 noms de points formant la surface
+  points: string[];
+  normal?: THREE.Vector3;
 }
 
-/**
- * Composant de géométrie structurée
- * Remplace la classe StructuredObject dans une architecture ECS pure
- */
-export class GeometryComponent implements Component {
+export class GeometryComponent extends Component {
   readonly type = 'geometry';
-
-  /**
-   * Points nommés en coordonnées locales
-   * Map: nom du point -> position Vector3
-   */
-  public points: Map<string, THREE.Vector3>;
-
-  /**
-   * Connexions entre points (pour créer des frames/lignes)
-   */
-  public connections: GeometryConnection[];
-
-  /**
-   * Surfaces définies par noms de points
-   */
-  public surfaces: GeometrySurface[];
-
-  constructor(data: {
-    points?: Map<string, THREE.Vector3>;
-    connections?: GeometryConnection[];
-    surfaces?: GeometrySurface[];
-  } = {}) {
-    this.points = data.points || new Map();
-    this.connections = data.connections || [];
-    this.surfaces = data.surfaces || [];
+  
+  /** Points en coordonnées locales */
+  private points: Map<string, THREE.Vector3>;
+  
+  /** Connexions (lignes) entre points */
+  connections: GeometryConnection[];
+  
+  /** Surfaces (pour rendu) */
+  surfaces: GeometrySurface[];
+  
+  constructor() {
+    super();
+    this.points = new Map();
+    this.connections = [];
+    this.surfaces = [];
   }
-
+  
   /**
-   * Ajoute ou met à jour un point
+   * Définit un point en coordonnées locales
    */
-  setPoint(name: string, position: THREE.Vector3): void {
-    this.points.set(name, position.clone());
+  setPoint(name: string, localPosition: THREE.Vector3): void {
+    this.points.set(name, localPosition.clone());
   }
-
+  
   /**
-   * Récupère un point par son nom
+   * Récupère un point en coordonnées locales
    */
   getPoint(name: string): THREE.Vector3 | undefined {
     return this.points.get(name)?.clone();
   }
-
+  
+  /**
+   * Transforme un point local en coordonnées monde
+   * 
+   * @param name - Nom du point
+   * @param entity - Entité contenant TransformComponent
+   * @returns Position monde ou undefined si point inexistant
+   */
+  getPointWorld(name: string, entity: Entity): THREE.Vector3 | undefined {
+    const localPoint = this.points.get(name);
+    if (!localPoint) return undefined;
+    
+    const transform = entity.getComponent<TransformComponent>('transform');
+    if (!transform) return undefined;
+    
+    // Transforme local → monde : rotation puis translation
+    return localPoint.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
+  }
+  
+  /**
+   * Liste tous les noms de points
+   */
+  getPointNames(): string[] {
+    return Array.from(this.points.keys());
+  }
+  
+  /**
+   * Compte le nombre de points
+   */
+  getPointCount(): number {
+    return this.points.size;
+  }
+  
+  /**
+   * Ajoute une connexion entre deux points
+   */
+  addConnection(from: string, to: string): void {
+    this.connections.push({ from, to });
+  }
+  
+  /**
+   * Ajoute une surface
+   */
+  addSurface(points: string[], normal?: THREE.Vector3): void {
+    this.surfaces.push({ points, normal: normal?.clone() });
+  }
+  
   /**
    * Vérifie si un point existe
    */
   hasPoint(name: string): boolean {
     return this.points.has(name);
-  }
-
-  /**
-   * Ajoute une connexion
-   */
-  addConnection(from: string, to: string): void {
-    this.connections.push({ from, to });
-  }
-
-  /**
-   * Ajoute une surface
-   */
-  addSurface(pointNames: string[]): void {
-    if (pointNames.length < 3) {
-      Logger.getInstance().warn('Une surface nécessite au moins 3 points', 'GeometryComponent');
-      return;
-    }
-    this.surfaces.push({ points: pointNames });
-  }
-
-  /**
-   * Clone le composant
-   */
-  clone(): GeometryComponent {
-    return new GeometryComponent({
-      points: new Map(this.points),
-      connections: [...this.connections],
-      surfaces: this.surfaces.map(s => ({ points: [...s.points] }))
-    });
   }
 }

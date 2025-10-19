@@ -26,7 +26,15 @@
       "Bash(npm run type-check:*)",
       "Bash(tree:*)",
       "Bash(npm run lint:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git clone:*)",
+      "Bash(git config:*)",
+      "Bash(git restore:*)",
+      "Bash(rm:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(mv:*)",
+      "Bash(unzip:*)"
     ],
     "deny": [],
     "ask": []

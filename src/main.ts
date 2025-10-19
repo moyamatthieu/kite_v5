@@ -1,6 +1,5 @@
-import { Logger, LogLevel } from '@utils/Logging';
-
-import { SimulationApp } from '@/ecs/SimulationApp';
+import { Logger, LogLevel } from './ecs/utils/Logging';
+import { SimulationApp } from './ecs/SimulationApp';
 
 // Initialisation de la simulation
 async function startSimulation() {
@@ -9,7 +8,16 @@ async function startSimulation() {
 
   logger.info('🚀 Starting simulation...', 'Main');
   try {
-    const app = new SimulationApp();
+    // Créer ou récupérer le canvas
+    const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement 
+      || document.createElement('canvas');
+    
+    if (!canvas.parentElement) {
+      canvas.id = 'simulation-canvas';
+      document.body.appendChild(canvas);
+    }
+    
+    const app = new SimulationApp(canvas);
     logger.info('✅ SimulationApp created', 'Main');
 
     await app.initialize();
