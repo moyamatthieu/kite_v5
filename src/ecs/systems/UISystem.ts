@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 import { System, type SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { InputComponent } from '../components/InputComponent';
@@ -44,19 +46,25 @@ export class UISystem extends System {
       const component = uiEntity.getComponent<InputComponent>(InputComponent.type);
       if (component) {
         this.inputComponent = component;
+        this.logger.info('InputComponent found', 'UISystem');
       }
     }
 
     // Chercher l'entité du cerf-volant (kite)
-    const potentialKites = entityManager.query(['physics', 'Aerodynamics']);
-    this.kiteEntity = potentialKites.find(e => e.id.includes('kite')) ?? null;
-    
+    this.kiteEntity = entityManager.getEntity('kite') ?? null;
+
+    if (this.kiteEntity) {
+      this.logger.info('Kite entity found in initialize: ' + this.kiteEntity.id, 'UISystem');
+    } else {
+      this.logger.warn('Kite entity not found in initialize', 'UISystem');
+    }
+
     // Initialiser les boutons une seule fois (ils se réfèrent à l'InputComponent qui peut changer)
     if (!this.buttonsInitialized) {
       this.setupButtons();
       this.buttonsInitialized = true;
     }
-    
+
     this.initUI();
   }
 
@@ -265,34 +273,196 @@ export class UISystem extends System {
   update(context: SimulationContext): void {
     if (!this.kiteEntity) {
       // Essayer de retrouver l'entité kite si elle n'a pas été trouvée à l'initialisation
-      const potentialKites = context.entityManager.query(['physics', 'Aerodynamics']);
-      this.kiteEntity = potentialKites.find(e => e.id.includes('kite')) ?? null;
-      if (!this.kiteEntity) return;
+      const potentialKites = context.entityManager.query(['physics', 'kite']);
+      this.kiteEntity = potentialKites.find(e => e.id === 'kite') ?? null;
+
+      if (!this.kiteEntity) {
+        // Essayer une requête plus large
+        this.kiteEntity = context.entityManager.getEntity('kite') ?? null;
+      }
+
+      if (!this.kiteEntity) {
+        this.logger.warn('Kite entity not found', 'UISystem');
+        return;
+      }
+
+      this.logger.info('Kite entity found: ' + this.kiteEntity.id, 'UISystem');
     }
 
     // Mettre à jour les affichages d'informations
     const physics = this.kiteEntity.getComponent<PhysicsComponent>('physics');
     const transform = this.kiteEntity.getComponent<TransformComponent>('transform');
 
-    if (physics) {
+    if (physics && transform) {
+      // === Vitesse ===
       const speedValue = document.getElementById('kite-speed-value');
       if (speedValue) {
         const speedKmh = physics.velocity.length() * KMH_TO_MS;
         speedValue.textContent = `${speedKmh.toFixed(DECIMAL_PRECISION_VELOCITY)} km/h`;
       }
-    }
 
-    if (transform) {
+      // === Altitude ===
       const altitudeValue = document.getElementById('kite-altitude-value');
       if (altitudeValue) {
-        altitudeValue.textContent = `${transform.position.y.toFixed(1)} m`;
+        altitudeValue.textContent = `${transform.position.y.toFixed(DECIMAL_PRECISION_POSITION)} m`;
       }
+
+      // === Position X ===
+      const posXValue = document.getElementById('kite-position-x-value');
+      if (posXValue) {
+        posXValue.textContent = `${transform.position.x.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      }
+
+      // === Position Z ===
+      const posZValue = document.getElementById('kite-position-z-value');
+      if (posZValue) {
+        posZValue.textContent = `${transform.position.z.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      }
+
+      // === Angle d'attaque ===
+      this.updateAngleOfAttack(context, transform);
+
+      // === Forces (portance et traînée) ===
+      this.updateForces(physics);
+
+      // === Tensions des lignes ===
+      this.updateLineTensions(context);
     }
 
-    // Afficher les infos du vent (optionnel)
-    const windInfo = document.getElementById('wind-info-value');
-    if (windInfo && this.inputComponent) {
-      windInfo.textContent = `${this.inputComponent.windSpeed.toFixed(1)} m/s`;
+    // === Vent ambiant et apparent ===
+    this.updateWindInfo(context);
+  }
+
+  /**
+   * Calcule et affiche l'angle d'attaque du kite
+   */
+  private updateAngleOfAttack(context: SimulationContext, transform: TransformComponent): void {
+    const aoaValue = document.getElementById('kite-aoa-value');
+    if (!aoaValue) return;
+
+    const windCache = context.windCache as Map<string, any> | undefined;
+    if (!windCache) return;
+
+    const windState = windCache.get('kite');
+    if (!windState || !windState.apparent) {
+      aoaValue.textContent = '-- °';
+      return;
     }
+
+    const apparentWind = windState.apparent;
+    const windSpeed = apparentWind.length();
+
+    if (windSpeed < 0.01) {
+      aoaValue.textContent = '0.0 °';
+      return;
+    }
+
+    // Calculer l'angle d'attaque : angle entre la corde du kite et la direction du vent
+    const chord = new THREE.Vector3(1, 0, 0).applyQuaternion(transform.quaternion);
+    const windDir = apparentWind.clone().normalize();
+    const dotProduct = chord.dot(windDir);
+    const alpha = Math.asin(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
+
+    aoaValue.textContent = `${alpha.toFixed(DECIMAL_PRECISION_ANGLE)} °`;
+  }
+
+  /**
+   * Calcule et affiche les forces totales de portance et traînée
+   */
+  private updateForces(physics: PhysicsComponent): void {
+    const liftValue = document.getElementById('kite-lift-value');
+    const dragValue = document.getElementById('kite-drag-value');
+
+    if (!liftValue || !dragValue) return;
+
+    // Calculer la somme des forces de portance et traînée depuis faceForces
+    let totalLift = 0;
+    let totalDrag = 0;
+
+    physics.faceForces.forEach(faceForce => {
+      totalLift += faceForce.lift.length();
+      totalDrag += faceForce.drag.length();
+    });
+
+    liftValue.textContent = `${totalLift.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
+    dragValue.textContent = `${totalDrag.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
+  }
+
+  /**
+   * Affiche les tensions des lignes gauche et droite
+   */
+  private updateLineTensions(context: SimulationContext): void {
+    const tensionLeftValue = document.getElementById('tension-left-value');
+    const tensionRightValue = document.getElementById('tension-right-value');
+
+    if (!tensionLeftValue || !tensionRightValue) return;
+
+    const { entityManager } = context;
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
+
+    // Tension ligne gauche
+    if (leftLine) {
+      const lineComp = leftLine.getComponent('line');
+      if (lineComp && (lineComp as any).currentTension !== undefined) {
+        const tension = (lineComp as any).currentTension;
+        tensionLeftValue.textContent = `${tension.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
+      } else {
+        tensionLeftValue.textContent = '0.0 N';
+      }
+    } else {
+      tensionLeftValue.textContent = '-- N';
+    }
+
+    // Tension ligne droite
+    if (rightLine) {
+      const lineComp = rightLine.getComponent('line');
+      if (lineComp && (lineComp as any).currentTension !== undefined) {
+        const tension = (lineComp as any).currentTension;
+        tensionRightValue.textContent = `${tension.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
+      } else {
+        tensionRightValue.textContent = '0.0 N';
+      }
+    } else {
+      tensionRightValue.textContent = '-- N';
+    }
+  }
+
+  /**
+   * Affiche les informations sur le vent (ambiant, apparent, direction)
+   */
+  private updateWindInfo(context: SimulationContext): void {
+    if (!this.inputComponent) return;
+
+    // Vent ambiant
+    const windInfo = document.getElementById('wind-info-value');
+    if (windInfo) {
+      windInfo.textContent = `${this.inputComponent.windSpeed.toFixed(DECIMAL_PRECISION_POSITION)} m/s`;
+    }
+
+    // Direction du vent
+    const windDirValue = document.getElementById('wind-direction-value');
+    if (windDirValue) {
+      windDirValue.textContent = `${this.inputComponent.windDirection.toFixed(0)} °`;
+    }
+
+    // Vent apparent
+    const windApparentValue = document.getElementById('wind-apparent-value');
+    if (!windApparentValue) return;
+
+    const windCache = context.windCache as Map<string, any> | undefined;
+    if (!windCache) {
+      windApparentValue.textContent = '-- m/s';
+      return;
+    }
+
+    const windState = windCache.get('kite');
+    if (!windState || !windState.apparent) {
+      windApparentValue.textContent = '-- m/s';
+      return;
+    }
+
+    const apparentSpeed = windState.apparent.length();
+    windApparentValue.textContent = `${apparentSpeed.toFixed(DECIMAL_PRECISION_POSITION)} m/s`;
   }
 }
