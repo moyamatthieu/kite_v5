@@ -113,22 +113,23 @@ export class AeroSystem extends System {
         // 5. Pression dynamique locale
         const q = DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
 
-        // 6. ✨ CERF-VOLANT PHYSICS: Forces perpendiculaires et parallèles à la surface
-        // Pour un cerf-volant (pas un avion) :
-        // - Lift = perpendiculaire à la surface (along the NORMAL)
-        // - Drag = parallèle au vent apparent
+        // 6. ✨ CERF-VOLANT PHYSICS: Forces perpendiculaires et parallèles au VENT APPARENT
+        // Aérodynamique standard :
+        // - Lift (portance) = perpendiculaire au vent apparent
+        // - Drag (traînée) = parallèle au vent apparent
         //
-        // La portance monte le kite, la traînée le tire d'avant en arrière
+        // La portance monte le kite, la traînée le tire dans la direction du vent
         
-        // Assurer que la normale pointe VERS LE VENT (pour que la portance monte vers le haut)
-        if (surfaceNormal.dot(localWindDir) < 0) {
-          surfaceNormal.negate(); // Inverser si elle pointe loin du vent
+        // === LIFT (Portance) : perpendiculaire au vent apparent ===
+        // Direction : normale au vent apparent dans le plan vertical
+        // On projette la normale de surface dans le plan perpendiculaire au vent
+        const windCrossNormal = new THREE.Vector3().crossVectors(localWindDir, surfaceNormal);
+        const liftDir = new THREE.Vector3().crossVectors(windCrossNormal, localWindDir).normalize();
+        
+        // Assurer que le lift pointe vers le haut (composante Y positive)
+        if (liftDir.y < 0) {
+          liftDir.negate();
         }
-        
-        // === LIFT (Portance) : perpendiculaire à la surface ===
-        // Le coefficient de portance dépend de l'angle d'attaque par rapport au vent
-        // mais la DIRECTION est toujours la normale de la surface
-        const liftDir = surfaceNormal.clone(); // Perpendiculaire à la surface (déjà correcte après vérif ci-dessus)
         
         // === DRAG (Traînée) : parallèle au vent ===
         // Tire le kite dans la direction du vent apparent
