@@ -177,6 +177,9 @@ export class DebugSystem extends System {
     // === Afficher les tensions des lignes (magenta) ===
     this.displayLineTensions(debugComp, context, kiteEntity, scale);
 
+    // === Afficher les forces aux poignets de la barre (cyan) ===
+    this.displayGripForces(debugComp, context, scale);
+
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
   }
@@ -238,6 +241,78 @@ export class DebugSystem extends System {
             0xff00ff, // Magenta
             'tension-right'
           );
+        }
+      }
+    }
+  }
+
+  /**
+   * Affiche les forces de tension au niveau des poignets de la barre de contrôle
+   * Visualise la force que les lignes exercent sur les mains du pilote
+   */
+  private displayGripForces(debugComp: DebugComponent, context: SimulationContext, scale: number): void {
+    const { entityManager } = context;
+
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
+    const controlBar = entityManager.getEntity('controlBar');
+
+    if (!controlBar) return;
+
+    const barGeometry = controlBar.getComponent('geometry') as GeometryComponent | null;
+    if (!barGeometry) return;
+
+    // Force sur le poignet gauche
+    if (leftLine) {
+      const lineComp = leftLine.getComponent('line') as LineComponent | null;
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+        const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
+        
+        if (barPoint) {
+          // La tension tire le poignet vers le haut-avant (direction du kite)
+          const barTransform = controlBar.getComponent('transform') as TransformComponent | null;
+          const kiteEntity = entityManager.getEntity('kite');
+          const kiteTransform = kiteEntity?.getComponent('transform') as TransformComponent | null;
+          
+          if (kiteTransform && barTransform) {
+            const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
+            const gripForce = direction.multiplyScalar(lineComp.currentTension);
+
+            // Afficher la force au poignet (cyan = couleur des forces de grip)
+            debugComp.addForceArrow(
+              barPoint.clone(),
+              gripForce.clone().multiplyScalar(scale),
+              0x00ffff, // Cyan
+              'grip-force-left'
+            );
+          }
+        }
+      }
+    }
+
+    // Force sur le poignet droit
+    if (rightLine) {
+      const lineComp = rightLine.getComponent('line') as LineComponent | null;
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+        const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
+        
+        if (barPoint) {
+          const barTransform = controlBar.getComponent('transform') as TransformComponent | null;
+          const kiteEntity = entityManager.getEntity('kite');
+          const kiteTransform = kiteEntity?.getComponent('transform') as TransformComponent | null;
+          
+          if (kiteTransform && barTransform) {
+            const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
+            const gripForce = direction.multiplyScalar(lineComp.currentTension);
+
+            // Afficher la force au poignet (cyan)
+            debugComp.addForceArrow(
+              barPoint.clone(),
+              gripForce.clone().multiplyScalar(scale),
+              0x00ffff, // Cyan
+              'grip-force-right'
+            );
+          }
         }
       }
     }
