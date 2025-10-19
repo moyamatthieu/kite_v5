@@ -15,10 +15,11 @@ export const CONFIG = {
     surfaceArea: 0.54, // m² (calculé : 1.65 × 0.65 × 0.5)
     
     // Inertie (approximation delta comme plaque triangulaire)
+    // Valeurs corrigées selon audit physique du 19/10/2025
     inertia: {
-      Ixx: 0.015, // kg⋅m²
-      Iyy: 0.020, // kg⋅m²
-      Izz: 0.005  // kg⋅m²
+      Ixx: 0.0315, // kg⋅m² (pitch - rotation avant/arrière)
+      Iyy: 0.0042, // kg⋅m² (yaw - rotation gauche/droite)
+      Izz: 0.0110  // kg⋅m² (roll - rotation latérale)
     },
     
     // Couleur (rouge comme dans main)
