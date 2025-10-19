@@ -67,6 +67,12 @@ export class GeometryRenderSystem extends System {
         const direction = new THREE.Vector3().subVectors(end, start);
         const length = direction.length();
         
+        // Protection contre longueurs invalides (NaN ou trop petites)
+        if (!Number.isFinite(length) || length < 0.001) {
+          console.warn(`⚠️ [GeometryRenderSystem] Invalid length: ${length}, skipping update`);
+          return;
+        }
+        
         // Si la longueur a changé significativement, recréer la géométrie
         const cylinderGeometry = child.geometry as THREE.CylinderGeometry;
         const currentHeight = cylinderGeometry.parameters.height;
@@ -323,6 +329,12 @@ export class GeometryRenderSystem extends System {
         // Créer un tube cylindrique entre les deux points
         const direction = new THREE.Vector3().subVectors(p2, p1);
         const length = direction.length();
+        
+        // Protection contre longueurs invalides
+        if (!Number.isFinite(length) || length < 0.001) {
+          console.warn(`⚠️ [GeometryRenderSystem] Invalid line length: ${length}, skipping`);
+          return;
+        }
         
         // Géométrie cylindrique
         const tubeGeometry = new THREE.CylinderGeometry(0.003, 0.003, length, 8); // 6mm de diamètre
