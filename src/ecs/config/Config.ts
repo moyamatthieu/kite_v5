@@ -35,7 +35,7 @@ export const CONFIG = {
     // === MODE DE CONTRAINTE ===
     // 'pbd' : Position-Based Dynamics (contraintes géométriques rigides)
     // 'spring-force' : Forces ressort + amortissement (approche physique classique)
-    constraintMode: 'pbd' as 'pbd' | 'spring-force',
+    constraintMode: 'spring-force' as 'pbd' | 'spring-force',
 
     // === PARAMÈTRES PBD ===
     // Utilisés seulement si constraintMode === 'pbd'
@@ -48,9 +48,10 @@ export const CONFIG = {
     // === PARAMÈTRES SPRING-FORCE ===
     // Utilisés seulement si constraintMode === 'spring-force'
     springForce: {
-      stiffness: 500, // N/m - Rigidité du ressort (500 N/m pour kite 120g)
-      damping: 50, // N·s/m - Amortissement visqueux (critique pour stabilité)
-      maxForce: 100, // N - Force maximale appliquée (évite explosions)
+      stiffness: 50, // N/m - Rigidité du ressort (réduit de 500 à 50 pour stabilité)
+      // Calcul: ω = sqrt(k/m) = sqrt(50/0.12) ≈ 20 rad/s (~3 Hz) → Raisonnable
+      damping: 5, // N·s/m - Amortissement visqueux (c_critique ≈ 4.9, donc légèrement sur-amorti)
+      maxForce: 10, // N - Force maximale appliquée (~83× poids kite, limite sécurité)
     }
   },
   
@@ -95,6 +96,14 @@ export const CONFIG = {
     angularDamping: 0.5
   },
   
+  // === PILOTE ===
+  pilot: {
+    mass: 75, // kg - Masse réaliste d'un pilote adulte (utilisé pour référence physique)
+    height: 1.6, // m - Hauteur du pilote
+    width: 0.5, // m - Largeur (épaules)
+    depth: 0.3 // m - Profondeur
+  },
+
   // === INITIALISATION ===
   // Système de coordonnées Three.js :
   // X = droite/gauche, Y = haut/bas, Z = devant/derrière (vent vient de -Z)

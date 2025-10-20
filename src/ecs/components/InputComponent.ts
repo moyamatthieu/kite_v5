@@ -46,7 +46,7 @@ export class InputComponent extends Component {
     this.windTurbulence = initialValues.windTurbulence ?? 10; // %
 
     // Lignes
-    this.constraintMode = initialValues.constraintMode ?? 'pbd';
+    this.constraintMode = initialValues.constraintMode ?? 'spring-force';
     this.lineLength = initialValues.lineLength ?? 150; // m
     this.bridleNez = initialValues.bridleNez ?? 1.5; // m
     this.bridleInter = initialValues.bridleInter ?? 2.0; // m

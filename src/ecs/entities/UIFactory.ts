@@ -21,6 +21,9 @@ export class UIFactory {
         bridleNez: CONFIG.bridles.nez,
         bridleInter: CONFIG.bridles.inter,
         bridleCentre: CONFIG.bridles.centre,
+        
+        // === Mode de contrainte ===
+        constraintMode: CONFIG.lines.constraintMode,
 
         // === Physique ===
         linearDamping: CONFIG.physics.linearDamping,

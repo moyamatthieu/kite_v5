@@ -61,16 +61,8 @@ export class SimulationApp {
     this.createEntities();
     this.createSystems();
     
-    // Attacher le canvas du RenderSystem au DOM
-    const renderSystem = this.systemManager.getSystem('RenderSystem') as RenderSystemType | undefined;
-    if (renderSystem?.getCanvas) {
-      const rendererCanvas = renderSystem.getCanvas();
-      // Remplacer le canvas existant
-      if (this.canvas.parentElement) {
-        this.canvas.parentElement.replaceChild(rendererCanvas, this.canvas);
-      }
-      rendererCanvas.id = 'simulation-canvas';
-    }
+    // Le canvas est déjà attaché au DOM dans createSystems()
+    // avant la création des OrbitControls
     
     await this.systemManager.initializeAll(this.entityManager);
     
@@ -137,13 +129,21 @@ export class SimulationApp {
     const scene = renderSystem.scene;
     const camera = renderSystem.camera;
 
+    // CRITIQUE : Attacher le canvas au DOM AVANT de créer les OrbitControls
+    // Les OrbitControls attachent leurs event listeners lors de la construction
+    const rendererCanvas = renderSystem.getCanvas();
+    if (this.canvas.parentElement) {
+      this.canvas.parentElement.replaceChild(rendererCanvas, this.canvas);
+    }
+    rendererCanvas.id = 'simulation-canvas';
+
     // Créer DebugSystem (on passera le renderSystem après)
     const debugSystem = new DebugSystem();
 
     // Ajouter les systèmes dans l'ordre de priorité
     this.systemManager.add(new EnvironmentSystem(scene)); // Priority 1
     this.systemManager.add(
-      new CameraControlsSystem(renderSystem.getCanvas(), camera)
+      new CameraControlsSystem(rendererCanvas, camera)
     ); // Priority 1 (bis)
     this.systemManager.add(new InputSyncSystem()); // Priority 5 - Synchronise UI → Composants
     this.systemManager.add(new BridleConstraintSystem()); // Priority 10 - Met à jour positions des brides via trilatération

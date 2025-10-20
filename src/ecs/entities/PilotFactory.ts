@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 import { Entity } from '../core/Entity';
 import { TransformComponent, MeshComponent, PilotComponent } from '../components';
+import { CONFIG } from '../config/Config';
 
 export class PilotFactory {
   /**
@@ -18,9 +19,10 @@ export class PilotFactory {
     const entity = new Entity('pilot');
     
     // === DIMENSIONS ===
-    const width = 0.5;   // Largeur (épaules)
-    const height = 1.6;  // Hauteur (taille humaine)
-    const depth = 0.3;   // Profondeur
+    // Utilise les dimensions de la configuration
+    const width = CONFIG.pilot.width;   // 0.5m - Largeur (épaules)
+    const height = CONFIG.pilot.height; // 1.6m - Hauteur (taille humaine)
+    const depth = CONFIG.pilot.depth;   // 0.3m - Profondeur
     
     // === TRANSFORM ===
     // Positionné à l'origine avec les pieds au sol
@@ -46,6 +48,8 @@ export class PilotFactory {
     
     // === PILOT ===
     // Composant pour le retour haptique
+    // Note: La masse du pilote (CONFIG.pilot.mass = 75 kg) est disponible
+    // pour référence mais n'est pas utilisée ici car le pilote est fixe au sol
     entity.addComponent(new PilotComponent());
     
     return entity;

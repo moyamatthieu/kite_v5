@@ -17,6 +17,7 @@ import { EntityManager } from '../core/EntityManager';
 export class CameraControlsSystem extends System {
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
+  private canvas: HTMLCanvasElement;
   // Variables de logging (désactivées en production)
   // private lastLoggedPosition = new THREE.Vector3();
   // private lastLoggedTarget = new THREE.Vector3();
@@ -26,9 +27,11 @@ export class CameraControlsSystem extends System {
   constructor(canvas: HTMLCanvasElement, camera: THREE.PerspectiveCamera) {
     super('CameraControlsSystem', 1); // Très haute priorité
     this.camera = camera;
+    this.canvas = canvas;
 
     this.controls = new OrbitControls(camera, canvas);
     this.setupControls();
+    this.setupCanvasEvents();
     
     // Log position initiale (désactivé en production)
     // console.log('📷 Camera position initiale:', this.camera.position);
@@ -51,6 +54,22 @@ export class CameraControlsSystem extends System {
     // Cet avertissement n'affecte pas les performances dans notre cas d'usage.
     
     this.controls.update();
+  }
+
+  /**
+   * Configure les événements du canvas pour permettre les contrôles de la souris
+   */
+  private setupCanvasEvents(): void {
+    // Désactiver le menu contextuel par défaut pour permettre le clic droit
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    // Rendre le canvas focusable pour capturer les événements clavier
+    this.canvas.setAttribute('tabindex', '0');
+    
+    // Focus automatique pour capturer immédiatement les événements
+    this.canvas.focus();
   }
 
   initialize(_entityManager: EntityManager): void {

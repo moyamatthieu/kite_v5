@@ -441,15 +441,20 @@ export class ConstraintSystem extends System {
     // Composante radiale de la vitesse (le long de la ligne)
     const radialVelocity = pointVelocity.dot(direction);
 
-    // Force d'amortissement : F_damp = -c × v_radial
-    const dampingForce = damping * radialVelocity;
+    // Force d'amortissement : F_damp = -c × v_radial (NÉGATIF pour s'opposer au mouvement)
+    const dampingForce = -damping * radialVelocity;
 
     // Force totale
     let totalForce = springForce + dampingForce;
 
-    // Limiter la force
-    if (totalForce > maxForce) {
-      totalForce = maxForce;
+    // Limiter la force (en valeur absolue pour gérer compression et tension)
+    if (Math.abs(totalForce) > maxForce) {
+      totalForce = Math.sign(totalForce) * maxForce;
+    }
+    
+    // Contrainte unilatérale : ne garder que les forces de tension (positives)
+    if (totalForce < 0) {
+      totalForce = 0;
     }
 
     // Stocker la tension
