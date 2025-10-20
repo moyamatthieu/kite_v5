@@ -72,7 +72,7 @@ export class SimulationApp {
   /**
    * Crée les entités de la simulation
    */
-  private createEntities(): void {
+  private createEntities(savedInputValues?: any): void {
     const controlBarPos = CONFIG.initialization.controlBarPosition.clone();
     
     // Position du kite calculée depuis controlBar
@@ -112,7 +112,7 @@ export class SimulationApp {
     this.entityManager.register(kite);
 
     // UI Entity
-    const ui = UIFactory.create();
+    const ui = UIFactory.create(savedInputValues);
     this.entityManager.register(ui);
     
     // Debug Entity (pour la visualisation des vecteurs)
@@ -261,6 +261,33 @@ export class SimulationApp {
     // Sauvegarder l'état pause AVANT de reset
     const wasPaused = this.paused;
 
+    // ✨ SAUVEGARDER LES VALEURS UI AVANT DE SUPPRIMER LES ENTITÉS ✨
+    let savedInputValues: any = null;
+    const oldUiEntity = this.entityManager.query(['Input'])[0];
+    if (oldUiEntity) {
+      const oldInput = oldUiEntity.getComponent('Input') as any;
+      if (oldInput) {
+        // Sauvegarder TOUS les paramètres importants
+        savedInputValues = {
+          windSpeed: oldInput.windSpeed,
+          windDirection: oldInput.windDirection,
+          windTurbulence: oldInput.windTurbulence,
+          lineLength: oldInput.lineLength,
+          bridleNez: oldInput.bridleNez,
+          bridleInter: oldInput.bridleInter,
+          bridleCentre: oldInput.bridleCentre,
+          constraintMode: oldInput.constraintMode, // ✨ IMPORTANT : sauvegarder le mode !
+          linearDamping: oldInput.linearDamping,
+          angularDamping: oldInput.angularDamping,
+          meshSubdivisionLevel: oldInput.meshSubdivisionLevel,
+          liftScale: oldInput.liftScale,
+          dragScale: oldInput.dragScale,
+          forceSmoothing: oldInput.forceSmoothing,
+          debugMode: oldInput.debugMode
+        };
+      }
+    }
+
     // Nettoyer l'état du rendu AVANT de supprimer les entités
     const renderSystem = this.systemManager.getSystem('RenderSystem') as any;
     if (renderSystem && renderSystem.resetRenderState) {
@@ -277,8 +304,8 @@ export class SimulationApp {
     const entities = this.entityManager.getAllEntities();
     entities.forEach(entity => this.entityManager.removeEntity(entity.id));
     
-    // Recréer les entités
-    this.createEntities();
+    // Recréer les entités avec les valeurs sauvegardées
+    this.createEntities(savedInputValues);
     
     // Ré-initialiser les systèmes avec les nouvelles entités
     await this.systemManager.initializeAll(this.entityManager);
