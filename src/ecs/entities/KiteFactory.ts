@@ -99,21 +99,21 @@ export class KiteFactory {
       geometry.addConnection(conn.from, conn.to);
     });
 
-    // Déclarer les surfaces triangulaires de la toile
-    // ⚠️ ORDRE DES VERTICES = DIRECTION DE LA NORMALE (règle main droite)
-    // WHISKERS à Z=-0.15 (arrière) → calcul vectoriel pour normale +Z (avant)
-    // 
-    // CÔTÉ GAUCHE (calcul vérifié manuellement):
-    // Surface 0 (leftUpper): NEZ → BORD_GAUCHE → WHISKER_GAUCHE → normale Z=+0.14 ✓
-    geometry.addSurface(['NEZ', 'BORD_GAUCHE', 'WHISKER_GAUCHE']); 
-    // Surface 1 (leftLower): NEZ → WHISKER_GAUCHE → SPINE_BAS → normale Z=+0.27 ✓
-    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'SPINE_BAS']);
+    // === SURFACES DU KITE ===
+    // ⚠️ IMPORTANT : L'ordre des vertices détermine l'orientation de la normale (règle main droite)
+    // Toutes les normales doivent pointer vers Z- (vers l'arrière du kite)
     
-    // CÔTÉ DROIT (symétrie inversée!):
-    // Surface 2 (rightUpper): NEZ → WHISKER_DROIT → BORD_DROIT → normale Z=+0.14 ✓
-    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'BORD_DROIT']);
-    // Surface 3 (rightLower): NEZ → SPINE_BAS → WHISKER_DROIT → normale Z=+0.27 ✓
-    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_DROIT']);
+    // Face 1 (leftUpper) : ordre inversé pour normale Z-
+    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE']); 
+
+    // Face 2 (leftLower) : ordre inversé pour normale Z-
+    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE']);
+    
+    // Face 3 (rightUpper) : ordre inversé pour normale Z-
+    geometry.addSurface(['NEZ', 'BORD_DROIT', 'WHISKER_DROIT']);
+    
+    // Face 4 (rightLower) : ordre inversé pour normale Z-
+    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'SPINE_BAS']);
     
     entity.addComponent(geometry);
   }
