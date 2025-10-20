@@ -31,7 +31,8 @@ import {
   EnvironmentSystem,
   CameraControlsSystem,
   UISystem,
-  DebugSystem
+  DebugSystem,
+  SimulationLogger,
 } from './systems';
 import { CONFIG } from './config/Config';
 import type { SimulationContext } from './core/System';
@@ -151,6 +152,7 @@ export class SimulationApp {
     this.systemManager.add(new WindSystem()); // Priority 20
     this.systemManager.add(new AeroSystem()); // Priority 30
     this.systemManager.add(new ConstraintSystem()); // Priority 40 - AVANT PhysicsSystem
+    this.systemManager.add(new SimulationLogger()); // Priority 45 - APRÈS ConstraintSystem, AVANT PhysicsSystem
     this.systemManager.add(new PhysicsSystem()); // Priority 50 - LIT forces accumulées
     this.systemManager.add(new PilotSystem()); // Priority 55
     this.systemManager.add(new LineRenderSystem()); // Priority 55 (bis)

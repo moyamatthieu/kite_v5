@@ -20,3 +20,5 @@ export { CameraControlsSystem } from './CameraControlsSystem';
 export { UISystem } from './UISystem';
 export { PilotSystem } from './PilotSystem';
 export { DebugSystem } from './DebugSystem';
+export { SimulationLogger } from './SimulationLogger';
+export { SimulationLoggerHelper } from './SimulationLoggerHelper';
