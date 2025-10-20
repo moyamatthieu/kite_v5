@@ -18,6 +18,7 @@ import {
 } from '../components';
 import { CONFIG } from '../config/Config';
 import { KiteGeometry } from '../config/KiteGeometry';
+import { KiteSurfaceDefinitions } from '../config/KiteSurfaceDefinition';
 import { MathUtils } from '../utils/MathUtils';
 
 export class KiteFactory {
@@ -100,20 +101,11 @@ export class KiteFactory {
     });
 
     // === SURFACES DU KITE ===
-    // ⚠️ IMPORTANT : L'ordre des vertices détermine l'orientation de la normale (règle main droite)
-    // Toutes les normales doivent pointer vers Z- (vers l'arrière du kite)
-    
-    // Face 1 (leftUpper) : ordre inversé pour normale Z-
-    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE']); 
-
-    // Face 2 (leftLower) : ordre inversé pour normale Z-
-    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE']);
-    
-    // Face 3 (rightUpper) : ordre inversé pour normale Z-
-    geometry.addSurface(['NEZ', 'BORD_DROIT', 'WHISKER_DROIT']);
-    
-    // Face 4 (rightLower) : ordre inversé pour normale Z-
-    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'SPINE_BAS']);
+    // ✨ ARCHITECTURE: Utiliser KiteSurfaceDefinitions pour éviter la duplication
+    // La source unique de vérité pour l'ordre des vertices est centralisée là-bas
+    KiteSurfaceDefinitions.getAll().forEach(surfaceDefinition => {
+      geometry.addSurface(surfaceDefinition.points);
+    });
     
     entity.addComponent(geometry);
   }
@@ -155,21 +147,12 @@ export class KiteFactory {
    * Ajoute le composant Aerodynamics avec coefficients aérodynamiques
    */
   private static addAerodynamicsComponent(entity: Entity): void {
-    // ✨ CORRECTION: L'ordre des vertices DOIT correspondre exactement à addGeometryComponent
-    // sinon la normale triangulaire sera inversée et les forces aéro seront calculées dans la mauvaise direction
-    const aeroSurfaces = [
-      // Face 1 (leftUpper) : ORDRE CORRIGÉ pour correspondre à geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE'])
-      { name: 'leftUpper', points: ['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE'] as [string, string, string] },
-      
-      // Face 2 (leftLower) : ORDRE CORRIGÉ pour correspondre à geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE'])
-      { name: 'leftLower', points: ['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE'] as [string, string, string] },
-      
-      // Face 3 (rightUpper) : Order correct
-      { name: 'rightUpper', points: ['NEZ', 'BORD_DROIT', 'WHISKER_DROIT'] as [string, string, string] },
-      
-      // Face 4 (rightLower) : Order correct
-      { name: 'rightLower', points: ['NEZ', 'WHISKER_DROIT', 'SPINE_BAS'] as [string, string, string] }
-    ];
+    // ✨ ARCHITECTURE: Utiliser KiteSurfaceDefinitions pour éviter la duplication
+    // La source unique de vérité pour l'ordre des vertices est centralisée là-bas
+    const aeroSurfaces = KiteSurfaceDefinitions.getAll().map(surfaceDefinition => ({
+      name: surfaceDefinition.id,
+      points: surfaceDefinition.points
+    }));
 
     entity.addComponent(new AerodynamicsComponent({
       coefficients: {
