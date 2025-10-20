@@ -1,24 +1,58 @@
 /**
- * ConstraintSystem.ts - Gestion des contraintes de lignes (PBD + Spring-Force)
+ * ConstraintSystem.ts - Dual-Mode Line Constraint Resolution
  *
- * DUAL MODE CONSTRAINT SYSTEM :
+ * This system implements two different constraint solving strategies for kite lines:
+ * 
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                    DUAL MODE ARCHITECTURE                        │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │                                                                   │
+ * │  1. PBD MODE (Position-Based Dynamics)                          │
+ * │     ─────────────────────────────────────────                   │
+ * │     Strategy: Direct position constraint + force-based torque   │
+ * │                                                                   │
+ * │     Algorithm:                                                   │
+ * │     ┌─ Step 1: Calculate line elongation                        │
+ * │     │  delta = distance - restLength                            │
+ * │     │                                                             │
+ * │     ├─ Step 2: Apply line forces (creates torque)               │
+ * │     │  F = k × delta  (spring force magnitude)                  │
+ * │     │  τ = r × F      (torque = lever × force)                  │
+ * │     │  forces += F, torques += τ                                │
+ * │     │                                                             │
+ * │     └─ Step 3: Project position (hard constraint)               │
+ * │        if distance > restLength:                                │
+ * │          project kite closer by distance excess                 │
+ * │                                                                   │
+ * │     Properties: Rigid, stable, high-speed, ball-joint pivots    │
+ * │                                                                   │
+ * │  2. SPRING-FORCE MODE (Classic Spring Physics)                 │
+ * │     ──────────────────────────────────────────                  │
+ * │     Strategy: Pure spring-damper forces on CTRL points          │
+ * │                                                                   │
+ * │     Algorithm:                                                   │
+ * │     ┌─ Calculate extension: delta = distance - restLength       │
+ * │     ├─ Spring force: F_spring = k × delta                       │
+ * │     ├─ Damping force: F_damp = -c × v_radial                   │
+ * │     ├─ Apply force to CTRL point                                │
+ * │     │  forces += (F_spring + F_damp) × direction                │
+ * │     └─ Torque: τ = r × F (automatic from PhysicsSystem)        │
+ * │                                                                   │
+ * │     Properties: Soft, responsive, intuitive, adjustable         │
+ * │                                                                   │
+ * │  Mode Selection: InputComponent.constraintMode                  │
+ * │  System Priority: 40 (after AeroSystem 30, before Physics 50)  │
+ * │                                                                   │
+ * └─────────────────────────────────────────────────────────────────┘
  *
- * 1. PBD (Position-Based Dynamics) - Architecture inspirée du legacy :
- *    - Sauvegarder l'état initial (position, quaternion)
- *    - Calculer positions monde CTRL avec état initial
- *    - Itérer pour résoudre les 2 contraintes ensemble (Gauss-Seidel)
- *    - Appliquer les corrections finales une seule fois
- *    - Avantages : Rigide, stable, pas d'oscillations
+ * ARCHITECTURE COMPLIANCE:
+ * ✓ Pure ECS: No logic in components, all state in PhysicsComponent
+ * ✓ Separation of concerns: Constraints (geometry) + Physics (dynamics)
+ * ✓ System ordering: AeroSystem → ConstraintSystem → PhysicsSystem
+ * ✓ Stateless: Frame-independent, no accumulated state
  *
- * 2. Spring-Force (Forces ressort classiques) :
- *    - Calculer extension de chaque ligne
- *    - Appliquer force F = -k × extension - c × vitesse
- *    - Distribuer force/torque selon point d'attache
- *    - Avantages : Physique intuitive, tuneable
- *
- * Le mode est sélectionné via InputComponent.constraintMode
- *
- * Priorité 40 (AVANT PhysicsSystem 50, APRÈS AeroSystem 30)
+ * @class ConstraintSystem
+ * @extends System
  */
 
 import * as THREE from 'three';
