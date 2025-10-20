@@ -39,6 +39,10 @@ export class AeroSystem extends System {
   private previousForces = new Map<string, THREE.Vector3>(); // entityId -> force lissée
   private previousTorques = new Map<string, THREE.Vector3>(); // entityId -> couple lissé
 
+  // Debug: activer pour logger les informations sur chaque face
+  private debugFaces = false;
+  private debugFrameCounter = 0;
+
   constructor() {
     const PRIORITY = 30;
     super('AeroSystem', PRIORITY);
@@ -82,8 +86,15 @@ export class AeroSystem extends System {
       // ========================================================================
       // CALCUL PAR FACE - Application directe des forces au niveau des faces
       // ========================================================================
-      // NOTE : Les forces ne sont plus accumulées dans physics.forces ici
-      // Chaque face génère un couple via son bras de levier depuis le centre de masse
+      // Traitement des 4 faces du cerf-volant (leftUpper, leftLower, rightUpper, rightLower)
+      // Chaque face reçoit ses propres forces aérodynamiques basées sur:
+      // - Sa normale (orientation de la surface)
+      // - Son angle d'attaque local (selon le vent apparent local)
+      // - Sa position (pour le calcul du couple)
+      // 
+      // L'orientation automatique de la portance (via dot product) garantit
+      // que toutes les faces contribuent correctement, qu'elles soient initialement
+      // orientées vers l'avant ou vers l'arrière.
       surfaceSamples.forEach(sample => {
         // 1. Vitesse locale du centroïde (translation + rotation)
         const leverArm = sample.centroid.clone().sub(transform.position);
@@ -127,6 +138,18 @@ export class AeroSystem extends System {
         // === DRAG (Traînée) : parallèle au vent ===
         // Tire le kite dans la direction du vent apparent
         const dragDir = localWindDir.clone();
+
+        // Debug: Logger les informations de chaque face (1 fois par seconde)
+        if (this.debugFaces && this.debugFrameCounter % 60 === 0) {
+          const dotNW = surfaceNormal.dot(localWindDir);
+          const isFlipped = dotNW < 0;
+          console.log(`[AeroSystem] Face: ${sample.descriptor.name}`);
+          console.log(`  Normal: (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
+          console.log(`  Wind: (${localWindDir.x.toFixed(2)}, ${localWindDir.y.toFixed(2)}, ${localWindDir.z.toFixed(2)})`);
+          console.log(`  Dot product: ${dotNW.toFixed(3)} ${isFlipped ? '(FLIPPED)' : '(OK)'}`);
+          console.log(`  Lift dir: (${liftDir.x.toFixed(2)}, ${liftDir.y.toFixed(2)}, ${liftDir.z.toFixed(2)})`);
+          console.log(`  Alpha: ${alpha.toFixed(1)}° | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
+        }
 
         // 7. Forces locales avec orientation correcte + application des scales UI
         const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
@@ -179,6 +202,9 @@ export class AeroSystem extends System {
       // (Gravité n'est plus appliquée globalement - elle l'est par face ci-dessus)
       // ========================================================================
     });
+
+    // Incrémenter le compteur debug pour le logging périodique
+    this.debugFrameCounter++;
   }
 
   private getSurfaceSamples(aero: AerodynamicsComponent, geometry: GeometryComponent, entity: Entity): SurfaceSample[] {
@@ -233,6 +259,14 @@ export class AeroSystem extends System {
   /**
    * Calcule la normale d'un triangle (règle de la main droite : (b-a) × (c-a))
    * ✨ MAKANI-INSPIRED: Utilisée pour l'orientation des forces aérodynamiques
+   * 
+   * IMPORTANT: L'orientation de la normale dépend de l'ordre des vertices:
+   * - Sens anti-horaire vu de face → normale pointe vers l'avant
+   * - Sens horaire vu de face → normale pointe vers l'arrière
+   * 
+   * Pour le cerf-volant, toutes les 4 faces (leftUpper, leftLower, rightUpper, rightLower)
+   * doivent avoir leurs vertices ordonnés de manière cohérente pour que leurs normales
+   * pointent toutes vers l'avant (face au vent) initialement.
    */
   private computeTriangleNormal(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): THREE.Vector3 {
     const ab = new THREE.Vector3().subVectors(b, a);
@@ -250,6 +284,13 @@ export class AeroSystem extends System {
    * - Drag = composante parallèle au vent
    * - Les coefficients CL et CD dosent l'intensité de chaque force
    * 
+   * Cette méthode fonctionne pour TOUTES les faces du cerf-volant:
+   * - leftUpper et rightUpper (faces supérieures gauche/droite)
+   * - leftLower et rightLower (faces inférieures gauche/droite)
+   * 
+   * L'orientation automatique (dot product) garantit que la normale pointe
+   * toujours face au vent, quelle que soit l'orientation initiale de la face.
+   * 
    * @param surfaceNormal - Normale de la surface (unitaire)
    * @param windDir - Direction du vent apparent (unitaire)
    * @returns Direction du lift = normale orientée face au vent
@@ -257,6 +298,7 @@ export class AeroSystem extends System {
   private calculateLiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 {
     // S'assurer que la normale pointe face au vent
     // Si normale·vent < 0, la normale pointe dans le sens opposé au vent → inverser
+    // Cela fonctionne automatiquement pour toutes les faces (internes et externes)
     const dotNW = surfaceNormal.dot(windDir);
     return dotNW < 0 ? surfaceNormal.clone().negate() : surfaceNormal.clone();
   }
