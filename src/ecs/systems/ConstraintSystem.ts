@@ -188,28 +188,11 @@ export class ConstraintSystem extends System {
     kiteTransform.position.copy(correctedPosition);
     kiteTransform.quaternion.copy(correctedQuaternion);
 
-    // 🔧 SYNCHRONISATION CRITIQUE: Les CTRL doivent être recalculés après la correction PBD
-    // car la rotation du kite invalide leurs positions locales précédentes.
-    // Forcer une recalculation en marquant comme changées (pour BridleConstraintSystem)
-    const bridle = kite.getComponent<any>('bridle');
-    if (bridle && kiteGeometry) {
-      // Marquer les longueurs comme étant "changées" pour forcer la trilatération
-      // dans la prochaine frame (via BridleConstraintSystem)
-      // Pour l'instant, on met simplement à jour les positions CTRL de manière simple :
-      // projeter les anciennes positions CTRL vers les nouvelles pour garder la continuité
-      const ctrlGaucheOld = kiteGeometry.getPoint('CTRL_GAUCHE');
-      const ctrlDroitOld = kiteGeometry.getPoint('CTRL_DROIT');
-      
-      if (ctrlGaucheOld && ctrlDroitOld) {
-        // Appliquer la même transformation (rotation + translation) aux CTRL
-        // pour les garder au même endroit relatif
-        ctrlGaucheOld.applyQuaternion(deltaQuaternion).add(deltaPosition);
-        ctrlDroitOld.applyQuaternion(deltaQuaternion).add(deltaPosition);
-        
-        kiteGeometry.setPoint('CTRL_GAUCHE', ctrlGaucheOld);
-        kiteGeometry.setPoint('CTRL_DROIT', ctrlDroitOld);
-      }
-    }
+    // ✅ ARCHITECTURE ECS PURE : Les points CTRL locaux restent INCHANGÉS
+    // Seuls position/quaternion du kite changent. Les positions WORLD des CTRL
+    // seront automatiquement correctes via getPointWorld() qui applique le transform.
+    // Les points CTRL locaux ne sont modifiés QUE par BridleConstraintSystem
+    // lors des changements de longueurs de brides.
 
     // Amortir les vitesses (projection)
     this.dampVelocities(kitePhysics, deltaPosition, deltaQuaternion, deltaTime);
