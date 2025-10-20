@@ -40,8 +40,10 @@ export class InputSystem extends System {
     // Aucune touche = 0 (neutre)
     if (this.keys.has('arrowleft') || this.keys.has('q')) {
       inputComp.barRotationInput = 1;
+      console.log('🎮 InputSystem: ArrowLeft/Q pressed → barRotationInput = 1');
     } else if (this.keys.has('arrowright') || this.keys.has('d')) {
       inputComp.barRotationInput = -1;
+      console.log('🎮 InputSystem: ArrowRight/D pressed → barRotationInput = -1');
     } else {
       inputComp.barRotationInput = 0;
     }

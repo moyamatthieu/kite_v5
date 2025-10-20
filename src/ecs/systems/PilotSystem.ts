@@ -175,14 +175,23 @@ export class PilotSystem extends System {
   private updateBarRotation(entityManager: EntityManager, deltaTime: number): void {
     // Récupérer l'input de rotation depuis InputComponent
     const uiEntity = entityManager.query(['Input'])[0];
-    if (!uiEntity) return;
+    if (!uiEntity) {
+      console.error('❌ PilotSystem: No entity with Input component found!');
+      return;
+    }
 
     const inputComp = uiEntity.getComponent<InputComponent>('Input');
-    if (!inputComp) return;
+    if (!inputComp) {
+      console.error('❌ PilotSystem: InputComponent not found on entity!');
+      return;
+    }
 
     // Récupérer la barre de contrôle
     const controlBar = entityManager.getEntity('controlBar');
-    if (!controlBar) return;
+    if (!controlBar) {
+      console.error('❌ PilotSystem: controlBar entity not found!');
+      return;
+    }
 
     const barTransform = controlBar.getComponent<TransformComponent>('transform');
     if (!barTransform) return;
@@ -197,6 +206,8 @@ export class PilotSystem extends System {
 
     // Mettre à jour l'angle de rotation selon l'input (-1, 0, ou 1)
     const rotationInput = inputComp.barRotationInput;
+    console.log('🎯 PilotSystem: rotationInput =', rotationInput, 'barRotationAngle =', this.barRotationAngle.toFixed(1));
+    
     if (rotationInput !== 0) {
       // Appliquer la rotation progressive
       const rotationDelta = rotationInput * this.ROTATION_SPEED * deltaTime;
@@ -204,6 +215,7 @@ export class PilotSystem extends System {
         -this.MAX_ROTATION_ANGLE,
         Math.min(this.MAX_ROTATION_ANGLE, this.barRotationAngle + rotationDelta)
       );
+      console.log('🔄 PilotSystem: Rotation applied → new angle =', this.barRotationAngle.toFixed(1));
     } else {
       // Retour progressif au centre quand aucun input
       const RETURN_SPEED_FACTOR = 2.0;
