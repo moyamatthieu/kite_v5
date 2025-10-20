@@ -114,21 +114,38 @@ export class AeroSystem extends System {
         const q = DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
 
         // 6. ✨ CERF-VOLANT PHYSICS: Forces perpendiculaires et parallèles au VENT APPARENT
-        // Aérodynamique standard :
-        // - Lift (portance) = perpendiculaire au vent apparent
+        // Aérodynamique standard pour cerf-volant:
+        // - Lift (portance) = perpendiculaire au vent apparent, direction basée sur l'orientation de la face
         // - Drag (traînée) = parallèle au vent apparent
         //
-        // La portance monte le kite, la traînée le tire dans la direction du vent
+        // La portance émerge naturellement de la géométrie sans correction artificielle
         
         // === LIFT (Portance) : perpendiculaire au vent apparent ===
-        // Direction : normale au vent apparent dans le plan vertical
-        // On projette la normale de surface dans le plan perpendiculaire au vent
-        const windCrossNormal = new THREE.Vector3().crossVectors(localWindDir, surfaceNormal);
-        const liftDir = new THREE.Vector3().crossVectors(windCrossNormal, localWindDir).normalize();
+        // Utilise la projection de la normale dans le plan perpendiculaire au vent
+        const liftDir = this.calculateLiftDirection(surfaceNormal, localWindDir);
         
-        // Assurer que le lift pointe vers le haut (composante Y positive)
-        if (liftDir.y < 0) {
-          liftDir.negate();
+        // Si le vent est parallèle à la surface, pas de portance
+        if (!liftDir) {
+          // Seule la traînée s'applique (vent glisse sur la surface)
+          const panelDrag = localWindDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
+          const gravityPerFace = this.gravity.clone().multiplyScalar((physics.mass * sample.area) / kiteComp.surfaceArea);
+          
+          this.addForce(physics, panelDrag);
+          this.addForce(physics, gravityPerFace);
+          
+          const leverArm = sample.centroid.clone().sub(transform.position);
+          const panelForce = panelDrag.clone().add(gravityPerFace);
+          const panelTorque = new THREE.Vector3().crossVectors(leverArm, panelForce);
+          this.addTorque(physics, panelTorque);
+          
+          physics.faceForces.push({
+            centroid: sample.centroid,
+            lift: new THREE.Vector3(),
+            drag: panelDrag,
+            gravity: gravityPerFace,
+            apparentWind: localApparentWind
+          });
+          return;
         }
         
         // === DRAG (Traînée) : parallèle au vent ===
@@ -245,6 +262,42 @@ export class AeroSystem extends System {
     const ab = new THREE.Vector3().subVectors(b, a);
     const ac = new THREE.Vector3().subVectors(c, a);
     return new THREE.Vector3().crossVectors(ab, ac).normalize();
+  }
+  
+  /**
+   * Calcule la direction de la portance (lift) correctement orientée
+   * ✨ PHYSIQUE PURE: La portance est perpendiculaire au vent apparent et suit l'orientation de la face
+   * 
+   * Algorithme:
+   * 1. Orienter la normale face au vent (si nécessaire)
+   * 2. Projeter la normale dans le plan perpendiculaire au vent: L = n - (n·w)w
+   * 3. Normaliser le résultat
+   * 
+   * @param surfaceNormal - Normale de la surface (unitaire)
+   * @param windDir - Direction du vent apparent (unitaire)
+   * @returns Direction du lift (unitaire) ou null si vent parallèle à la surface
+   */
+  private calculateLiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 | null {
+    // 1. S'assurer que la normale pointe face au vent
+    // Si normale·vent < 0, la normale pointe dans le sens opposé au vent → inverser
+    const dotNW = surfaceNormal.dot(windDir);
+    const windFacingNormal = dotNW < 0 ? surfaceNormal.clone().negate() : surfaceNormal.clone();
+    
+    // 2. Projeter la normale dans le plan perpendiculaire au vent
+    // Formule: L = n - (n·w)w
+    // Cette projection garantit que L ⊥ w (preuve: L·w = n·w - (n·w)(w·w) = 0)
+    const dotProjection = windFacingNormal.dot(windDir);
+    const liftDir = windFacingNormal.clone().sub(windDir.clone().multiplyScalar(dotProjection));
+    
+    // 3. Vérifier si le vent est parallèle à la surface (pas de portance)
+    const liftMagnitude = liftDir.length();
+    const PARALLEL_THRESHOLD = 0.01; // ~0.57° d'angle minimal
+    if (liftMagnitude < PARALLEL_THRESHOLD) {
+      return null; // Vent glisse sur la surface
+    }
+    
+    // 4. Normaliser et retourner
+    return liftDir.normalize();
   }
   
   /**
