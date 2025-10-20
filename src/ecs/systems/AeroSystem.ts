@@ -19,11 +19,7 @@ import { GeometryComponent } from '../components/GeometryComponent';
 import { InputComponent } from '../components/InputComponent';
 
 import { WindState } from './WindSystem';
-
-// Constantes physiques
-const GRAVITY_ACCELERATION = -9.81; // m/s² (vers le bas)
-const DYNAMIC_PRESSURE_COEFF = 0.5; // Coefficient de pression dynamique
-const OSWALD_EFFICIENCY = 0.8; // Efficacité typique profil delta
+import { PhysicsConstants, AeroConfig, DebugConfig } from '../config/Config';
 
 interface SurfaceSample {
   descriptor: AeroSurfaceDescriptor;
@@ -33,7 +29,7 @@ interface SurfaceSample {
 }
 
 export class AeroSystem extends System {
-  private readonly gravity = new THREE.Vector3(0, GRAVITY_ACCELERATION, 0); // Y est vertical dans Three.js
+  private readonly gravity = new THREE.Vector3(0, -PhysicsConstants.GRAVITY, 0); // Y est vertical dans Three.js
 
   // Debug: activer pour logger les informations sur chaque face
   private debugFaces = false;
@@ -92,7 +88,7 @@ export class AeroSystem extends System {
       // orientées vers l'avant ou vers l'arrière.
       surfaceSamples.forEach((sample, index) => {
         // Debug: Afficher l'orientation du kite (1 fois par seconde, 1ère face seulement)
-        if (this.debugFaces && this.debugFrameCounter % 60 === 0 && index === 0) {
+        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0 && index === 0) {
           const euler = new THREE.Euler().setFromQuaternion(transform.quaternion, 'XYZ');
           console.log(`[AeroSystem] 🪁 Orientation kite: pitch=${(euler.x * 180/Math.PI).toFixed(1)}° yaw=${(euler.y * 180/Math.PI).toFixed(1)}° roll=${(euler.z * 180/Math.PI).toFixed(1)}°`);
         }
@@ -106,8 +102,7 @@ export class AeroSystem extends System {
         const localApparentWind = wind.ambient.clone().sub(localVelocity);
         const localWindSpeed = localApparentWind.length();
 
-        const MINIMUM_WIND_SPEED = 0.01;
-        if (localWindSpeed < MINIMUM_WIND_SPEED) return;
+        if (localWindSpeed < 0.01) return;
 
         const localWindDir = localApparentWind.clone().normalize();
 
@@ -151,7 +146,7 @@ export class AeroSystem extends System {
         const CD = this.calculateCD(aero, CL, kiteComp.aspectRatio);
 
         // 5. Pression dynamique locale
-        const q = DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
+        const q = AeroConfig.DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
 
         // 6. ✨ CERF-VOLANT PHYSICS: Forces pour surface plane
         // Pour un cerf-volant (surface plane sans profil aérodynamique):
@@ -169,7 +164,7 @@ export class AeroSystem extends System {
         const dragDir = localWindDir.clone();
 
         // Debug: Logger les informations de chaque face (1 fois par seconde)
-        if (this.debugFaces && this.debugFrameCounter % 60 === 0) {
+        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
           const alphaDeg = Math.acos(Math.min(1, dotNW)) * 180 / Math.PI;
           console.log(`[AeroSystem] Face: ${sample.descriptor.name}`);
           console.log(`  Normal (monde): (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
@@ -315,7 +310,7 @@ export class AeroSystem extends System {
   private calculateCD(aero: AerodynamicsComponent, CL: number, aspectRatio: number): number {
     const CD0 = aero.coefficients.CD;
     const safeAspectRatio = Math.max(aspectRatio, 0.1);
-    const k = 1 / (Math.PI * safeAspectRatio * OSWALD_EFFICIENCY);
+    const k = 1 / (Math.PI * safeAspectRatio * AeroConfig.OSWALD_EFFICIENCY);
     return CD0 + k * CL * CL;
   }
   

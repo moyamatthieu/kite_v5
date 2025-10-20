@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { KiteSpecs } from './Config';
 
 export class KiteGeometry {
   /**
@@ -21,9 +22,9 @@ export class KiteGeometry {
     const points = new Map<string, THREE.Vector3>();
     
     // Dimensions
-    const width = 1.65;  // Envergure
-    const height = 0.65; // Hauteur (nez)
-    const depth = 0.15;  // Profondeur whiskers (vers l'arrière)
+    const width = KiteSpecs.WINGSPAN_M;  // Envergure
+    const height = KiteSpecs.CHORD_M;    // Hauteur (nez)
+    const depth = KiteSpecs.WHISKER_DEPTH_M;  // Profondeur whiskers (vers l'arrière)
     
     // Points principaux (dans le plan Z=0)
     points.set('SPINE_BAS', new THREE.Vector3(0, 0, 0));
@@ -32,25 +33,25 @@ export class KiteGeometry {
     points.set('BORD_DROIT', new THREE.Vector3(width / 2, 0, 0));
     
     // CENTRE (25% de la hauteur depuis la base)
-    const centreY = height * 0.25;
+    const centreY = height * KiteSpecs.CENTER_HEIGHT_RATIO;
     points.set('CENTRE', new THREE.Vector3(0, centreY, 0));
     
     // INTER points (intersection barre transversale / bords d'attaque)
     // À hauteur CENTRE, sur les leading edges
-    const t = (height - centreY) / height; // = 0.75
+    const t = KiteSpecs.INTERPOLATION_RATIO; // = 0.75
     const interX = (width / 2) * t;
     points.set('INTER_GAUCHE', new THREE.Vector3(-interX, centreY, 0));
     points.set('INTER_DROIT', new THREE.Vector3(interX, centreY, 0));
     
     // FIX points (whiskers attachments sur le frame)
-    const fixRatio = 2 / 3;
+    const fixRatio = KiteSpecs.FIX_POINT_RATIO; // = 2/3
     points.set('FIX_GAUCHE', new THREE.Vector3(-interX * fixRatio, centreY, 0));
     points.set('FIX_DROIT', new THREE.Vector3(interX * fixRatio, centreY, 0));
     
     // WHISKER points (EN ARRIÈRE - Z négatif)
     // Stabilisateurs qui donnent de la profondeur au kite
-    points.set('WHISKER_GAUCHE', new THREE.Vector3(-interX * fixRatio, centreY * 0.6, -depth));
-    points.set('WHISKER_DROIT', new THREE.Vector3(interX * fixRatio, centreY * 0.6, -depth));
+    points.set('WHISKER_GAUCHE', new THREE.Vector3(-interX * fixRatio, centreY * KiteSpecs.WHISKER_HEIGHT_RATIO, -depth));
+    points.set('WHISKER_DROIT', new THREE.Vector3(interX * fixRatio, centreY * KiteSpecs.WHISKER_HEIGHT_RATIO, -depth));
     
     // === POINTS DE CONTRÔLE (CTRL) - CALCULÉS DYNAMIQUEMENT ===
     // Points où les lignes s'attachent au kite via les brides

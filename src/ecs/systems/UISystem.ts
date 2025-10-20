@@ -8,13 +8,13 @@ import { TransformComponent } from '../components/TransformComponent';
 import { Entity } from '../core/Entity';
 import { Logger } from '../utils/Logging';
 import { UI_METADATA } from '../config/UIConfig';
+import { UIConfig } from '../config/Config';
 
 // Constantes UI
-const PRIORITY = 90;
-const DECIMAL_PRECISION_VELOCITY = 2;
-const DECIMAL_PRECISION_POSITION = 2;
-const DECIMAL_PRECISION_ANGLE = 2;
-const KMH_TO_MS = 3.6;
+const DECIMAL_PRECISION_VELOCITY = UIConfig.DECIMAL_PRECISION_VELOCITY;
+const DECIMAL_PRECISION_POSITION = UIConfig.DECIMAL_PRECISION_POSITION;
+const DECIMAL_PRECISION_ANGLE = UIConfig.DECIMAL_PRECISION_ANGLE;
+const MS_TO_KMH = UIConfig.MS_TO_KMH;
 
 interface SliderConfig {
   id: string;
@@ -37,7 +37,7 @@ export class UISystem extends System {
   private buttonsInitialized = false; // Flag pour éviter les doublons d'event listeners
 
   constructor() {
-    super('Input', PRIORITY);
+    super('Input', UIConfig.PRIORITY);
   }
 
   async initialize(entityManager: EntityManager): Promise<void> {
@@ -157,9 +157,8 @@ export class UISystem extends System {
         max: meta.render.meshSubdivision.max,
         step: meta.render.meshSubdivision.step,
         formatter: (v) => {
-          const TRIANGLES_BASE = 4;
           const level = Math.floor(v);
-          const triangles = Math.pow(TRIANGLES_BASE, level + 1);
+          const triangles = Math.pow(UIConfig.TRIANGLES_BASE, level + 1);
           return `${level} (${triangles} tris)`;
         },
         property: 'meshSubdivisionLevel'
@@ -317,7 +316,7 @@ export class UISystem extends System {
       // === Vitesse ===
       const speedValue = document.getElementById('kite-speed-value');
       if (speedValue) {
-        const speedKmh = physics.velocity.length() * KMH_TO_MS;
+        const speedKmh = physics.velocity.length() * MS_TO_KMH;
         speedValue.textContent = `${speedKmh.toFixed(DECIMAL_PRECISION_VELOCITY)} km/h`;
       }
 
@@ -375,7 +374,7 @@ export class UISystem extends System {
     const apparentWind = windState.apparent;
     const windSpeed = apparentWind.length();
 
-    if (windSpeed < 0.01) {
+    if (windSpeed < UIConfig.MIN_WIND_SPEED) {
       aoaValue.textContent = '0.0 °';
       return;
     }

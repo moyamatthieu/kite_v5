@@ -17,6 +17,7 @@ import { TransformComponent } from '../components/TransformComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
 import { DebugFactory } from '../entities/DebugFactory';
+import { DebugConfig } from '../config/Config';
 
 import { RenderSystem } from './RenderSystem';
 
@@ -129,9 +130,6 @@ export class DebugSystem extends System {
     }
     
     // === Afficher les forces par face (aux positions exactes de calcul) ===
-    const scale = 0.5; // Facteur d'échelle pour la visibilité
-    const minForceThreshold = 0.001; // Seuil réduit pour le debug
-    
     // Afficher les forces de portance, traînée et gravité pour chaque face
     physics.faceForces.forEach((faceForce, index) => {
       // Debug: afficher la magnitude de la portance
@@ -140,10 +138,10 @@ export class DebugSystem extends System {
       }
       
       // Portance (bleu ciel) - TOUJOURS afficher même si petite
-      if (faceForce.lift.length() > 0.0001) { // Seuil ultra-bas
+      if (faceForce.lift.length() > DebugConfig.LIFT_THRESHOLD) {
         debugComp.addForceArrow(
           faceForce.centroid,
-          faceForce.lift.clone().multiplyScalar(scale),
+          faceForce.lift.clone().multiplyScalar(DebugConfig.FORCE_VECTOR_SCALE),
           0x87CEEB, // Bleu ciel
           `lift-face-${index}`
         );
@@ -152,40 +150,40 @@ export class DebugSystem extends System {
       }
       
       // Traînée (rouge)
-      if (faceForce.drag.length() > minForceThreshold) {
+      if (faceForce.drag.length() > DebugConfig.FORCE_THRESHOLD) {
         debugComp.addForceArrow(
           faceForce.centroid,
-          faceForce.drag.clone().multiplyScalar(scale),
+          faceForce.drag.clone().multiplyScalar(DebugConfig.FORCE_VECTOR_SCALE),
           0xff0000, // Rouge
           `drag-face-${index}`
         );
       }
 
       // Gravité par face (jaune)
-      if (faceForce.gravity.length() > minForceThreshold) {
+      if (faceForce.gravity.length() > DebugConfig.FORCE_THRESHOLD) {
         debugComp.addForceArrow(
           faceForce.centroid,
-          faceForce.gravity.clone().multiplyScalar(scale),
+          faceForce.gravity.clone().multiplyScalar(DebugConfig.FORCE_VECTOR_SCALE),
           0xffff00, // Jaune
           `gravity-face-${index}`
         );
       }
 
       // Vent apparent par face (vert)
-      if (faceForce.apparentWind.length() > minForceThreshold) {
+      if (faceForce.apparentWind.length() > DebugConfig.FORCE_THRESHOLD) {
         debugComp.addForceArrow(
           faceForce.centroid,
-          faceForce.apparentWind.clone().multiplyScalar(0.05), // Échelle réduite pour visibilité
+          faceForce.apparentWind.clone().multiplyScalar(DebugConfig.WIND_VECTOR_SCALE),
           0x00ff00, // Vert
           `apparent-wind-face-${index}`
         );
       }
 
       // 🎯 NORMALE de la face (bleu foncé)
-      if (faceForce.normal && faceForce.normal.length() > minForceThreshold) {
+      if (faceForce.normal && faceForce.normal.length() > DebugConfig.FORCE_THRESHOLD) {
         debugComp.addForceArrow(
           faceForce.centroid,
-          faceForce.normal.clone().multiplyScalar(2.0), // Longueur fixe 2m pour visibilité
+          faceForce.normal.clone().multiplyScalar(DebugConfig.NORMAL_DISPLAY_LENGTH),
           0x00008B, // Bleu foncé (dark blue)
           `normal-face-${index}`
         );
@@ -195,7 +193,7 @@ export class DebugSystem extends System {
       // Créer les labels UNE SEULE FOIS, puis juste mettre à jour leur position
       const faceNumber = index + 1;
       
-      if (faceForce.normal && faceForce.normal.length() > 0.01) {
+      if (faceForce.normal && faceForce.normal.length() > DebugConfig.MIN_FORCE_ARROW_DISPLAY) {
         if (!debugComp.labelsCreated) {
           // Première fois: créer le label
           debugComp.addSurfaceLabel(
@@ -203,7 +201,7 @@ export class DebugSystem extends System {
             faceForce.centroid.clone(), // Position au centre exact de la face
             faceForce.normal.clone(), // Normale pour alignement parallèle
             '#FFFF00', // Jaune pour visibilité
-            0.2 // Taille réduite du label (20cm)
+            DebugConfig.TEXT_LABEL_SIZE
           );
         } else {
           // Ensuite: juste mettre à jour la position (pas de recréation!)
@@ -223,10 +221,10 @@ export class DebugSystem extends System {
     }
 
     // === Afficher les tensions des lignes (magenta) ===
-    this.displayLineTensions(debugComp, context, kiteEntity, scale);
+    this.displayLineTensions(debugComp, context, kiteEntity);
 
     // === Afficher les forces aux poignets de la barre (cyan) ===
-    this.displayGripForces(debugComp, context, scale);
+    this.displayGripForces(debugComp, context);
 
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
@@ -235,8 +233,9 @@ export class DebugSystem extends System {
   /**
    * Affiche les vecteurs de tension des lignes aux points d'attache
    */
-  private displayLineTensions(debugComp: DebugComponent, context: SimulationContext, kiteEntity: any, scale: number): void {
+  private displayLineTensions(debugComp: DebugComponent, context: SimulationContext, kiteEntity: any): void {
     const { entityManager } = context;
+    const scale = DebugConfig.FORCE_VECTOR_SCALE;
 
     const leftLine = entityManager.getEntity('leftLine');
     const rightLine = entityManager.getEntity('rightLine');
@@ -252,7 +251,7 @@ export class DebugSystem extends System {
     // Tension ligne gauche
     if (leftLine) {
       const lineComp = leftLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
         const kitePoint = kiteGeometry.getPointWorld('CTRL_GAUCHE', kiteEntity);
         const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
 
@@ -274,7 +273,7 @@ export class DebugSystem extends System {
     // Tension ligne droite
     if (rightLine) {
       const lineComp = rightLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
         const kitePoint = kiteGeometry.getPointWorld('CTRL_DROIT', kiteEntity);
         const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
 
@@ -298,8 +297,9 @@ export class DebugSystem extends System {
    * Affiche les forces de tension au niveau des poignets de la barre de contrôle
    * Visualise la force que les lignes exercent sur les mains du pilote
    */
-  private displayGripForces(debugComp: DebugComponent, context: SimulationContext, scale: number): void {
+  private displayGripForces(debugComp: DebugComponent, context: SimulationContext): void {
     const { entityManager } = context;
+    const scale = DebugConfig.FORCE_VECTOR_SCALE;
 
     const leftLine = entityManager.getEntity('leftLine');
     const rightLine = entityManager.getEntity('rightLine');
@@ -313,7 +313,7 @@ export class DebugSystem extends System {
     // Force sur le poignet gauche
     if (leftLine) {
       const lineComp = leftLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
         const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
         
         if (barPoint) {
@@ -341,7 +341,7 @@ export class DebugSystem extends System {
     // Force sur le poignet droit
     if (rightLine) {
       const lineComp = rightLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > 0.001) {
+      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
         const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
         
         if (barPoint) {

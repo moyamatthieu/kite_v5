@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 
 import { Component } from '../core/Component';
+import { DebugConfig } from '../config/Config';
 
 export class DebugComponent extends Component {
   readonly type = 'debug';
@@ -111,12 +112,12 @@ export class DebugComponent extends Component {
   addForceArrow(origin: THREE.Vector3, direction: THREE.Vector3, color: number, name: string): void {
     // Créer une flèche (helper Three.js)
     const length = direction.length();
-    if (length < 0.01) return; // Ignorer les forces très petites
+    if (length < DebugConfig.MIN_FORCE_ARROW_DISPLAY) return; // Ignorer les forces très petites
     
     const arrow = new THREE.ArrowHelper(
       direction.clone().normalize(),
       origin.clone(),
-      Math.min(length, 30), // Limiter la longueur pour la visibilité (max 30m)
+      Math.min(length, DebugConfig.MAX_FORCE_ARROW_LENGTH), // Limiter la longueur pour la visibilité
       color
     );
     
@@ -135,8 +136,8 @@ export class DebugComponent extends Component {
     if (!context) return;
     
     // Taille du canvas
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = DebugConfig.CANVAS_SMALL_SIZE;
+    canvas.height = DebugConfig.CANVAS_SMALL_SIZE;
     
     // Style du texte
     context.fillStyle = color;
@@ -145,7 +146,7 @@ export class DebugComponent extends Component {
     context.textBaseline = 'middle';
     
     // Dessiner le texte
-    context.fillText(text, 64, 64);
+    context.fillText(text, DebugConfig.CANVAS_SMALL_CENTER, DebugConfig.CANVAS_SMALL_CENTER);
     
     // Créer une texture depuis le canvas
     const texture = new THREE.CanvasTexture(canvas);
@@ -184,11 +185,11 @@ export class DebugComponent extends Component {
     if (!context) return;
     
     // Taille du canvas (haute résolution pour meilleure qualité)
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = DebugConfig.CANVAS_LARGE_SIZE;
+    canvas.height = DebugConfig.CANVAS_LARGE_SIZE;
     
     // Pas de fond - transparent uniquement
-    context.clearRect(0, 0, 512, 512);
+    context.clearRect(0, 0, DebugConfig.CANVAS_LARGE_SIZE, DebugConfig.CANVAS_LARGE_SIZE);
     
     // Style du texte
     context.fillStyle = color;
@@ -197,7 +198,7 @@ export class DebugComponent extends Component {
     context.textBaseline = 'middle';
     
     // Dessiner le texte
-    context.fillText(text, 256, 256);
+    context.fillText(text, DebugConfig.CANVAS_LARGE_CENTER, DebugConfig.CANVAS_LARGE_CENTER);
     
     // Créer une texture depuis le canvas
     const texture = new THREE.CanvasTexture(canvas);
@@ -229,7 +230,7 @@ export class DebugComponent extends Component {
     mesh.quaternion.copy(quaternion);
     
     // Légèrement décalé le long de la normale pour éviter z-fighting avec la face
-    mesh.position.add(normal.clone().normalize().multiplyScalar(0.01));
+    mesh.position.add(normal.clone().normalize().multiplyScalar(DebugConfig.MIN_FORCE_ARROW_DISPLAY));
     
     // Stocker dans le tableau des meshes persistants
     this.faceLabelMeshes.push(mesh);
@@ -257,7 +258,7 @@ export class DebugComponent extends Component {
     mesh.quaternion.copy(quaternion);
     
     // Décalage pour éviter z-fighting
-    mesh.position.add(normal.clone().normalize().multiplyScalar(0.01));
+    mesh.position.add(normal.clone().normalize().multiplyScalar(DebugConfig.MIN_FORCE_ARROW_DISPLAY));
   }
 }
 

@@ -11,6 +11,7 @@ import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { TransformComponent } from '../components/TransformComponent';
 import { MeshComponent } from '../components/MeshComponent';
+import { RenderConfig } from '../config/Config';
 
 export class RenderSystem extends System {
   scene: THREE.Scene;
@@ -35,8 +36,8 @@ export class RenderSystem extends System {
       1000
     );
     // Position trouvée manuellement pour voir pilote ET kite ensemble
-    this.camera.position.set(13.37, 11.96, 0.45);
-    this.camera.lookAt(-3.92, 0, -12.33);
+    this.camera.position.set(RenderConfig.CAMERA_POSITION_X, RenderConfig.CAMERA_POSITION_Y, RenderConfig.CAMERA_POSITION_Z);
+    this.camera.lookAt(RenderConfig.CAMERA_LOOKAT_X, RenderConfig.CAMERA_LOOKAT_Y, RenderConfig.CAMERA_LOOKAT_Z);
     
     // Créer renderer
     this.renderer = new THREE.WebGLRenderer({

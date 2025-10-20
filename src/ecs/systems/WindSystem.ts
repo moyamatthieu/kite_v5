@@ -51,6 +51,7 @@ import * as THREE from 'three';
 import { System, SimulationContext } from '../core/System';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { InputComponent } from '../components/InputComponent';
+import { WindConfig } from '../config/Config';
 
 /**
  * État du vent stocké dans le contexte
@@ -74,17 +75,12 @@ export class WindSystem extends System {
     windDirection?: number;  // degrés
     turbulence?: number;     // %
   } = {}) {
-    const PRIORITY = 20;
-    const DEFAULT_WIND_SPEED_MS = 5.56; // ~20 km/h
-    const DEFAULT_WIND_DIRECTION = 0;
-    const DEFAULT_TURBULENCE = 10;
-    
-    super('WindSystem', PRIORITY);
+    super('WindSystem', WindConfig.PRIORITY);
     
     // Paramètres initiaux
-    this.windSpeed = options.windSpeed ?? DEFAULT_WIND_SPEED_MS;
-    this.windDirection = options.windDirection ?? DEFAULT_WIND_DIRECTION;
-    this.turbulence = options.turbulence ?? DEFAULT_TURBULENCE;
+    this.windSpeed = options.windSpeed ?? WindConfig.DEFAULT_WIND_SPEED_MS;
+    this.windDirection = options.windDirection ?? WindConfig.DEFAULT_WIND_DIRECTION;
+    this.turbulence = options.turbulence ?? WindConfig.DEFAULT_TURBULENCE;
     
     // Calculer vecteur vent ambiant dans le plan horizontal XZ
     this.updateAmbientWind();
@@ -109,19 +105,15 @@ export class WindSystem extends System {
   update(context: SimulationContext): void {
     const currentTime = performance.now();
     const { entityManager } = context;
-    const WIND_UPDATE_INTERVAL = 100; // Mettre à jour le vent tous les 100ms depuis InputComponent
-    const SPEED_CHANGE_THRESHOLD = 0.01; // m/s
-    const DIRECTION_CHANGE_THRESHOLD = 0.1; // degrés
-    const TURBULENCE_CHANGE_THRESHOLD = 0.1; // %
     
     // Synchroniser avec InputComponent si disponible
     const inputEntities = entityManager.query(['Input']);
-    if (inputEntities.length > 0 && currentTime - this.lastWindUpdate > WIND_UPDATE_INTERVAL) {
+    if (inputEntities.length > 0 && currentTime - this.lastWindUpdate > WindConfig.UPDATE_INTERVAL) {
       const inputComp = inputEntities[0].getComponent<InputComponent>('Input');
       if (inputComp) {
-        const speedChanged = Math.abs(inputComp.windSpeed - this.windSpeed) > SPEED_CHANGE_THRESHOLD;
-        const directionChanged = Math.abs(inputComp.windDirection - this.windDirection) > DIRECTION_CHANGE_THRESHOLD;
-        const turbulenceChanged = Math.abs(inputComp.windTurbulence - this.turbulence) > TURBULENCE_CHANGE_THRESHOLD;
+        const speedChanged = Math.abs(inputComp.windSpeed - this.windSpeed) > WindConfig.SPEED_CHANGE_THRESHOLD;
+        const directionChanged = Math.abs(inputComp.windDirection - this.windDirection) > WindConfig.DIRECTION_CHANGE_THRESHOLD;
+        const turbulenceChanged = Math.abs(inputComp.windTurbulence - this.turbulence) > WindConfig.TURBULENCE_CHANGE_THRESHOLD;
         
         if (speedChanged || directionChanged || turbulenceChanged) {
           this.windSpeed = inputComp.windSpeed;
@@ -152,10 +144,9 @@ export class WindSystem extends System {
       // Ajouter de la turbulence si configurée
       if (this.turbulence > 0) {
         const TURBULENCE_SCALE = this.turbulence / 100;
-        const VERTICAL_TURBULENCE_FACTOR = 0.3;
         const turbulenceVector = new THREE.Vector3(
           (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE,
-          (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE * VERTICAL_TURBULENCE_FACTOR, // Moins de turbulence verticale
+          (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE * WindConfig.VERTICAL_TURBULENCE_FACTOR, // Moins de turbulence verticale
           (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE
         );
         apparentWindBase.add(turbulenceVector);
@@ -163,8 +154,7 @@ export class WindSystem extends System {
       
       const apparentWind = apparentWindBase;
       const speed = apparentWind.length();
-      const MINIMUM_WIND_SPEED = 0.01;
-      const direction = speed > MINIMUM_WIND_SPEED ? apparentWind.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      const direction = speed > WindConfig.MINIMUM_WIND_SPEED ? apparentWind.clone().normalize() : new THREE.Vector3(1, 0, 0);
       
       // Stocker dans un cache temporaire du contexte
       // (AeroSystem le lira ensuite)
