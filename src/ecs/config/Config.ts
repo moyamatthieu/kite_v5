@@ -422,7 +422,7 @@ namespace WindConfig {
   export const SPEED_CHANGE_THRESHOLD = 0.01;
 
   /** Seuil de changement détecté en direction vent (°) */
-  export const DIRECTION_CHANGE_THRESHOLD = 0.1;
+  export const DIRECTION_CHANGE_THRESHOLD = 0.5;
 
   /** Seuil de changement détecté en turbulence (%) */
   export const TURBULENCE_CHANGE_THRESHOLD = 0.1;

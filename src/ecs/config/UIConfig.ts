@@ -22,7 +22,7 @@ export const UI_METADATA = {
     },
     direction: {
       min: 0,
-      max: 359,
+      max: 360,
       step: 1,
       unit: '°',
       label: 'Direction du vent'
