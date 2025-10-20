@@ -134,7 +134,7 @@ namespace LineSpecs {
 
   // === Mode de contrainte ===
   /** Mode : 'pbd' (Position-Based Dynamics) ou 'spring-force' (ressort physique) */
-  export const CONSTRAINT_MODE = 'spring-force' as const;
+  export const CONSTRAINT_MODE = 'pbd' as const;
 
   // === Paramètres Spring-Force ===
   /** Rigidité du ressort (N/m) - Réduit de 500 à 50 pour stabilité */
