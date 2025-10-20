@@ -27,11 +27,19 @@ export const CONFIG = {
   },
   
   // === LIGNES ===
+  // PBD (Position-Based Dynamics) pour contraintes rigides
   lines: {
     length: 15, // m - Longueur réaliste des lignes de vol
-    stiffness: 1, // N/m - Très souple pour kite léger (120g = 1.2N)
-    damping: 0.5, // N·s/m - Amortissement léger
+    stiffness: 1, // N/m - Très souple pour kite léger (120g = 1.2N) - LEGACY (non utilisé en PBD)
+    damping: 0.5, // N·s/m - Amortissement léger - LEGACY (non utilisé en PBD)
     maxTension: 10, // N - Tension max ~8× le poids
+    
+    // Paramètres PBD
+    pbdEnabled: true, // Utiliser PBD au lieu de forces ressort
+    pbdIterations: 1, // UNE SEULE itération (multiples causent instabilité)
+    pbdCompliance: 0.001, // Compliance (0 = rigide, >0 = souple) - augmenté pour stabilité
+    pbdMaxCorrection: 0.5, // Correction max par frame (m) - évite sauts énormes
+    
     color: 0x0000ff // Bleu
   },
   
