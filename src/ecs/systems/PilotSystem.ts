@@ -253,21 +253,36 @@ export class PilotSystem extends System {
     
     toKite.normalize();
 
-    // Calculer l'axe de rotation perpendiculaire à toKite
-    // rotationAxis = up × toKite (produit vectoriel)
-    const up = new THREE.Vector3(0, 1, 0);
-    const rotationAxis = up.clone().cross(toKite);
+    // Construire une base orthonormale orientée vers le kite
+    // forward = direction vers le kite
+    // right = axe de rotation (perpendiculaire à toKite et à la verticale)
+    // up = perpendiculaire aux deux autres
+    const forward = toKite.clone();
+    const worldUp = new THREE.Vector3(0, 1, 0);
     
-    // Si toKite est colinéaire à Y (vertical pur), utiliser l'axe X
-    if (rotationAxis.lengthSq() < 1e-6) {
-      rotationAxis.set(1, 0, 0);
+    // Calculer l'axe "right" (gauche-droite de la barre)
+    let right = worldUp.clone().cross(forward);
+    
+    // Cas limite : si toKite est vertical, choisir un axe right par défaut
+    if (right.lengthSq() < 1e-6) {
+      right.set(1, 0, 0);
     } else {
-      rotationAxis.normalize();
+      right.normalize();
     }
+    
+    // Calculer l'axe "up" local de la barre
+    const up = forward.clone().cross(right).normalize();
 
-    // Appliquer la rotation autour de l'axe calculé
+    // Créer la matrice de rotation de base (barre orientée vers le kite)
+    const baseMatrix = new THREE.Matrix4().makeBasis(right, up, forward);
+    const baseQuaternion = new THREE.Quaternion().setFromRotationMatrix(baseMatrix);
+
+    // Créer la rotation de contrôle autour de l'axe "right"
     const rotationRad = this.barRotationAngle * Math.PI / 180;
-    barTransform.quaternion.setFromAxisAngle(rotationAxis, rotationRad);
+    const controlRotation = new THREE.Quaternion().setFromAxisAngle(right, rotationRad);
+
+    // Composer les deux rotations : orientation de base × rotation de contrôle
+    barTransform.quaternion.copy(baseQuaternion).multiply(controlRotation);
   }
 
   /**
