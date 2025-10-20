@@ -43,6 +43,15 @@ export class BridleConstraintSystem extends System {
     super('BridleConstraintSystem', PRIORITY);
   }
 
+  /**
+   * Réinitialise le système lors d'un reset de simulation
+   */
+  initialize(entityManager: EntityManager): void {
+    this.initialized = false;
+    this.lastLengths = { nez: 0, inter: 0, centre: 0 };
+    console.log('🔧 [BridleConstraintSystem] System reset - initialized flag cleared');
+  }
+
   update(context: SimulationContext): void {
     const { entityManager } = context;
 
