@@ -463,7 +463,7 @@ export class UISystem extends System {
     }
 
     // Direction du vent
-    const windDirValue = document.getElementById('wind-direction-value');
+    const windDirValue = document.getElementById('wind-direction-info-value');
     if (windDirValue) {
       windDirValue.textContent = `${this.inputComponent.windDirection.toFixed(0)} °`;
     }
