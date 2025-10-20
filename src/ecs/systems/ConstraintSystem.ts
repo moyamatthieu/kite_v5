@@ -498,30 +498,27 @@ export class ConstraintSystem extends System {
   /**
    * Gère les vitesses après corrections PBD
    * 
-   * En PBD pur (Position-Based Dynamics), les contraintes modifient directement
-   * les positions. Pour éviter que PhysicsSystem (priorité 50) réintègre une
-   * vitesse obsolète qui annulerait la correction, on réinitialise les vitesses.
+   * En PBD, les corrections de position doivent être "absorbées" par la vitesse
+   * pour éviter que PhysicsSystem ne réintègre un mouvement supplémentaire.
    * 
-   * PBD Algorithm:
-   * 1. ConstraintSystem: position = correctedPosition (PBD constraint solving)
-   * 2. dampVelocities: velocity = 0 (geler le mouvement)
-   * 3. PhysicsSystem: position += velocity × dt = 0 (ne rien changer)
-   * 4. AeroSystem (next frame): applique forces → crée nouvelles vitesses
-   * 5. PhysicsSystem (next frame): intègre normalement
-   * 
-   * This is stable PBD: constraints freeze motion, external forces create it.
+   * Approche simple et stable : réduire la vitesse pour qu'elle correspondent 
+   * à la correction appliquée, sans l'annuler complètement.
    */
   private dampVelocities(
     physics: PhysicsComponent,
-    _deltaPosition: THREE.Vector3,
+    deltaPosition: THREE.Vector3,
     _deltaQuaternion: THREE.Quaternion,
-    _deltaTime: number
+    deltaTime: number
   ): void {
-    // En PBD, réinitialiser les vitesses à zéro après correction
-    // Cela empêche PhysicsSystem d'appliquer un mouvement supplémentaire
-    // et laisse les forces externes recréer les vitesses de manière stable
-    physics.velocity.set(0, 0, 0);
-    physics.angularVelocity.set(0, 0, 0);
+    if (deltaTime < EPSILON) return;
+
+    // Appliquer un amortissement adaptatif basé sur la correction
+    // Plus la correction est grande, plus on amortit
+    const correctionMagnitude = deltaPosition.length();
+    const dampingFactor = Math.max(0.5, 1.0 - correctionMagnitude * 0.1);
+    
+    physics.velocity.multiplyScalar(dampingFactor);
+    physics.angularVelocity.multiplyScalar(dampingFactor);
   }
 
   /**
