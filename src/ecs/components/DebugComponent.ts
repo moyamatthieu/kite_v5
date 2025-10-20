@@ -14,8 +14,14 @@ export class DebugComponent extends Component {
   /** Flèches de visualisation des forces */
   forceArrows: THREE.ArrowHelper[] = [];
   
-  /** Labels textuels pour identifier les faces */
+  /** Labels textuels pour identifier les faces (sprites) */
   faceLabels: THREE.Sprite[] = [];
+  
+  /** Labels meshes persistants pour les faces (créés une seule fois) */
+  faceLabelMeshes: THREE.Mesh[] = [];
+  
+  /** Flag pour savoir si les labels de faces ont été créés */
+  labelsCreated = false;
   
   /** Groupe contenant tous les éléments de debug */
   debugGroup: THREE.Group;
@@ -59,7 +65,7 @@ export class DebugComponent extends Component {
     });
     this.forceArrows = [];
     
-    // Nettoyer aussi les labels
+    // Nettoyer aussi les labels sprites (temporaires)
     this.faceLabels.forEach(label => {
       if (label.material) {
         if (label.material.map) {
@@ -70,6 +76,33 @@ export class DebugComponent extends Component {
       this.debugGroup.remove(label);
     });
     this.faceLabels = [];
+    
+    // ⚠️ NE PAS détruire les faceLabelMeshes ici!
+    // Ils sont persistants et gérés séparément
+  }
+  
+  /**
+   * Nettoie TOUT y compris les labels persistants (appelé quand debug se désactive)
+   */
+  clearAll(): void {
+    this.clearArrows();
+    
+    // Nettoyer les meshes de labels persistants
+    this.faceLabelMeshes.forEach(mesh => {
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
+      if (mesh.material) {
+        const mat = mesh.material as THREE.MeshBasicMaterial;
+        if (mat.map) {
+          mat.map.dispose();
+        }
+        mat.dispose();
+      }
+      this.debugGroup.remove(mesh);
+    });
+    this.faceLabelMeshes = [];
+    this.labelsCreated = false;
   }
   
   /**
@@ -134,4 +167,97 @@ export class DebugComponent extends Component {
     this.faceLabels.push(sprite);
     this.debugGroup.add(sprite);
   }
+  
+  /**
+   * Ajoute un label "collé" à une surface (mesh plat aligné avec la face)
+   * Version optimisée: crée le mesh une seule fois, puis réutilise
+   * @param text Texte à afficher
+   * @param position Position du centre du label (centroïde de la face)
+   * @param normal Normale de la surface pour alignement
+   * @param color Couleur du texte
+   * @param size Taille du label (en mètres)
+   */
+  addSurfaceLabel(text: string, position: THREE.Vector3, normal: THREE.Vector3, color = '#FFFF00', size = 0.5): void {
+    // Créer un canvas pour dessiner le texte
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    
+    // Taille du canvas (haute résolution pour meilleure qualité)
+    canvas.width = 512;
+    canvas.height = 512;
+    
+    // Pas de fond - transparent uniquement
+    context.clearRect(0, 0, 512, 512);
+    
+    // Style du texte
+    context.fillStyle = color;
+    context.font = 'Bold 320px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Dessiner le texte
+    context.fillText(text, 256, 256);
+    
+    // Créer une texture depuis le canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    // Créer un matériau avec la texture
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide, // Visible des deux côtés
+      depthTest: true,
+      depthWrite: false
+    });
+    
+    // Créer une géométrie plane
+    const geometry = new THREE.PlaneGeometry(size, size);
+    
+    // Créer le mesh
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    // Positionner le mesh au centre exact de la face
+    mesh.position.copy(position);
+    
+    // Orienter le mesh parallèle à la face (aligné avec la normale)
+    // Créer un quaternion qui aligne le vecteur Z local avec la normale
+    const up = new THREE.Vector3(0, 0, 1);
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(up, normal.clone().normalize());
+    mesh.quaternion.copy(quaternion);
+    
+    // Légèrement décalé le long de la normale pour éviter z-fighting avec la face
+    mesh.position.add(normal.clone().normalize().multiplyScalar(0.01));
+    
+    // Stocker dans le tableau des meshes persistants
+    this.faceLabelMeshes.push(mesh);
+    this.debugGroup.add(mesh);
+  }
+  
+  /**
+   * Met à jour la position d'un label existant (sans le recréer)
+   * @param index Index du label dans faceLabelMeshes
+   * @param position Nouvelle position
+   * @param normal Nouvelle normale
+   */
+  updateSurfaceLabel(index: number, position: THREE.Vector3, normal: THREE.Vector3): void {
+    if (index >= this.faceLabelMeshes.length) return;
+    
+    const mesh = this.faceLabelMeshes[index];
+    
+    // Mettre à jour la position
+    mesh.position.copy(position);
+    
+    // Mettre à jour l'orientation
+    const up = new THREE.Vector3(0, 0, 1);
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromUnitVectors(up, normal.clone().normalize());
+    mesh.quaternion.copy(quaternion);
+    
+    // Décalage pour éviter z-fighting
+    mesh.position.add(normal.clone().normalize().multiplyScalar(0.01));
+  }
 }
+

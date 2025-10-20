@@ -94,7 +94,7 @@ export class DebugSystem extends System {
     else if (!this.inputComponent.debugMode && this.prevDebugMode) {
       console.log('🐛 [DebugSystem] DEBUG MODE DEACTIVATED');
       this.renderSystem.scene.remove(debugComp.debugGroup);
-      debugComp.clearArrows();
+      debugComp.clearAll(); // Nettoyer TOUT, y compris les labels persistants
       this.lastLogTime = currentTime;
     }
 
@@ -134,14 +134,21 @@ export class DebugSystem extends System {
     
     // Afficher les forces de portance, traînée et gravité pour chaque face
     physics.faceForces.forEach((faceForce, index) => {
-      // Portance (bleu ciel)
-      if (faceForce.lift.length() > minForceThreshold) {
+      // Debug: afficher la magnitude de la portance
+      if (shouldLog) {
+        console.log(`🐛 Face ${index + 1}: Lift magnitude = ${faceForce.lift.length().toFixed(4)} N`);
+      }
+      
+      // Portance (bleu ciel) - TOUJOURS afficher même si petite
+      if (faceForce.lift.length() > 0.0001) { // Seuil ultra-bas
         debugComp.addForceArrow(
           faceForce.centroid,
           faceForce.lift.clone().multiplyScalar(scale),
           0x87CEEB, // Bleu ciel
           `lift-face-${index}`
         );
+      } else if (shouldLog) {
+        console.log(`⚠️ Face ${index + 1}: Lift trop faible ou nulle!`);
       }
       
       // Traînée (rouge)
@@ -184,18 +191,36 @@ export class DebugSystem extends System {
         );
       }
       
-      // 🏷️ LABEL numérique de la face (jaune, grande taille)
-      // Affiche le numéro ET le nom de la face
+      // 🏷️ LABEL numérique de la face (parallèle à la surface)
+      // Créer les labels UNE SEULE FOIS, puis juste mettre à jour leur position
       const faceNumber = index + 1;
-      const faceName = faceForce.name || `face${faceNumber}`;
       
-      debugComp.addTextLabel(
-        `${faceNumber}`, // Juste le numéro pour simplicité (1-4)
-        faceForce.centroid.clone(), // Position au centre de la face
-        '#FFFF00', // Jaune pour visibilité
-        1.5 // Taille augmentée pour meilleure visibilité
-      );
+      if (faceForce.normal && faceForce.normal.length() > 0.01) {
+        if (!debugComp.labelsCreated) {
+          // Première fois: créer le label
+          debugComp.addSurfaceLabel(
+            `${faceNumber}`, // Juste le numéro (1-4)
+            faceForce.centroid.clone(), // Position au centre exact de la face
+            faceForce.normal.clone(), // Normale pour alignement parallèle
+            '#FFFF00', // Jaune pour visibilité
+            0.2 // Taille réduite du label (20cm)
+          );
+        } else {
+          // Ensuite: juste mettre à jour la position (pas de recréation!)
+          debugComp.updateSurfaceLabel(
+            index,
+            faceForce.centroid.clone(),
+            faceForce.normal.clone()
+          );
+        }
+      }
     });
+    
+    // Marquer les labels comme créés après la première passe
+    if (!debugComp.labelsCreated && physics.faceForces.length > 0) {
+      debugComp.labelsCreated = true;
+      console.log('🏷️ [DebugSystem] Labels de faces créés (une seule fois)');
+    }
 
     // === Afficher les tensions des lignes (magenta) ===
     this.displayLineTensions(debugComp, context, kiteEntity, scale);
