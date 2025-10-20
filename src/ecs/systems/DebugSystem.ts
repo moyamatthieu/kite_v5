@@ -226,6 +226,9 @@ export class DebugSystem extends System {
     // === Afficher les forces aux poignets de la barre (cyan) ===
     this.displayGripForces(debugComp, context);
 
+    // === Afficher le vecteur du vent au point NEZ (blanc) ===
+    this.displayWindVector(debugComp, context, kiteEntity);
+
     // Log count seulement lors du throttle
     // (Le log de forces ci-dessus a déjà mis à jour lastLogTime)
   }
@@ -363,6 +366,36 @@ export class DebugSystem extends System {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Affiche le vecteur du vent ambiant au point NEZ (nez) du kite
+   * Couleur : blanc pour une bonne visibilité
+   */
+  private displayWindVector(debugComp: DebugComponent, context: SimulationContext, kiteEntity: Entity): void {
+    const windCache = context.windCache as Map<string, any> | undefined;
+    if (!windCache) return;
+
+    const wind = windCache.get(kiteEntity.id);
+    if (!wind || !wind.ambient) return;
+
+    // Récupérer la géométrie du kite pour accéder au point NEZ
+    const geometry = kiteEntity.getComponent('geometry') as GeometryComponent | null;
+    if (!geometry) return;
+
+    // Obtenir la position du point NEZ en coordonnées du monde
+    const nezWorldPosition = geometry.getPointWorld('NEZ', kiteEntity);
+    if (!nezWorldPosition) return;
+
+    // Afficher le vecteur du vent ambiant avec l'échelle de Config
+    if (wind.ambient.length() > DebugConfig.FORCE_THRESHOLD) {
+      debugComp.addForceArrow(
+        nezWorldPosition.clone(),
+        wind.ambient.clone().multiplyScalar(DebugConfig.WIND_VECTOR_SCALE),
+        0xffffff, // Blanc
+        'wind-vector-nez'
+      );
     }
   }
 

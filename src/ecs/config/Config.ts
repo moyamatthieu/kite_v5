@@ -87,7 +87,7 @@ namespace KiteSpecs {
   export const WHISKER_HEIGHT_RATIO = 0.6;
 
   /** Profondeur des whiskers (arrière du kite, m) */
-  export const WHISKER_DEPTH_M = 0.15;
+  export const WHISKER_DEPTH_M = 0.20;
 }
 
 // ============================================================================
