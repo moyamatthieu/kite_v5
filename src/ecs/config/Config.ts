@@ -36,9 +36,9 @@ export const CONFIG = {
     
     // Paramètres PBD
     pbdEnabled: true, // Utiliser PBD au lieu de forces ressort
-    pbdIterations: 1, // UNE SEULE itération (multiples causent instabilité)
-    pbdCompliance: 0.001, // Compliance (0 = rigide, >0 = souple) - augmenté pour stabilité
-    pbdMaxCorrection: 0.5, // Correction max par frame (m) - évite sauts énormes
+    pbdIterations: 4, // 4 itérations pour convergence (legacy utilise 2, on augmente pour stabilité)
+    pbdCompliance: 0.00001, // Compliance (0 = rigide, >0 = souple) - TRÈS PETIT pour lignes quasi-rigides
+    pbdMaxCorrection: 2.0, // Correction max par frame (m) - augmenté pour rattraper grandes violations
     
     color: 0x0000ff // Bleu
   },

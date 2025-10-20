@@ -236,7 +236,7 @@ export class ConstraintSystem extends System {
     const correctionBar = direction.clone().multiplyScalar(-lambda * w2);
     
     // LIMITE LA MAGNITUDE DE CORRECTION (évite sauts énormes)
-    const maxCorrection = CONFIG.lines.pbdMaxCorrection || 0.5; // 50cm max
+    const maxCorrection = CONFIG.lines.pbdMaxCorrection;
     if (correctionKite.length() > maxCorrection) {
       correctionKite.setLength(maxCorrection);
     }
