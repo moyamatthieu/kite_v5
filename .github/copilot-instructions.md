@@ -41,8 +41,28 @@ La physique de la simulation est un aspect critique.
 
 Utilisez les commandes npm définies dans `package.json` pour les tâches courantes.
 
--   **Démarrage** : `npm run dev`
+### ⛔ RÈGLE STRICTE : NE JAMAIS EXÉCUTER `npm run dev`
+
+**Ne JAMAIS lancer `npm run dev` automatiquement.** C'est absolument interdit.
+
+**Pourquoi :**
+- Le serveur de développement est géré manuellement par l'utilisateur
+- Lancer automatiquement le serveur peut créer des conflits de ports
+- Le rechargement à chaud (HMR) peut perturber le débogage en cours
+- L'utilisateur doit avoir le contrôle total du cycle de vie du serveur
+- Les agents IA ne doivent pas interférer avec les processus en arrière-plan
+
+**À faire à la place :**
+- ✅ Informer l'utilisateur qu'il doit lancer `npm run dev` lui-même
+- ✅ Indiquer l'URL attendue : `http://localhost:3001` (ou 3002 si port occupé)
+- ✅ Expliquer que le rechargement à chaud détectera automatiquement les changements
+
+**Référence serveur** :
+-   **Démarrage** : `npm run dev` (MANUEL UNIQUEMENT)
     *   Lance le serveur de développement Vite sur `http://localhost:3001` avec rechargement à chaud.
+
+### Autres commandes disponibles
+
 -   **Qualité du code** :
     *   `npm run lint` : Exécute ESLint pour l'analyse statique.
     *   `npm run lint:fix` : Corrige automatiquement les problèmes de style.
