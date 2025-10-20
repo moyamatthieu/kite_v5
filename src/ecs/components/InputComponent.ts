@@ -34,6 +34,7 @@ export class InputComponent extends Component {
   resetSimulation: boolean = false;
   isPaused: boolean = false; // true = en pause, false = en cours d'exécution
   debugMode: boolean = false;
+  showNormals: boolean = false; // Afficher les vecteurs normaux des faces
 
   // === Contrôle barre (clavier) ===
   barRotationInput: number = 0; // -1 = gauche, 0 = neutre, 1 = droite

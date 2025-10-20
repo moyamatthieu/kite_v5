@@ -177,7 +177,8 @@ export class AeroSystem extends System {
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
           gravity: gravityPerFace.clone(),
-          apparentWind: localApparentWind.clone()
+          apparentWind: localApparentWind.clone(),
+          normal: liftDir.clone()  // Stocker la normale orientée pour debug visuel
         });
       });
 

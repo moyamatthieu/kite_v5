@@ -173,6 +173,16 @@ export class DebugSystem extends System {
           `apparent-wind-face-${index}`
         );
       }
+
+      // 🎯 NORMALE de la face (bleu foncé)
+      if (faceForce.normal && faceForce.normal.length() > minForceThreshold) {
+        debugComp.addForceArrow(
+          faceForce.centroid,
+          faceForce.normal.clone().multiplyScalar(2.0), // Longueur fixe 2m pour visibilité
+          0x00008B, // Bleu foncé (dark blue)
+          `normal-face-${index}`
+        );
+      }
     });
 
     // === Afficher les tensions des lignes (magenta) ===
