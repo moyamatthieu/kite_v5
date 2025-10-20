@@ -338,17 +338,31 @@ export class ConstraintSystem extends System {
     // Bras de levier
     const r = ctrlWorld.clone().sub(correctedPosition);
     const rCrossN = new THREE.Vector3().crossVectors(r, direction);
-    const denominator = invMass + rCrossN.lengthSq() * invInertia + alpha;
+    let denominator = invMass + rCrossN.lengthSq() * invInertia + alpha;
 
     if (denominator < EPSILON) {
       return;
     }
 
+    // ✨ Assurer une stabilité minimale : limiter le lambda maximum ✨
+    const minDenominator = Math.max(EPSILON, 0.1); // Minimum raisonnable pour éviter lambdas énormes
+    denominator = Math.max(denominator, minDenominator);
+
     const lambda = -extension / denominator;
+
+    // ✨ PROTECTIONS POUR STABILITÉ ✨
+    // Limiter lambda pour éviter les corrections infinies
+    const maxLambda = Math.max(extension * 100, 1000); // Limite raisonnable
+    const clampedLambda = Math.max(Math.min(lambda, maxLambda), -maxLambda);
+
+    // Si lambda s'écarte trop, cela indique une instabilité
+    if (!isFinite(clampedLambda)) {
+      return;
+    }
 
     // === 3. CORRECTIONS (appliquées aux variables temporaires) ===
     // Position
-    const deltaP = direction.clone().multiplyScalar(lambda * invMass);
+    const deltaP = direction.clone().multiplyScalar(clampedLambda * invMass);
 
     // Limiter magnitude
     const maxCorrection = CONFIG.lines.pbd.maxCorrection;
@@ -359,7 +373,7 @@ export class ConstraintSystem extends System {
     correctedPosition.add(deltaP);
 
     // Rotation
-    const deltaTheta = rCrossN.clone().multiplyScalar(-lambda * invInertia);
+    const deltaTheta = rCrossN.clone().multiplyScalar(-clampedLambda * invInertia);
     const angle = deltaTheta.length();
 
     if (angle > EPSILON && isFinite(angle)) {
@@ -369,7 +383,7 @@ export class ConstraintSystem extends System {
     }
 
     // Estimation tension
-    const estimatedTension = Math.abs(lambda) / (deltaTime * deltaTime);
+    const estimatedTension = Math.abs(clampedLambda) / (deltaTime * deltaTime);
     lineComponent.currentTension = isFinite(estimatedTension) ? estimatedTension : 0;
   }
 
