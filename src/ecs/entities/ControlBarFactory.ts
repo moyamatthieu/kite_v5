@@ -40,9 +40,10 @@ export class ControlBarFactory {
     // === PHYSICS ===
     // La barre est maintenue par le pilote mais peut bouger légèrement
     // Masse réaliste d'une barre de contrôle : ~0.5kg
+    // TEMPORAIRE: Cinématique pour tester les contraintes
     entity.addComponent(new PhysicsComponent({
       mass: 0.5,
-      isKinematic: false, // Dynamique : subit les forces des lignes
+      isKinematic: true, // ← FIXE pour tester (pilote tient fermement)
       linearDamping: 0.98, // Amortissement fort (pilote contrôle)
       angularDamping: 0.95
     }));
