@@ -351,8 +351,8 @@ export class ConstraintSystem extends System {
     const lambda = -extension / denominator;
 
     // ✨ PROTECTIONS POUR STABILITÉ ✨
-    // Limiter lambda pour éviter les corrections infinies
-    const maxLambda = Math.max(extension * 100, 1000); // Limite raisonnable
+    // Limiter lambda de façon STRICTE pour convergence stable
+    const maxLambda = CONFIG.lines.pbd.maxLambda; // Limite stricte = 100
     const clampedLambda = Math.max(Math.min(lambda, maxLambda), -maxLambda);
 
     // Si lambda s'écarte trop, cela indique une instabilité
@@ -514,9 +514,10 @@ export class ConstraintSystem extends System {
       );
     }
 
-    // Amortissement angulaire (simplifié)
-    // L'angle de rotation induit un changement de vitesse angulaire
-    physics.angularVelocity.multiplyScalar(0.95);
+    // Amortissement angulaire MINIMAL en PBD (0.99 = 1% damp seulement)
+    // Les contraintes gèrent la stabilité, ne pas les étouffer
+    const angularDamping = CONFIG.lines.pbd.angularDamping;
+    physics.angularVelocity.multiplyScalar(angularDamping);
   }
 
   /**

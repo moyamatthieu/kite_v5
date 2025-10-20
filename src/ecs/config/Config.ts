@@ -29,13 +29,19 @@ namespace PhysicsConstants {
   export const AIR_DENSITY = 1.225;
 
   /** Nombre d'itérations PBD pour convergence */
-  export const PBD_ITERATIONS = 4;
+  export const PBD_ITERATIONS = 8;
 
   /** Compliance PBD (0 = rigide, >0 = souple) */
   export const PBD_COMPLIANCE = 0.00001;
 
   /** Correction max PBD par frame (m) */
   export const PBD_MAX_CORRECTION = 2.0;
+
+  /** Facteur d'amortissement angulaire PBD (0.95 = 5% damp par frame) */
+  export const PBD_ANGULAR_DAMPING = 0.99;
+
+  /** Lambda max pour PBD : limite stricte pour éviter divergence */
+  export const PBD_MAX_LAMBDA = 100;
 }
 
 // ============================================================================
@@ -471,7 +477,9 @@ export const CONFIG = {
     pbd: {
       iterations: PhysicsConstants.PBD_ITERATIONS,
       compliance: PhysicsConstants.PBD_COMPLIANCE,
-      maxCorrection: PhysicsConstants.PBD_MAX_CORRECTION
+      maxCorrection: PhysicsConstants.PBD_MAX_CORRECTION,
+      maxLambda: PhysicsConstants.PBD_MAX_LAMBDA,
+      angularDamping: PhysicsConstants.PBD_ANGULAR_DAMPING
     },
     springForce: {
       stiffness: LineSpecs.STIFFNESS_N_PER_M,
