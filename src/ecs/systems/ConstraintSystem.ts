@@ -496,34 +496,54 @@ export class ConstraintSystem extends System {
   // ============================================================================
 
   /**
-   * Amortit les vitesses basées sur les corrections appliquées (PBD)
+   * Met à jour les vitesses basées sur les corrections PBD appliquées
+   * 
+   * CRITIQUE : En PBD, on modifie directement la position. Il faut mettre à jour
+   * la vitesse pour refléter ce changement, sinon PhysicsSystem (priorité 50)
+   * va intégrer l'ancienne vitesse et annuler la correction PBD.
+   * 
+   * Solution : velocity = deltaPosition / deltaTime
+   * Cela synchronise la vitesse avec le mouvement imposé par les contraintes.
    */
   private dampVelocities(
     physics: PhysicsComponent,
     deltaPosition: THREE.Vector3,
-    _deltaQuaternion: THREE.Quaternion,
+    deltaQuaternion: THREE.Quaternion,
     deltaTime: number
   ): void {
     if (deltaTime < EPSILON) return;
 
-    // Amortissement basé sur le mouvement
-    const dampingFactor = 0.5;
-
-    // Vitesse linéaire induite par correction
+    // === VITESSE LINÉAIRE ===
+    // La vitesse doit refléter le déplacement imposé par PBD
     const correctionVelocity = deltaPosition.clone().multiplyScalar(1.0 / deltaTime);
+    
+    // METTRE À JOUR la vitesse (ne pas juste amortir)
+    // On remplace la composante de vitesse dans la direction de la correction
+    physics.velocity.copy(correctionVelocity);
 
-    // Projeter et amortir
-    const radialComponent = physics.velocity.dot(correctionVelocity.normalize());
-    if (radialComponent > 0) {
-      physics.velocity.sub(
-        correctionVelocity.normalize().multiplyScalar(dampingFactor * radialComponent)
-      );
+    // === VITESSE ANGULAIRE ===
+    // Extraire l'angle de rotation depuis le quaternion de correction
+    // deltaQuaternion représente la rotation appliquée
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(deltaQuaternion.w)));
+    
+    if (angle > EPSILON) {
+      // Axe de rotation (normalisé)
+      const sinHalfAngle = Math.sqrt(1 - deltaQuaternion.w * deltaQuaternion.w);
+      if (sinHalfAngle > EPSILON) {
+        const axis = new THREE.Vector3(
+          deltaQuaternion.x / sinHalfAngle,
+          deltaQuaternion.y / sinHalfAngle,
+          deltaQuaternion.z / sinHalfAngle
+        );
+        
+        // Vitesse angulaire = angle / deltaTime × axe
+        const angularSpeed = angle / deltaTime;
+        physics.angularVelocity.copy(axis.multiplyScalar(angularSpeed));
+      }
+    } else {
+      // Pas de rotation significative, mettre vitesse angulaire à zéro
+      physics.angularVelocity.set(0, 0, 0);
     }
-
-    // Amortissement angulaire MINIMAL en PBD (0.99 = 1% damp seulement)
-    // Les contraintes gèrent la stabilité, ne pas les étouffer
-    const angularDamping = CONFIG.lines.pbd.angularDamping;
-    physics.angularVelocity.multiplyScalar(angularDamping);
   }
 
   /**
