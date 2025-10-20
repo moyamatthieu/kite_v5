@@ -58,9 +58,35 @@ Utilisez les commandes npm définies dans `package.json` pour les tâches couran
 
 ## 📝 Gestion de la documentation
 
--   **Règle importante** : **Ne JAMAIS créer de fichiers Markdown (.md)** pour la documentation.
--   Toute documentation doit être intégrée directement dans le code via des commentaires JSDoc/TSDoc, ou ajoutée à ce fichier `copilot-instructions.md`.
--   Pour expliquer des fonctionnalités ou des changements, utilisez uniquement des commentaires dans le code TypeScript.
+### ⛔ RÈGLE STRICTE : PAS DE FICHIERS MARKDOWN
+
+**Ne JAMAIS créer de fichiers Markdown (.md)** pour la documentation, même temporairement. C'est absolument interdit.
+
+**Pourquoi :**
+- Les fichiers .md polluent le repository et créent du debt technique
+- Ils ne sont pas maintenus et deviennent rapidement obsolètes
+- Ils ne sont pas liés au code, donc impossible à refactoriser avec le code
+- Ils créent du bruit dans git history
+- Les rapports/analyses doivent rester en conversation ou dans les commits
+
+**Alternative :**
+- Documentation intégrée directement dans le code via commentaires **JSDoc/TSDoc**
+- Explications ajoutées à ce fichier `copilot-instructions.md`
+- Analyses complexes documentées dans les messages de commit avec `git commit -m "long message"`
+- Pour les explications détaillées, utiliser les commentaires multi-lignes (`/** ... */`) dans le code
+
+**Exemples interdits :**
+- ❌ CONTROL_MECHANISM_ANALYSIS.md
+- ❌ DEBUG_CHECKLIST.md
+- ❌ SESSION_SUMMARY.md
+- ❌ README_DEBUGGING.md
+- ❌ LOGGING_GUIDE.md
+
+**Exemples acceptés :**
+- ✅ Commentaires JSDoc dans `src/ecs/systems/ConstraintSystem.ts`
+- ✅ Sections ajoutées à ce fichier `copilot-instructions.md`
+- ✅ Messages de commit détaillés (50+ lignes si nécessaire)
+- ✅ Console logs temporaires pendant debug (puis supprimés)
 
 ## 🧠 Méthodologie de résolution de problèmes
 
