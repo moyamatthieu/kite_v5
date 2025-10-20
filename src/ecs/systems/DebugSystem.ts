@@ -183,6 +183,18 @@ export class DebugSystem extends System {
           `normal-face-${index}`
         );
       }
+      
+      // 🏷️ LABEL numérique de la face (jaune, grande taille)
+      // Affiche le numéro ET le nom de la face
+      const faceNumber = index + 1;
+      const faceName = faceForce.name || `face${faceNumber}`;
+      
+      debugComp.addTextLabel(
+        `${faceNumber}`, // Juste le numéro pour simplicité (1-4)
+        faceForce.centroid.clone(), // Position au centre de la face
+        '#FFFF00', // Jaune pour visibilité
+        1.5 // Taille augmentée pour meilleure visibilité
+      );
     });
 
     // === Afficher les tensions des lignes (magenta) ===

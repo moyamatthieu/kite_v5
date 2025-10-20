@@ -29,6 +29,7 @@ export class PhysicsComponent extends Component {
   
   // Forces par face (pour debug et application distribuée)
   faceForces: Array<{
+    name: string;           // Nom de la face (ex: "leftUpper", "rightLower")
     centroid: THREE.Vector3;
     lift: THREE.Vector3;
     drag: THREE.Vector3;

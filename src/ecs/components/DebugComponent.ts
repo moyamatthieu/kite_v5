@@ -14,6 +14,9 @@ export class DebugComponent extends Component {
   /** Flèches de visualisation des forces */
   forceArrows: THREE.ArrowHelper[] = [];
   
+  /** Labels textuels pour identifier les faces */
+  faceLabels: THREE.Sprite[] = [];
+  
   /** Groupe contenant tous les éléments de debug */
   debugGroup: THREE.Group;
   
@@ -55,6 +58,18 @@ export class DebugComponent extends Component {
       this.debugGroup.remove(arrow);
     });
     this.forceArrows = [];
+    
+    // Nettoyer aussi les labels
+    this.faceLabels.forEach(label => {
+      if (label.material) {
+        if (label.material.map) {
+          label.material.map.dispose();
+        }
+        label.material.dispose();
+      }
+      this.debugGroup.remove(label);
+    });
+    this.faceLabels = [];
   }
   
   /**
@@ -75,5 +90,48 @@ export class DebugComponent extends Component {
     arrow.name = name;
     this.forceArrows.push(arrow);
     this.debugGroup.add(arrow);
+  }
+  
+  /**
+   * Ajoute un label textuel à une position donnée
+   */
+  addTextLabel(text: string, position: THREE.Vector3, color = '#ffffff', size = 0.5): void {
+    // Créer un canvas pour dessiner le texte
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    
+    // Taille du canvas
+    canvas.width = 128;
+    canvas.height = 128;
+    
+    // Style du texte
+    context.fillStyle = color;
+    context.font = 'Bold 80px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Dessiner le texte
+    context.fillText(text, 64, 64);
+    
+    // Créer une texture depuis le canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    // Créer un matériau sprite
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false, // Toujours visible au-dessus
+      depthWrite: false
+    });
+    
+    // Créer le sprite
+    const sprite = new THREE.Sprite(material);
+    sprite.position.copy(position);
+    sprite.scale.set(size, size, 1);
+    
+    this.faceLabels.push(sprite);
+    this.debugGroup.add(sprite);
   }
 }

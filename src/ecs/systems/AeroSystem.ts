@@ -173,6 +173,7 @@ export class AeroSystem extends System {
 
         // 10. Stockage pour visualisation debug
         physics.faceForces.push({
+          name: sample.descriptor.name, // Nom de la face (ex: "leftUpper")
           centroid: sample.centroid.clone(),
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
