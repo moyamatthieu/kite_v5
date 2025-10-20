@@ -110,15 +110,43 @@ export class AeroSystem extends System {
 
         const localWindDir = localApparentWind.clone().normalize();
 
-        // 3. Angle d'attaque local (basé sur la normale du panneau)
-        // Pour un cerf-volant : alpha = arccos(|normale · vent|)
-        // Cela donne alpha=90° quand le vent frappe frontalement (surface perpendiculaire au vent)
+        // 3. Angle d'attaque pour plaque plane (cerf-volant)
+        // dot = normale · vent
+        // - dot > 0 : vent frappe la face de devant → génère une force
+        // - dot < 0 : vent frappe de derrière → PAS de force
+        // - dot = 1 : vent perpendiculaire à la face (impact frontal maximal)
+        // - dot = 0 : vent parallèle à la surface (pas d'impact)
         let surfaceNormal = sample.normal.clone();
-        const dotProduct = Math.abs(surfaceNormal.dot(localWindDir));
-        const alpha = Math.acos(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
+        const dotNW = surfaceNormal.dot(localWindDir);
+        
+        // Si le vent vient de derrière, pas de force aéro sur cette face
+        if (dotNW < 0) {
+          // Stocker des forces nulles pour le debug
+          physics.faceForces.push({
+            lift: new THREE.Vector3(),
+            drag: new THREE.Vector3(),
+            gravity: new THREE.Vector3(),
+            apparentWind: localApparentWind.clone(),
+            centroid: sample.centroid.clone(),
+            name: sample.descriptor.name,
+            normal: surfaceNormal.clone()
+          });
+          return; // Pas de force si vent de derrière
+        }
 
-        // 4. Coefficients aéro locaux
-        const CL = this.calculateCL(aero, alpha);
+        // 4. Coefficient normal pour plaque plane (formule de Rayleigh)
+        // C_N = 2 × sin(α) × cos(α) = sin(2α)
+        // où α est l'angle entre la normale et le vent
+        // dot = cos(α) donc sin(α) = sqrt(1 - dot²)
+        const cosAlpha = dotNW; // déjà calculé
+        const sinAlpha = Math.sqrt(Math.max(0, 1 - cosAlpha * cosAlpha));
+        
+        // Coefficient normal pour plaque plane
+        const CN = 2.0 * sinAlpha * cosAlpha;
+        
+        // Pour compatibilité avec le reste du code, on utilise CN comme "CL"
+        // et on calcule CD de manière cohérente
+        const CL = CN * aero.coefficients.CLAlpha; // Facteur d'échelle pour tuning
         const CD = this.calculateCD(aero, CL, kiteComp.aspectRatio);
 
         // 5. Pression dynamique locale
@@ -141,14 +169,13 @@ export class AeroSystem extends System {
 
         // Debug: Logger les informations de chaque face (1 fois par seconde)
         if (this.debugFaces && this.debugFrameCounter % 60 === 0) {
-          const dotNW = surfaceNormal.dot(localWindDir);
-          const isFlipped = dotNW < 0;
+          const alphaDeg = Math.acos(Math.min(1, dotNW)) * 180 / Math.PI;
           console.log(`[AeroSystem] Face: ${sample.descriptor.name}`);
           console.log(`  Normal: (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
           console.log(`  Wind: (${localWindDir.x.toFixed(2)}, ${localWindDir.y.toFixed(2)}, ${localWindDir.z.toFixed(2)})`);
-          console.log(`  Dot product: ${dotNW.toFixed(3)} ${isFlipped ? '(FLIPPED)' : '(OK)'}`);
+          console.log(`  Dot product: ${dotNW.toFixed(3)} (cos α)`);
           console.log(`  Lift dir: (${liftDir.x.toFixed(2)}, ${liftDir.y.toFixed(2)}, ${liftDir.z.toFixed(2)})`);
-          console.log(`  Alpha: ${alpha.toFixed(1)}° | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
+          console.log(`  α: ${alphaDeg.toFixed(1)}° | CN: ${CN.toFixed(3)} | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
         }
 
         // 7. Forces locales avec orientation correcte + application des scales UI
@@ -277,32 +304,22 @@ export class AeroSystem extends System {
   }
   
   /**
-   * Calcule la direction de la portance (lift) correctement orientée
-   * ✨ CERF-VOLANT PHYSIQUE: Pour une surface plane, la portance est normale à la face
+   * Calcule la direction de la portance (lift) pour cerf-volant
+   * ✨ CERF-VOLANT PHYSIQUE: Pour une surface plane (plaque), la force est normale à la face
    * 
-   * Pour un cerf-volant (surface plane sans profil aérodynamique):
-   * - La force aérodynamique principale est perpendiculaire à la surface
-   * - Lift = force normale à la face (orientée face au vent)
-   * - Drag = composante parallèle au vent
-   * - Les coefficients CL et CD dosent l'intensité de chaque force
-   * 
-   * Cette méthode fonctionne pour TOUTES les faces du cerf-volant:
-   * - leftUpper et rightUpper (faces supérieures gauche/droite)
-   * - leftLower et rightLower (faces inférieures gauche/droite)
-   * 
-   * L'orientation automatique (dot product) garantit que la normale pointe
-   * toujours face au vent, quelle que soit l'orientation initiale de la face.
+   * Pour un cerf-volant:
+   * - La force aérodynamique est perpendiculaire à la surface (normale)
+   * - L'intensité est déterminée par le coefficient normal C_N = 2×sin(α)×cos(α)
+   * - Seules les faces "face au vent" (dot > 0) génèrent une force
    * 
    * @param surfaceNormal - Normale de la surface (unitaire)
-   * @param windDir - Direction du vent apparent (unitaire)
-   * @returns Direction du lift = normale orientée face au vent
+   * @param windDir - Direction du vent apparent (non utilisée, gardée pour compatibilité)
+   * @returns Direction du lift = normale de la surface
    */
   private calculateLiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 {
-    // S'assurer que la normale pointe face au vent
-    // Si normale·vent < 0, la normale pointe dans le sens opposé au vent → inverser
-    // Cela fonctionne automatiquement pour toutes les faces (internes et externes)
-    const dotNW = surfaceNormal.dot(windDir);
-    return dotNW < 0 ? surfaceNormal.clone().negate() : surfaceNormal.clone();
+    // Pour une plaque plane, la force est simplement normale à la surface
+    // Le filtrage "face au vent" est fait avant l'appel (dotNW < 0 → return)
+    return surfaceNormal.clone();
   }
   
   /**
