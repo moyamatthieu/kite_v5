@@ -52,15 +52,22 @@ export class KiteGeometry {
     points.set('WHISKER_GAUCHE', new THREE.Vector3(-interX * fixRatio, centreY * 0.6, -depth));
     points.set('WHISKER_DROIT', new THREE.Vector3(interX * fixRatio, centreY * 0.6, -depth));
     
-    // === POINTS DE CONTRÔLE (CTRL) - EN AVANT ===
+    // === POINTS DE CONTRÔLE (CTRL) - CALCULÉS DYNAMIQUEMENT ===
     // Points où les lignes s'attachent au kite via les brides
-    // Position : devant le kite (Z positif), centrés horizontalement
-    const ctrlHeight = 0.3; // 30cm de haut
-    const ctrlForward = 0.4; // 40cm en avant (Z positif)
-    const ctrlSpacing = 0.3; // 30cm d'espacement
+    // 
+    // IMPORTANT: Les positions CTRL ne sont PAS définies ici statiquement.
+    // Elles sont calculées dynamiquement par BridleConstraintSystem via trilatération 3D
+    // pour satisfaire les contraintes de longueur des bridles (nez, inter, centre).
+    //
+    // Les positions initiales placeholders sont fournies par BridleConstraintSystem.update()
+    // lors de la première initialisation du kite.
+    //
+    // Pour modifier les longueurs des brides, utilisez InputComponent dans l'UI,
+    // et BridleConstraintSystem recalculera automatiquement les positions CTRL.
     
-    points.set('CTRL_GAUCHE', new THREE.Vector3(-ctrlSpacing / 2, ctrlHeight, ctrlForward));
-    points.set('CTRL_DROIT', new THREE.Vector3(ctrlSpacing / 2, ctrlHeight, ctrlForward));
+    // Placeholder: positions seront recalculées par BridleConstraintSystem
+    points.set('CTRL_GAUCHE', new THREE.Vector3(0, 0, 0));
+    points.set('CTRL_DROIT', new THREE.Vector3(0, 0, 0));
     
     return points;
   }

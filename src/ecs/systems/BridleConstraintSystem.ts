@@ -37,6 +37,7 @@ const CONVERGENCE_EPSILON = 0.0001; // 0.1mm - seuil de convergence
  */
 export class BridleConstraintSystem extends System {
   private lastLengths: BridleLengths = { nez: 0, inter: 0, centre: 0 };
+  private initialized = false;
 
   constructor() {
     super('BridleConstraintSystem', PRIORITY);
@@ -52,6 +53,19 @@ export class BridleConstraintSystem extends System {
     const bridle = kite.getComponent<BridleComponent>('bridle');
 
     if (!geometry || !bridle) return;
+
+    // ✨ INITIALISATION: Au premier appel, forcer le calcul des positions CTRL
+    if (!this.initialized) {
+      this.initialized = true;
+      this.lastLengths = {
+        nez: bridle.lengths.nez,
+        inter: bridle.lengths.inter,
+        centre: bridle.lengths.centre
+      };
+      console.log(`🔧 [BridleConstraintSystem] Initialisation des positions CTRL via trilatération`);
+      this.updateControlPointPositions(geometry, bridle);
+      return;
+    }
 
     // Vérifier si les longueurs ont changé
     const lengthsChanged = 

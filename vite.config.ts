@@ -33,6 +33,9 @@ export default defineConfig({
       '@objects': resolve(__dirname, 'src/ecs/objects'),
       '@factories': resolve(__dirname, 'src/ecs/factories'),
       '@types': resolve(__dirname, 'src/ecs/types'), // Alias for @mytypes for backward compat
+
+      // === Deduplicate Three.js ===
+      three: resolve(__dirname, 'node_modules/three'),
     }
   },
   server: {
