@@ -1,18 +1,22 @@
 /**
- * ConstraintSystem.ts - Gestion des contraintes de lignes (PBD complet)
+ * ConstraintSystem.ts - Gestion des contraintes de lignes (PBD + Spring-Force)
  *
- * ARCHITECTURE INSPIRÉE DU LEGACY (ConstraintSolverPBD.ts) :
+ * DUAL MODE CONSTRAINT SYSTEM :
  *
- * Le problème des approches précédentes :
- * - Modifier transform.position/quaternion pendant les itérations
- * - Les points CTRL bougent à chaque itération (coordonnées locales)
- * - Les 2 lignes se battent entre elles
+ * 1. PBD (Position-Based Dynamics) - Architecture inspirée du legacy :
+ *    - Sauvegarder l'état initial (position, quaternion)
+ *    - Calculer positions monde CTRL avec état initial
+ *    - Itérer pour résoudre les 2 contraintes ensemble (Gauss-Seidel)
+ *    - Appliquer les corrections finales une seule fois
+ *    - Avantages : Rigide, stable, pas d'oscillations
  *
- * Solution legacy :
- * 1. Sauvegarder l'état initial (position, quaternion)
- * 2. Calculer positions monde CTRL avec état initial
- * 3. Itérer pour résoudre les 2 contraintes ensemble
- * 4. Appliquer les corrections finales une seule fois
+ * 2. Spring-Force (Forces ressort classiques) :
+ *    - Calculer extension de chaque ligne
+ *    - Appliquer force F = -k × extension - c × vitesse
+ *    - Distribuer force/torque selon point d'attache
+ *    - Avantages : Physique intuitive, tuneable
+ *
+ * Le mode est sélectionné via InputComponent.constraintMode
  *
  * Priorité 40 (AVANT PhysicsSystem 50, APRÈS AeroSystem 30)
  */
@@ -24,6 +28,7 @@ import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
+import { InputComponent } from '../components/InputComponent';
 import { CONFIG } from '../config/Config';
 
 const GROUND_Y = 0;
@@ -36,6 +41,24 @@ export class ConstraintSystem extends System {
   }
 
   update(context: SimulationContext): void {
+    // Récupérer le mode de contrainte depuis InputComponent
+    const inputEntities = context.entityManager.query(['Input']);
+    const inputComponent = inputEntities[0]?.getComponent<InputComponent>('Input');
+
+    const mode = inputComponent?.constraintMode ?? CONFIG.lines.constraintMode;
+
+    // Basculer entre les deux modes
+    if (mode === 'pbd') {
+      this.updatePBD(context);
+    } else {
+      this.updateSpringForce(context);
+    }
+  }
+
+  /**
+   * MODE PBD : Position-Based Dynamics avec architecture legacy
+   */
+  private updatePBD(context: SimulationContext): void {
     const { entityManager, deltaTime } = context;
 
     const kite = entityManager.getEntity('kite');
@@ -128,7 +151,7 @@ export class ConstraintSystem extends System {
         .add(correctedPosition);
 
       // === CONTRAINTE LIGNE GAUCHE ===
-      this.solveLineConstraint({
+      this.solveLineConstraintPBD({
         ctrlWorld: ctrlLeftCurrent,
         handleWorld: leftHandleWorld,
         restLength: leftLineComp.restLength,
@@ -142,7 +165,7 @@ export class ConstraintSystem extends System {
       });
 
       // === CONTRAINTE LIGNE DROITE ===
-      this.solveLineConstraint({
+      this.solveLineConstraintPBD({
         ctrlWorld: ctrlRightCurrent,
         handleWorld: rightHandleWorld,
         restLength: rightLineComp.restLength,
@@ -173,10 +196,93 @@ export class ConstraintSystem extends System {
   }
 
   /**
-   * Résout une contrainte de ligne individuelle
+   * MODE SPRING-FORCE : Forces ressort classiques
+   */
+  private updateSpringForce(context: SimulationContext): void {
+    const { entityManager } = context;
+
+    const kite = entityManager.getEntity('kite');
+    const controlBar = entityManager.getEntity('controlBar');
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
+
+    if (!kite || !controlBar || !leftLine || !rightLine) {
+      return;
+    }
+
+    const kiteTransform = kite.getComponent<TransformComponent>('transform');
+    const kitePhysics = kite.getComponent<PhysicsComponent>('physics');
+    const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
+
+    if (!kiteTransform || !kitePhysics || !kiteGeometry) {
+      return;
+    }
+
+    if (kitePhysics.isKinematic) {
+      return;
+    }
+
+    // Points de contrôle du kite
+    const ctrlGaucheWorld = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
+    const ctrlDroitWorld = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
+
+    if (!ctrlGaucheWorld || !ctrlDroitWorld) {
+      console.warn('[ConstraintSystem] Points CTRL manquants');
+      return;
+    }
+
+    // Handles de la barre
+    const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
+    if (!barGeometry) return;
+
+    const leftHandleWorld = barGeometry.getPointWorld('leftHandle', controlBar);
+    const rightHandleWorld = barGeometry.getPointWorld('rightHandle', controlBar);
+
+    if (!leftHandleWorld || !rightHandleWorld) {
+      return;
+    }
+
+    // Composants des lignes
+    const leftLineComp = leftLine.getComponent<LineComponent>('line');
+    const rightLineComp = rightLine.getComponent<LineComponent>('line');
+
+    if (!leftLineComp || !rightLineComp) {
+      return;
+    }
+
+    // === LIGNE GAUCHE ===
+    this.applySpringForce({
+      ctrlWorld: ctrlGaucheWorld,
+      handleWorld: leftHandleWorld,
+      restLength: leftLineComp.restLength,
+      kiteTransform,
+      kitePhysics,
+      lineComponent: leftLineComp
+    });
+
+    // === LIGNE DROITE ===
+    this.applySpringForce({
+      ctrlWorld: ctrlDroitWorld,
+      handleWorld: rightHandleWorld,
+      restLength: rightLineComp.restLength,
+      kiteTransform,
+      kitePhysics,
+      lineComponent: rightLineComp
+    });
+
+    // Collision sol
+    this.handleGroundCollision(kiteTransform, kitePhysics);
+  }
+
+  // ============================================================================
+  // MÉTHODES PBD
+  // ============================================================================
+
+  /**
+   * Résout une contrainte de ligne individuelle (PBD)
    * Modifie correctedPosition et correctedQuaternion par référence
    */
-  private solveLineConstraint(params: {
+  private solveLineConstraintPBD(params: {
     ctrlWorld: THREE.Vector3;
     handleWorld: THREE.Vector3;
     restLength: number;
@@ -267,8 +373,105 @@ export class ConstraintSystem extends System {
     lineComponent.currentTension = isFinite(estimatedTension) ? estimatedTension : 0;
   }
 
+  // ============================================================================
+  // MÉTHODES SPRING-FORCE
+  // ============================================================================
+
   /**
-   * Amortit les vitesses basées sur les corrections appliquées
+   * Applique une force ressort à une ligne (Spring-Force mode)
+   */
+  private applySpringForce(params: {
+    ctrlWorld: THREE.Vector3;
+    handleWorld: THREE.Vector3;
+    restLength: number;
+    kiteTransform: TransformComponent;
+    kitePhysics: PhysicsComponent;
+    lineComponent: LineComponent;
+  }): void {
+    const {
+      ctrlWorld,
+      handleWorld,
+      restLength,
+      kiteTransform,
+      kitePhysics,
+      lineComponent
+    } = params;
+
+    // === 1. CALCUL EXTENSION ===
+    const diff = handleWorld.clone().sub(ctrlWorld);
+    const distance = diff.length();
+
+    if (distance < EPSILON) {
+      return;
+    }
+
+    const direction = diff.normalize();
+    const extension = distance - restLength;
+
+    // Mettre à jour état ligne
+    lineComponent.currentLength = distance;
+    lineComponent.state.currentLength = distance;
+
+    // Contrainte unilatérale : seulement tension
+    if (extension <= 0) {
+      lineComponent.state.isTaut = false;
+      lineComponent.state.elongation = 0;
+      lineComponent.currentTension = 0;
+      return;
+    }
+
+    lineComponent.state.isTaut = true;
+    lineComponent.state.elongation = extension;
+    lineComponent.state.strainRatio = extension / restLength;
+
+    // === 2. CALCUL FORCE RESSORT ===
+    const stiffness = CONFIG.lines.springForce.stiffness;
+    const damping = CONFIG.lines.springForce.damping;
+    const maxForce = CONFIG.lines.springForce.maxForce;
+
+    // Force élastique : F = k × extension
+    let springForce = stiffness * extension;
+
+    // Amortissement : calculer vitesse relative au point d'attache
+    const r = ctrlWorld.clone().sub(kiteTransform.position);
+    const angularContribution = new THREE.Vector3()
+      .crossVectors(kitePhysics.angularVelocity, r);
+    const pointVelocity = kitePhysics.velocity.clone().add(angularContribution);
+
+    // Composante radiale de la vitesse (le long de la ligne)
+    const radialVelocity = pointVelocity.dot(direction);
+
+    // Force d'amortissement : F_damp = -c × v_radial
+    const dampingForce = damping * radialVelocity;
+
+    // Force totale
+    let totalForce = springForce + dampingForce;
+
+    // Limiter la force
+    if (totalForce > maxForce) {
+      totalForce = maxForce;
+    }
+
+    // Stocker la tension
+    lineComponent.currentTension = totalForce;
+
+    // === 3. APPLIQUER FORCE ET TORQUE ===
+    const forceVector = direction.clone().multiplyScalar(totalForce);
+
+    // Force linéaire
+    kitePhysics.forces.add(forceVector);
+
+    // Torque (r × F)
+    const torque = new THREE.Vector3().crossVectors(r, forceVector);
+    kitePhysics.torques.add(torque);
+  }
+
+  // ============================================================================
+  // MÉTHODES COMMUNES
+  // ============================================================================
+
+  /**
+   * Amortit les vitesses basées sur les corrections appliquées (PBD)
    */
   private dampVelocities(
     physics: PhysicsComponent,
