@@ -28,6 +28,7 @@ import { LineComponent } from '../components/LineComponent';
 import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { InputComponent } from '../components/InputComponent';
+import { GeometryComponent } from '../components/GeometryComponent';
 import { CONFIG } from '../config/Config';
 
 export class PilotSystem extends System {
@@ -169,7 +170,7 @@ export class PilotSystem extends System {
 
   /**
    * Met à jour la rotation de la barre de contrôle depuis les inputs clavier
-   * Rotation autour de l'axe Y (vertical) au niveau du point pivot
+   * Rotation autour d'un axe perpendiculaire au vecteur (pivot → milieu_CTRL)
    */
   private updateBarRotation(entityManager: EntityManager, deltaTime: number): void {
     // Récupérer l'input de rotation depuis InputComponent
@@ -185,6 +186,14 @@ export class PilotSystem extends System {
 
     const barTransform = controlBar.getComponent<TransformComponent>('transform');
     if (!barTransform) return;
+
+    // Récupérer le kite et sa géométrie
+    const kite = entityManager.getEntity('kite');
+    if (!kite) return;
+
+    const kiteGeom = kite.getComponent<GeometryComponent>('geometry');
+    const kiteTransform = kite.getComponent<TransformComponent>('transform');
+    if (!kiteGeom || !kiteTransform) return;
 
     // Mettre à jour l'angle de rotation selon l'input (-1, 0, ou 1)
     const rotationInput = inputComp.barRotationInput;
@@ -206,10 +215,59 @@ export class PilotSystem extends System {
       }
     }
 
-    // Appliquer la rotation autour de l'axe Y (vertical)
+    // Calculer les positions mondiales des points CTRL
+    const ctrlLeftLocal = kiteGeom.getPoint('CTRL_LEFT');
+    const ctrlRightLocal = kiteGeom.getPoint('CTRL_RIGHT');
+    
+    if (!ctrlLeftLocal || !ctrlRightLocal) {
+      // Fallback : rotation autour de l'axe Y si CTRL non trouvés
+      const rotationRad = this.barRotationAngle * Math.PI / 180;
+      const yAxis = new THREE.Vector3(0, 1, 0);
+      barTransform.quaternion.setFromAxisAngle(yAxis, rotationRad);
+      return;
+    }
+
+    // Convertir les points CTRL en coordonnées monde
+    const ctrlLeftWorld = ctrlLeftLocal.clone()
+      .applyQuaternion(kiteTransform.quaternion)
+      .add(kiteTransform.position);
+    const ctrlRightWorld = ctrlRightLocal.clone()
+      .applyQuaternion(kiteTransform.quaternion)
+      .add(kiteTransform.position);
+
+    // Calculer le milieu des points CTRL
+    const ctrlMidpoint = ctrlLeftWorld.clone()
+      .add(ctrlRightWorld)
+      .multiplyScalar(0.5);
+
+    // Vecteur du pivot de la barre vers le milieu des CTRL
+    const toKite = ctrlMidpoint.clone().sub(barTransform.position);
+    
+    // Si le vecteur est trop court, utiliser l'axe Y par défaut
+    if (toKite.lengthSq() < 1e-6) {
+      const rotationRad = this.barRotationAngle * Math.PI / 180;
+      const yAxis = new THREE.Vector3(0, 1, 0);
+      barTransform.quaternion.setFromAxisAngle(yAxis, rotationRad);
+      return;
+    }
+    
+    toKite.normalize();
+
+    // Calculer l'axe de rotation perpendiculaire à toKite
+    // rotationAxis = up × toKite (produit vectoriel)
+    const up = new THREE.Vector3(0, 1, 0);
+    const rotationAxis = up.clone().cross(toKite);
+    
+    // Si toKite est colinéaire à Y (vertical pur), utiliser l'axe X
+    if (rotationAxis.lengthSq() < 1e-6) {
+      rotationAxis.set(1, 0, 0);
+    } else {
+      rotationAxis.normalize();
+    }
+
+    // Appliquer la rotation autour de l'axe calculé
     const rotationRad = this.barRotationAngle * Math.PI / 180;
-    const yAxis = new THREE.Vector3(0, 1, 0);
-    barTransform.quaternion.setFromAxisAngle(yAxis, rotationRad);
+    barTransform.quaternion.setFromAxisAngle(rotationAxis, rotationRad);
   }
 
   /**

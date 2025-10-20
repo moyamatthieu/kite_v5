@@ -34,13 +34,14 @@ export class InputSystem extends System {
     if (!inputComp) return;
 
     // Mettre à jour l'input de rotation depuis le clavier
-    // Flèche gauche ou Q = -1 (rotation gauche)
-    // Flèche droite ou D = +1 (rotation droite)
+    // INVERSÉ pour correspondre à l'intuition du pilote :
+    // Flèche gauche ou Q = +1 (rotation droite de la barre = cerf-volant va à gauche)
+    // Flèche droite ou D = -1 (rotation gauche de la barre = cerf-volant va à droite)
     // Aucune touche = 0 (neutre)
     if (this.keys.has('arrowleft') || this.keys.has('q')) {
-      inputComp.barRotationInput = -1;
-    } else if (this.keys.has('arrowright') || this.keys.has('d')) {
       inputComp.barRotationInput = 1;
+    } else if (this.keys.has('arrowright') || this.keys.has('d')) {
+      inputComp.barRotationInput = -1;
     } else {
       inputComp.barRotationInput = 0;
     }
