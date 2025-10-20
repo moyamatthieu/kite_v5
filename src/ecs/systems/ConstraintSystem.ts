@@ -56,10 +56,15 @@ export class ConstraintSystem extends System {
   }
 
   /**
-   * MODE PBD : Position-Based Dynamics avec architecture legacy
+   * MODE PBD : Position-Based Dynamics - SIMPLE ET STABLE
+   * 
+   * Approche ultra-simple : contrainte de distance inélastique
+   * - Mesurer la distance entre CTRL et handle
+   * - Si distance > restLength, projeter le kite pour ramener à restLength
+   * - Pas d'itérations complexes, pas de calculs de lambda
    */
   private updatePBD(context: SimulationContext): void {
-    const { entityManager, deltaTime } = context;
+    const { entityManager } = context;
 
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
@@ -72,9 +77,8 @@ export class ConstraintSystem extends System {
 
     const kiteTransform = kite.getComponent<TransformComponent>('transform');
     const kitePhysics = kite.getComponent<PhysicsComponent>('physics');
-    const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
 
-    if (!kiteTransform || !kitePhysics || !kiteGeometry) {
+    if (!kiteTransform || !kitePhysics) {
       return;
     }
 
@@ -82,56 +86,22 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    // === ARCHITECTURE LEGACY : Sauvegarder état initial ===
-    const initialPosition = kiteTransform.position.clone();
-    const initialQuaternion = kiteTransform.quaternion.clone();
+    const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
+    if (!kiteGeometry) return;
 
-    // Calculer positions monde CTRL avec état initial (UNE FOIS)
-    const ctrlGaucheLocal = kiteGeometry.getPoint('CTRL_GAUCHE');
-    const ctrlDroitLocal = kiteGeometry.getPoint('CTRL_DROIT');
-
-    if (!ctrlGaucheLocal || !ctrlDroitLocal) {
-      console.warn('[ConstraintSystem] Points CTRL manquants');
-      return;
-    }
-
-    // === Positions des handles (barre) ===
     const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
-    const barTransform = controlBar.getComponent<TransformComponent>('transform');
+    if (!barGeometry) return;
 
-    if (!barGeometry || !barTransform) {
+    // Récupérer positions monde actuelles
+    const ctrlGauche = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
+    const ctrlDroit = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
+    const leftHandle = barGeometry.getPointWorld('leftHandle', controlBar);
+    const rightHandle = barGeometry.getPointWorld('rightHandle', controlBar);
+
+    if (!ctrlGauche || !ctrlDroit || !leftHandle || !rightHandle) {
       return;
     }
 
-    const leftHandleWorld = barGeometry.getPointWorld('leftHandle', controlBar);
-    const rightHandleWorld = barGeometry.getPointWorld('rightHandle', controlBar);
-
-    if (!leftHandleWorld || !rightHandleWorld) {
-      return;
-    }
-
-    // === RÉSOLUTION PBD : Itérations Gauss-Seidel ===
-    // On modifie des variables temporaires, pas les transforms
-    let correctedPosition = initialPosition.clone();
-    let correctedQuaternion = initialQuaternion.clone();
-
-    const iterations = CONFIG.lines.pbd.iterations;
-    const compliance = CONFIG.lines.pbd.compliance;
-    const invMass = 1.0 / kitePhysics.mass;
-
-    // Inertie moyenne (simplifié)
-    const I_avg = (kitePhysics.inertia.elements[0] +
-                   kitePhysics.inertia.elements[4] +
-                   kitePhysics.inertia.elements[8]) / 3;
-    const invInertia = I_avg > EPSILON ? 1.0 / I_avg : 0;
-
-    if (deltaTime < EPSILON) {
-      return; // Éviter division par zéro
-    }
-
-    const alpha = compliance / (deltaTime * deltaTime);
-
-    // Composants des lignes
     const leftLineComp = leftLine.getComponent<LineComponent>('line');
     const rightLineComp = rightLine.getComponent<LineComponent>('line');
 
@@ -139,63 +109,100 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    // === ITÉRATIONS PBD ===
-    for (let iter = 0; iter < iterations; iter++) {
-      // Recalculer positions CTRL avec état corrigé
-      const ctrlLeftCurrent = ctrlGaucheLocal.clone()
-        .applyQuaternion(correctedQuaternion)
-        .add(correctedPosition);
+    // === SIMPLE CONSTRAINT : Project onto distance sphere ===
+    // Si distance > restLength, rapprocher le kite du handle
+    const leftDist = leftHandle.distanceTo(ctrlGauche);
+    const rightDist = rightHandle.distanceTo(ctrlDroit);
 
-      const ctrlRightCurrent = ctrlDroitLocal.clone()
-        .applyQuaternion(correctedQuaternion)
-        .add(correctedPosition);
+    // Mettre à jour les états des lignes
+    leftLineComp.currentLength = leftDist;
+    leftLineComp.state.currentLength = leftDist;
+    rightLineComp.currentLength = rightDist;
+    rightLineComp.state.currentLength = rightDist;
 
-      // === CONTRAINTE LIGNE GAUCHE ===
-      this.solveLineConstraintPBD({
-        ctrlWorld: ctrlLeftCurrent,
-        handleWorld: leftHandleWorld,
-        restLength: leftLineComp.restLength,
-        correctedPosition,
-        correctedQuaternion,
-        invMass,
-        invInertia,
-        alpha,
-        lineComponent: leftLineComp,
-        deltaTime
-      });
-
-      // === CONTRAINTE LIGNE DROITE ===
-      this.solveLineConstraintPBD({
-        ctrlWorld: ctrlRightCurrent,
-        handleWorld: rightHandleWorld,
-        restLength: rightLineComp.restLength,
-        correctedPosition,
-        correctedQuaternion,
-        invMass,
-        invInertia,
-        alpha,
-        lineComponent: rightLineComp,
-        deltaTime
-      });
+    if (leftDist > leftLineComp.restLength) {
+      leftLineComp.state.isTaut = true;
+      leftLineComp.state.elongation = leftDist - leftLineComp.restLength;
+      leftLineComp.state.strainRatio = leftLineComp.state.elongation / leftLineComp.restLength;
+      leftLineComp.currentTension = leftLineComp.state.elongation * 100; // Approximation
+    } else {
+      leftLineComp.state.isTaut = false;
+      leftLineComp.state.elongation = 0;
+      leftLineComp.state.strainRatio = 0;
+      leftLineComp.currentTension = 0;
     }
 
-    // === APPLICATION DES CORRECTIONS FINALES ===
-    // Calculer les deltas
-    const deltaPosition = correctedPosition.clone().sub(initialPosition);
-    const deltaQuaternion = correctedQuaternion.clone().multiply(initialQuaternion.clone().invert());
+    if (rightDist > rightLineComp.restLength) {
+      rightLineComp.state.isTaut = true;
+      rightLineComp.state.elongation = rightDist - rightLineComp.restLength;
+      rightLineComp.state.strainRatio = rightLineComp.state.elongation / rightLineComp.restLength;
+      rightLineComp.currentTension = rightLineComp.state.elongation * 100;
+    } else {
+      rightLineComp.state.isTaut = false;
+      rightLineComp.state.elongation = 0;
+      rightLineComp.state.strainRatio = 0;
+      rightLineComp.currentTension = 0;
+    }
 
-    // Appliquer au kite
-    kiteTransform.position.copy(correctedPosition);
-    kiteTransform.quaternion.copy(correctedQuaternion);
+    // === ÉTAPE 1: APPLIQUER LES FORCES DES LIGNES POUR GÉNÉRER DU TORQUE ===
+    // IMPORTANT: Sans les forces, le kite ne peut pas se tourner pour générer de la portance!
+    // On applique une force qui crée un torque permettant au kite de s'orienter au vent.
+    
+    // Ligne gauche - calcul de la force pour créer un torque
+    if (leftDist > 0) {
+      const direction = leftHandle.clone().sub(ctrlGauche).normalize();
+      const elongation = Math.max(0, leftDist - leftLineComp.restLength);
+      const k = 100; // Rigidité de la ligne
+      const magnitude = k * elongation;
+      
+      // Force sur le CTRL point crée un torque autour du centre du kite
+      const force = direction.multiplyScalar(magnitude);
+      kitePhysics.forces.add(force);
+      
+      // Torque = r × F (r = vecteur du centre à CTRL)
+      const r = ctrlGauche.clone().sub(kiteTransform.position);
+      const torque = new THREE.Vector3().crossVectors(r, force);
+      kitePhysics.torques.add(torque);
+    }
 
-    // ✅ ARCHITECTURE ECS PURE : Les points CTRL locaux restent INCHANGÉS
-    // Seuls position/quaternion du kite changent. Les positions WORLD des CTRL
-    // seront automatiquement correctes via getPointWorld() qui applique le transform.
-    // Les points CTRL locaux ne sont modifiés QUE par BridleConstraintSystem
-    // lors des changements de longueurs de brides.
+    // Ligne droite
+    if (rightDist > 0) {
+      const direction = rightHandle.clone().sub(ctrlDroit).normalize();
+      const elongation = Math.max(0, rightDist - rightLineComp.restLength);
+      const k = 100;
+      const magnitude = k * elongation;
+      
+      const force = direction.multiplyScalar(magnitude);
+      kitePhysics.forces.add(force);
+      
+      const r = ctrlDroit.clone().sub(kiteTransform.position);
+      const torque = new THREE.Vector3().crossVectors(r, force);
+      kitePhysics.torques.add(torque);
+    }
 
-    // Amortir les vitesses (projection)
-    this.dampVelocities(kitePhysics, deltaPosition, deltaQuaternion, deltaTime);
+    // === ÉTAPE 2: PROJECTION DE DISTANCE - CONTRAINTE RIGIDE ===
+    // Ramener le kite si les lignes dépassent la limite
+    let correction = new THREE.Vector3(0, 0, 0);
+
+    // Contrainte gauche
+    if (leftDist > leftLineComp.restLength) {
+      const direction = ctrlGauche.clone().sub(leftHandle).normalize();
+      const delta = leftDist - leftLineComp.restLength;
+      correction.add(direction.multiplyScalar(delta * 0.5)); // 50% de la correction pour chaque ligne
+    }
+
+    // Contrainte droite
+    if (rightDist > rightLineComp.restLength) {
+      const direction = ctrlDroit.clone().sub(rightHandle).normalize();
+      const delta = rightDist - rightLineComp.restLength;
+      correction.add(direction.multiplyScalar(delta * 0.5));
+    }
+
+    // Appliquer la correction (ramener le kite VERS la barre, pas le repousser)
+    if (correction.length() > EPSILON) {
+      correction.multiplyScalar(-1); // Inverser pour rapprocher
+      kiteTransform.position.add(correction);
+    }
 
     // Collision sol
     this.handleGroundCollision(kiteTransform, kitePhysics);
@@ -288,111 +295,6 @@ export class ConstraintSystem extends System {
    * Résout une contrainte de ligne individuelle (PBD)
    * Modifie correctedPosition et correctedQuaternion par référence
    */
-  private solveLineConstraintPBD(params: {
-    ctrlWorld: THREE.Vector3;
-    handleWorld: THREE.Vector3;
-    restLength: number;
-    correctedPosition: THREE.Vector3;
-    correctedQuaternion: THREE.Quaternion;
-    invMass: number;
-    invInertia: number;
-    alpha: number;
-    lineComponent: LineComponent;
-    deltaTime: number;
-  }): void {
-    const {
-      ctrlWorld,
-      handleWorld,
-      restLength,
-      correctedPosition,
-      correctedQuaternion,
-      invMass,
-      invInertia,
-      alpha,
-      lineComponent,
-      deltaTime
-    } = params;
-
-    // === 1. CALCUL VIOLATION ===
-    const diff = handleWorld.clone().sub(ctrlWorld);
-    const distance = diff.length();
-
-    if (distance < EPSILON) {
-      return;
-    }
-
-    const direction = diff.normalize();
-    const extension = distance - restLength;
-
-    // Mettre à jour état ligne
-    lineComponent.currentLength = distance;
-    lineComponent.state.currentLength = distance;
-
-    // Contrainte unilatérale : seulement tension
-    if (extension <= 0) {
-      lineComponent.state.isTaut = false;
-      lineComponent.state.elongation = 0;
-      lineComponent.currentTension = 0;
-      return;
-    }
-
-    lineComponent.state.isTaut = true;
-    lineComponent.state.elongation = extension;
-    lineComponent.state.strainRatio = extension / restLength;
-
-    // === 2. CALCUL LAMBDA PBD ===
-    // Bras de levier
-    const r = ctrlWorld.clone().sub(correctedPosition);
-    const rCrossN = new THREE.Vector3().crossVectors(r, direction);
-    let denominator = invMass + rCrossN.lengthSq() * invInertia + alpha;
-
-    if (denominator < EPSILON) {
-      return;
-    }
-
-    // ✨ Assurer une stabilité minimale : limiter le lambda maximum ✨
-    const minDenominator = Math.max(EPSILON, 0.1); // Minimum raisonnable pour éviter lambdas énormes
-    denominator = Math.max(denominator, minDenominator);
-
-    const lambda = -extension / denominator;
-
-    // ✨ PROTECTIONS POUR STABILITÉ ✨
-    // Limiter lambda de façon STRICTE pour convergence stable
-    const maxLambda = CONFIG.lines.pbd.maxLambda; // Limite stricte = 100
-    const clampedLambda = Math.max(Math.min(lambda, maxLambda), -maxLambda);
-
-    // Si lambda s'écarte trop, cela indique une instabilité
-    if (!isFinite(clampedLambda)) {
-      return;
-    }
-
-    // === 3. CORRECTIONS (appliquées aux variables temporaires) ===
-    // Position
-    const deltaP = direction.clone().multiplyScalar(clampedLambda * invMass);
-
-    // Limiter magnitude
-    const maxCorrection = CONFIG.lines.pbd.maxCorrection;
-    if (deltaP.length() > maxCorrection) {
-      deltaP.setLength(maxCorrection);
-    }
-
-    correctedPosition.add(deltaP);
-
-    // Rotation
-    const deltaTheta = rCrossN.clone().multiplyScalar(-clampedLambda * invInertia);
-    const angle = deltaTheta.length();
-
-    if (angle > EPSILON && isFinite(angle)) {
-      const axis = deltaTheta.normalize();
-      const deltaQuat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      correctedQuaternion.premultiply(deltaQuat).normalize();
-    }
-
-    // Estimation tension
-    const estimatedTension = Math.abs(clampedLambda) / (deltaTime * deltaTime);
-    lineComponent.currentTension = isFinite(estimatedTension) ? estimatedTension : 0;
-  }
-
   // ============================================================================
   // MÉTHODES SPRING-FORCE
   // ============================================================================
