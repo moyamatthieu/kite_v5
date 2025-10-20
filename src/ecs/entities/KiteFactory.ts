@@ -101,17 +101,17 @@ export class KiteFactory {
 
     // Déclarer les surfaces triangulaires de la toile
     // ⚠️ ORDRE DES VERTICES = DIRECTION DE LA NORMALE (règle main droite)
-    // Pour que la normale pointe vers l'AVANT (face au vent):
-    // - Vue de dessus, ordre ANTI-HORAIRE = normale vers +Z (avant)
+    // Les WHISKERS sont à Z=-0.15 (vers l'arrière)
+    // Pour que la normale pointe vers l'AVANT (+Z), il faut inverser l'ordre standard
     // 
-    // Surface 0 (leftUpper) - INVERSÉE pour normale vers avant
-    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE']); 
-    // Surface 1 (leftLower)  
-    geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'SPINE_BAS']);
-    // Surface 2 (rightUpper) - INVERSÉE pour normale vers avant
-    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'BORD_DROIT']);
-    // Surface 3 (rightLower)
-    geometry.addSurface(['NEZ', 'WHISKER_DROIT', 'SPINE_BAS']);
+    // Surface 0 (leftUpper) - ordre inversé pour normale +Z
+    geometry.addSurface(['NEZ', 'BORD_GAUCHE', 'WHISKER_GAUCHE']); 
+    // Surface 1 (leftLower) - ordre inversé pour normale +Z  
+    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE']);
+    // Surface 2 (rightUpper) - ordre inversé pour normale +Z
+    geometry.addSurface(['NEZ', 'BORD_DROIT', 'WHISKER_DROIT']);
+    // Surface 3 (rightLower) - ordre inversé pour normale +Z
+    geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_DROIT']);
     
     entity.addComponent(geometry);
   }
