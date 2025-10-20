@@ -216,8 +216,8 @@ export class PilotSystem extends System {
     }
 
     // Calculer les positions mondiales des points CTRL
-    const ctrlLeftLocal = kiteGeom.getPoint('CTRL_LEFT');
-    const ctrlRightLocal = kiteGeom.getPoint('CTRL_RIGHT');
+    const ctrlLeftLocal = kiteGeom.getPoint('CTRL_GAUCHE');
+    const ctrlRightLocal = kiteGeom.getPoint('CTRL_DROIT');
     
     if (!ctrlLeftLocal || !ctrlRightLocal) {
       // Fallback : rotation autour de l'axe Y si CTRL non trouvés
