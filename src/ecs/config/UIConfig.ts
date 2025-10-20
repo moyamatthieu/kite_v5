@@ -37,6 +37,14 @@ export const UI_METADATA = {
   },
 
   lines: {
+    constraintMode: {
+      options: ['pbd', 'spring-force'] as const,
+      labels: {
+        pbd: 'PBD (Rigide)',
+        'spring-force': 'Forces Ressort'
+      },
+      label: 'Mode de contrainte'
+    },
     length: {
       min: 5,
       max: 300,

@@ -222,6 +222,105 @@
       box-shadow: 0 0 16px rgba(77, 166, 255, 0.6);
     }
 
+    /* Toggle Switch pour mode contrainte */
+    .constraint-mode-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      background: rgba(100, 150, 255, 0.08);
+      border-radius: 6px;
+      border: 1px solid rgba(100, 150, 255, 0.15);
+    }
+
+    .constraint-mode-toggle label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #9db4d4;
+      margin: 0;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 28px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a2740;
+      transition: 0.3s;
+      border-radius: 14px;
+      border: 1px solid rgba(100, 150, 255, 0.3);
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 56px;
+      left: 4px;
+      bottom: 3px;
+      background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+      transition: 0.3s;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(56px);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .toggle-labels {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      pointer-events: none;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .toggle-labels span {
+      transition: color 0.3s;
+      z-index: 1;
+    }
+
+    .toggle-labels .label-pbd {
+      color: #fff;
+    }
+
+    .toggle-labels .label-force {
+      color: #6b7280;
+    }
+
+    .toggle-switch input:checked ~ .toggle-labels .label-pbd {
+      color: #6b7280;
+    }
+
+    .toggle-switch input:checked ~ .toggle-labels .label-force {
+      color: #fff;
+    }
+
   </style>
 </head>
 <body>
@@ -313,7 +412,20 @@
     <!-- Panneau de contrôles (droite) -->
     <div id="controls-panel" class="panel">
       <h2>⚙️ Contrôles Simulation</h2>
-      
+
+      <!-- Mode de contrainte -->
+      <div class="constraint-mode-toggle">
+        <label>Mode Contrainte</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="constraint-mode-toggle">
+          <span class="toggle-slider"></span>
+          <div class="toggle-labels">
+            <span class="label-pbd">PBD</span>
+            <span class="label-force">Force</span>
+          </div>
+        </label>
+      </div>
+
       <!-- Boutons de contrôle en haut -->
       <div class="button-group">
         <button id="play-pause">▶️ Démarrer</button>

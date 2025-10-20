@@ -230,7 +230,7 @@ export class UISystem extends System {
         this.updatePlayPauseButton(playPauseBtn, !this.inputComponent.isPaused);
         this.logger.info(`Simulation ${this.inputComponent.isPaused ? 'paused' : 'resumed'}`, 'UISystem');
       };
-      
+
       // Initialiser l'état visuel du bouton selon isPaused
       this.updatePlayPauseButton(playPauseBtn, !this.inputComponent.isPaused);
     }
@@ -253,10 +253,24 @@ export class UISystem extends System {
         debugBtn.classList.toggle('active', this.inputComponent.debugMode);
         this.logger.info(`Debug mode: ${this.inputComponent.debugMode}`, 'UISystem');
       };
-      
+
       // Initialiser l'état du bouton
       debugBtn.textContent = this.inputComponent.debugMode ? '🔍 Debug ON' : '🔍 Debug OFF';
       debugBtn.classList.toggle('active', this.inputComponent.debugMode);
+    }
+
+    // Toggle Mode de Contrainte
+    const constraintModeToggle = document.getElementById('constraint-mode-toggle') as HTMLInputElement;
+    if (constraintModeToggle) {
+      // Initialiser l'état du toggle selon inputComponent.constraintMode
+      // Unchecked = 'pbd', Checked = 'spring-force'
+      constraintModeToggle.checked = this.inputComponent.constraintMode === 'spring-force';
+
+      // Event listener pour mettre à jour le mode de contrainte
+      constraintModeToggle.addEventListener('change', () => {
+        this.inputComponent.constraintMode = constraintModeToggle.checked ? 'spring-force' : 'pbd';
+        this.logger.info(`Constraint mode changed to: ${this.inputComponent.constraintMode}`, 'UISystem');
+      });
     }
   }
 
