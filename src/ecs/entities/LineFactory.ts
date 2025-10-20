@@ -24,8 +24,8 @@ export class LineFactory {
     // === LINE COMPONENT ===
     entity.addComponent(new LineComponent({
       length: CONFIG.lines.length,
-      stiffness: CONFIG.lines.stiffness,
-      damping: CONFIG.lines.damping,
+      stiffness: CONFIG.lines.springForce.stiffness,
+      damping: CONFIG.lines.springForce.damping,
       maxTension: CONFIG.lines.maxTension
     }));
     

@@ -92,8 +92,8 @@ export class ConstraintSystem extends System {
     let correctedPosition = initialPosition.clone();
     let correctedQuaternion = initialQuaternion.clone();
 
-    const iterations = CONFIG.lines.pbdIterations;
-    const compliance = CONFIG.lines.pbdCompliance;
+    const iterations = CONFIG.lines.pbd.iterations;
+    const compliance = CONFIG.lines.pbd.compliance;
     const invMass = 1.0 / kitePhysics.mass;
 
     // Inertie moyenne (simplifié)
@@ -245,7 +245,7 @@ export class ConstraintSystem extends System {
     const deltaP = direction.clone().multiplyScalar(lambda * invMass);
 
     // Limiter magnitude
-    const maxCorrection = CONFIG.lines.pbdMaxCorrection;
+    const maxCorrection = CONFIG.lines.pbd.maxCorrection;
     if (deltaP.length() > maxCorrection) {
       deltaP.setLength(maxCorrection);
     }

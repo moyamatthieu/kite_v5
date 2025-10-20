@@ -27,20 +27,31 @@ export const CONFIG = {
   },
   
   // === LIGNES ===
-  // PBD (Position-Based Dynamics) pour contraintes rigides
   lines: {
     length: 15, // m - Longueur réaliste des lignes de vol
-    stiffness: 1, // N/m - Très souple pour kite léger (120g = 1.2N) - LEGACY (non utilisé en PBD)
-    damping: 0.5, // N·s/m - Amortissement léger - LEGACY (non utilisé en PBD)
     maxTension: 10, // N - Tension max ~8× le poids
-    
-    // Paramètres PBD
-    pbdEnabled: true, // Utiliser PBD au lieu de forces ressort
-    pbdIterations: 4, // 4 itérations pour convergence (legacy utilise 2, on augmente pour stabilité)
-    pbdCompliance: 0.00001, // Compliance (0 = rigide, >0 = souple) - TRÈS PETIT pour lignes quasi-rigides
-    pbdMaxCorrection: 2.0, // Correction max par frame (m) - augmenté pour rattraper grandes violations
-    
-    color: 0x0000ff // Bleu
+    color: 0x0000ff, // Bleu
+
+    // === MODE DE CONTRAINTE ===
+    // 'pbd' : Position-Based Dynamics (contraintes géométriques rigides)
+    // 'spring-force' : Forces ressort + amortissement (approche physique classique)
+    constraintMode: 'pbd' as 'pbd' | 'spring-force',
+
+    // === PARAMÈTRES PBD ===
+    // Utilisés seulement si constraintMode === 'pbd'
+    pbd: {
+      iterations: 4, // 4 itérations pour convergence (legacy utilise 2, on augmente pour stabilité)
+      compliance: 0.00001, // Compliance (0 = rigide, >0 = souple) - TRÈS PETIT pour lignes quasi-rigides
+      maxCorrection: 2.0, // Correction max par frame (m) - augmenté pour rattraper grandes violations
+    },
+
+    // === PARAMÈTRES SPRING-FORCE ===
+    // Utilisés seulement si constraintMode === 'spring-force'
+    springForce: {
+      stiffness: 500, // N/m - Rigidité du ressort (500 N/m pour kite 120g)
+      damping: 50, // N·s/m - Amortissement visqueux (critique pour stabilité)
+      maxForce: 100, // N - Force maximale appliquée (évite explosions)
+    }
   },
   
   // === BRIDES ===
