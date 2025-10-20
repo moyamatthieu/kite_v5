@@ -155,10 +155,19 @@ export class KiteFactory {
    * Ajoute le composant Aerodynamics avec coefficients aérodynamiques
    */
   private static addAerodynamicsComponent(entity: Entity): void {
+    // ✨ CORRECTION: L'ordre des vertices DOIT correspondre exactement à addGeometryComponent
+    // sinon la normale triangulaire sera inversée et les forces aéro seront calculées dans la mauvaise direction
     const aeroSurfaces = [
-      { name: 'leftUpper', points: ['NEZ', 'BORD_GAUCHE', 'WHISKER_GAUCHE'] as [string, string, string] },
-      { name: 'leftLower', points: ['NEZ', 'WHISKER_GAUCHE', 'SPINE_BAS'] as [string, string, string] },
+      // Face 1 (leftUpper) : ORDRE CORRIGÉ pour correspondre à geometry.addSurface(['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE'])
+      { name: 'leftUpper', points: ['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE'] as [string, string, string] },
+      
+      // Face 2 (leftLower) : ORDRE CORRIGÉ pour correspondre à geometry.addSurface(['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE'])
+      { name: 'leftLower', points: ['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE'] as [string, string, string] },
+      
+      // Face 3 (rightUpper) : Order correct
       { name: 'rightUpper', points: ['NEZ', 'BORD_DROIT', 'WHISKER_DROIT'] as [string, string, string] },
+      
+      // Face 4 (rightLower) : Order correct
       { name: 'rightLower', points: ['NEZ', 'WHISKER_DROIT', 'SPINE_BAS'] as [string, string, string] }
     ];
 
