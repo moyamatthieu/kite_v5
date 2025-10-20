@@ -35,10 +35,6 @@ interface SurfaceSample {
 export class AeroSystem extends System {
   private readonly gravity = new THREE.Vector3(0, GRAVITY_ACCELERATION, 0); // Y est vertical dans Three.js
 
-  // Lissage temporel des forces (pour éviter les oscillations brusques)
-  private previousForces = new Map<string, THREE.Vector3>(); // entityId -> force lissée
-  private previousTorques = new Map<string, THREE.Vector3>(); // entityId -> couple lissé
-
   // Debug: activer pour logger les informations sur chaque face
   private debugFaces = false;
   private debugFrameCounter = 0;
@@ -62,7 +58,6 @@ export class AeroSystem extends System {
 
     const liftScale = inputComp?.liftScale ?? 1.0;
     const dragScale = inputComp?.dragScale ?? 1.0;
-    const forceSmoothing = inputComp?.forceSmoothing ?? 0.0;
 
     // Pour chaque kite
     const kites = entityManager.query(['kite', 'transform', 'physics', 'aerodynamics', 'geometry']);
@@ -217,29 +212,14 @@ export class AeroSystem extends System {
       });
 
       // ========================================================================
-      // LISSAGE TEMPOREL DES FORCES (optionnel, contrôlé par forceSmoothing)
-      // ========================================================================
-      if (forceSmoothing > 0) {
-        const prevForce = this.previousForces.get(kite.id) ?? physics.forces.clone();
-        const prevTorque = this.previousTorques.get(kite.id) ?? physics.torques.clone();
-
-        // Interpolation linéaire : newValue = (1-α) × newValue + α × oldValue
-        // forceSmoothing = α (0 = pas de lissage, 1 = lissage maximal)
-        physics.forces.lerp(prevForce, forceSmoothing);
-        physics.torques.lerp(prevTorque, forceSmoothing);
-
-        // Stocker pour la prochaine frame
-        this.previousForces.set(kite.id, physics.forces.clone());
-        this.previousTorques.set(kite.id, physics.torques.clone());
-      }
-
-      // ========================================================================
       // (Gravité n'est plus appliquée globalement - elle l'est par face ci-dessus)
       // ========================================================================
     });
 
-    // Incrémenter le compteur debug pour le logging périodique
-    this.debugFrameCounter++;
+    // Incrémenter le compteur debug pour le logging périodique (seulement si debug activé)
+    if (this.debugFaces) {
+      this.debugFrameCounter++;
+    }
   }
 
   private getSurfaceSamples(aero: AerodynamicsComponent, geometry: GeometryComponent, entity: Entity): SurfaceSample[] {
@@ -326,32 +306,6 @@ export class AeroSystem extends System {
     // Pour une plaque plane, la force est simplement normale à la surface
     // Le filtrage "face au vent" est fait avant l'appel (dotNW < 0 → return)
     return surfaceNormal.clone();
-  }
-  
-  /**
-   * Calcule CL pour un angle d'attaque donné (approximation linéaire)
-   * Formule : CL = CLAlpha × (alpha - alpha0)
-   */
-  private calculateCL(aero: AerodynamicsComponent, alphaDeg: number): number {
-    const { CLAlpha, alpha0, alphaOptimal } = aero.coefficients;
-    const alphaRelative = alphaDeg - alpha0;
-    const sign = Math.sign(alphaRelative);
-    const absRelative = Math.abs(alphaRelative);
-    const optimal = Math.max(alphaOptimal, 1);
-    const stallMargin = 15; // marge après alphaOptimal avant décrochage complet
-    const stallLimit = optimal + stallMargin;
-
-    if (absRelative <= optimal) {
-      return CLAlpha * alphaRelative;
-    }
-
-    const clAtOptimal = CLAlpha * optimal * sign;
-    if (absRelative >= stallLimit) {
-      return 0;
-    }
-
-    const attenuation = 1 - (absRelative - optimal) / Math.max(1, stallLimit - optimal);
-    return clAtOptimal * Math.max(attenuation, 0);
   }
   
   /**
