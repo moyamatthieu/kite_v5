@@ -496,54 +496,32 @@ export class ConstraintSystem extends System {
   // ============================================================================
 
   /**
-   * Met à jour les vitesses basées sur les corrections PBD appliquées
+   * Gère les vitesses après corrections PBD
    * 
-   * CRITIQUE : En PBD, on modifie directement la position. Il faut mettre à jour
-   * la vitesse pour refléter ce changement, sinon PhysicsSystem (priorité 50)
-   * va intégrer l'ancienne vitesse et annuler la correction PBD.
+   * En PBD pur (Position-Based Dynamics), les contraintes modifient directement
+   * les positions. Pour éviter que PhysicsSystem (priorité 50) réintègre une
+   * vitesse obsolète qui annulerait la correction, on réinitialise les vitesses.
    * 
-   * Solution : velocity = deltaPosition / deltaTime
-   * Cela synchronise la vitesse avec le mouvement imposé par les contraintes.
+   * PBD Algorithm:
+   * 1. ConstraintSystem: position = correctedPosition (PBD constraint solving)
+   * 2. dampVelocities: velocity = 0 (geler le mouvement)
+   * 3. PhysicsSystem: position += velocity × dt = 0 (ne rien changer)
+   * 4. AeroSystem (next frame): applique forces → crée nouvelles vitesses
+   * 5. PhysicsSystem (next frame): intègre normalement
+   * 
+   * This is stable PBD: constraints freeze motion, external forces create it.
    */
   private dampVelocities(
     physics: PhysicsComponent,
-    deltaPosition: THREE.Vector3,
-    deltaQuaternion: THREE.Quaternion,
-    deltaTime: number
+    _deltaPosition: THREE.Vector3,
+    _deltaQuaternion: THREE.Quaternion,
+    _deltaTime: number
   ): void {
-    if (deltaTime < EPSILON) return;
-
-    // === VITESSE LINÉAIRE ===
-    // La vitesse doit refléter le déplacement imposé par PBD
-    const correctionVelocity = deltaPosition.clone().multiplyScalar(1.0 / deltaTime);
-    
-    // METTRE À JOUR la vitesse (ne pas juste amortir)
-    // On remplace la composante de vitesse dans la direction de la correction
-    physics.velocity.copy(correctionVelocity);
-
-    // === VITESSE ANGULAIRE ===
-    // Extraire l'angle de rotation depuis le quaternion de correction
-    // deltaQuaternion représente la rotation appliquée
-    const angle = 2 * Math.acos(Math.min(1, Math.abs(deltaQuaternion.w)));
-    
-    if (angle > EPSILON) {
-      // Axe de rotation (normalisé)
-      const sinHalfAngle = Math.sqrt(1 - deltaQuaternion.w * deltaQuaternion.w);
-      if (sinHalfAngle > EPSILON) {
-        const axis = new THREE.Vector3(
-          deltaQuaternion.x / sinHalfAngle,
-          deltaQuaternion.y / sinHalfAngle,
-          deltaQuaternion.z / sinHalfAngle
-        );
-        
-        // Vitesse angulaire = angle / deltaTime × axe
-        const angularSpeed = angle / deltaTime;
-        physics.angularVelocity.copy(axis.multiplyScalar(angularSpeed));
-      }
-    } else {
-      // Pas de rotation significative, mettre vitesse angulaire à zéro
-      physics.angularVelocity.set(0, 0, 0);
-    }
+    // En PBD, réinitialiser les vitesses à zéro après correction
+    // Cela empêche PhysicsSystem d'appliquer un mouvement supplémentaire
+    // et laisse les forces externes recréer les vitesses de manière stable
+    physics.velocity.set(0, 0, 0);
+    physics.angularVelocity.set(0, 0, 0);
   }
 
   /**
