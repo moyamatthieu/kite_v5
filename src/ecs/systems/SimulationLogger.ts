@@ -24,6 +24,8 @@ const PRIORITY = 45;
 interface LogEntry {
   frameNumber: number;
   timestamp: number;
+  constraintMode: 'pbd' | 'spring-force';
+  aeroMode: 'perso' | 'nasa';
   barRotation: number;
   barHandles: {
     left: THREE.Vector3;
@@ -106,6 +108,9 @@ export class SimulationLogger extends System {
 
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
+    const ui = entityManager.query(['Input'])[0]; // Récupérer l'entité UI pour les modes
+
+    if (!kite || !controlBar || !ui) return;
     const leftLine = entityManager.getEntity('leftLine');
     const rightLine = entityManager.getEntity('rightLine');
 
@@ -135,6 +140,11 @@ export class SimulationLogger extends System {
       return;
     }
 
+    // Récupérer les modes depuis le composant Input
+    const inputComp = ui.getComponent('Input') as any;
+    const constraintMode = inputComp?.constraintMode ?? 'spring-force';
+    const aeroMode = inputComp?.aeroMode ?? 'perso';
+
     // Collecter toutes les données
     const entry = this.collectLogEntry(
       kite,
@@ -146,7 +156,9 @@ export class SimulationLogger extends System {
       barGeometry,
       leftLineComp,
       rightLineComp,
-      kiteBridle
+      kiteBridle,
+      constraintMode,
+      aeroMode
     );
 
     this.logHistory.push(entry);
@@ -163,7 +175,9 @@ export class SimulationLogger extends System {
     barGeometry: GeometryComponent,
     leftLineComp: LineComponent,
     rightLineComp: LineComponent,
-    kiteBridle: BridleComponent | null | undefined
+    kiteBridle: BridleComponent | null | undefined,
+    constraintMode: 'pbd' | 'spring-force',
+    aeroMode: 'perso' | 'nasa'
   ): LogEntry {
     // Bar rotation
     const barEuler = new THREE.Euler().setFromQuaternion(barTransform.quaternion);
@@ -200,6 +214,8 @@ export class SimulationLogger extends System {
     const entry: LogEntry = {
       frameNumber: this.frameNumber,
       timestamp: performance.now(),
+      constraintMode: constraintMode,
+      aeroMode: aeroMode,
       barRotation: barRotationDeg,
       barHandles: {
         left: barLeft.clone(),
@@ -262,6 +278,10 @@ export class SimulationLogger extends System {
       `📊 FRAME ${entry.frameNumber} | ${new Date(entry.timestamp).toLocaleTimeString()}`
     );
     lines.push(`${'='.repeat(120)}`);
+
+    // Modes
+    lines.push(`\n⚙️  MODES:`);
+    lines.push(`  Constraint: ${entry.constraintMode} | Aero: ${entry.aeroMode}`);
 
     // Bar state
     lines.push(`\n🎮 BAR STATE:`);

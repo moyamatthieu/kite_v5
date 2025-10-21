@@ -87,12 +87,6 @@ export class AeroSystem extends System {
       // que toutes les faces contribuent correctement, qu'elles soient initialement
       // orientées vers l'avant ou vers l'arrière.
       surfaceSamples.forEach((sample, index) => {
-        // Debug: Afficher l'orientation du kite (1 fois par seconde, 1ère face seulement)
-        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0 && index === 0) {
-          const euler = new THREE.Euler().setFromQuaternion(transform.quaternion, 'XYZ');
-          console.log(`[AeroSystem] 🪁 Orientation kite: pitch=${(euler.x * 180/Math.PI).toFixed(1)}° yaw=${(euler.y * 180/Math.PI).toFixed(1)}° roll=${(euler.z * 180/Math.PI).toFixed(1)}°`);
-        }
-        
         // 1. Vitesse locale du centroïde (translation + rotation)
         const leverArm = sample.centroid.clone().sub(transform.position);
         const rotationVelocity = new THREE.Vector3().crossVectors(physics.angularVelocity, leverArm);
@@ -163,16 +157,8 @@ export class AeroSystem extends System {
         // Tire le kite dans la direction du vent apparent
         const dragDir = localWindDir.clone();
 
-        // Debug: Logger les informations de chaque face (1 fois par seconde)
-        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
-          const alphaDeg = Math.acos(Math.min(1, dotNW)) * 180 / Math.PI;
-          console.log(`[AeroSystem] Face: ${sample.descriptor.name}`);
-          console.log(`  Normal (monde): (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
-          console.log(`  Wind: (${localWindDir.x.toFixed(2)}, ${localWindDir.y.toFixed(2)}, ${localWindDir.z.toFixed(2)})`);
-          console.log(`  Dot product: ${dotNW.toFixed(3)} (cos α) ${dotNW < 0 ? '❌ VENT DE DERRIÈRE' : '✓ VENT DE DEVANT'}`);
-          console.log(`  Lift dir: (${liftDir.x.toFixed(2)}, ${liftDir.y.toFixed(2)}, ${liftDir.z.toFixed(2)})`);
-          console.log(`  α: ${alphaDeg.toFixed(1)}° | CN: ${CN.toFixed(3)} | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
-        }
+        // Debug: Logger les informations de chaque face (1 fois par seconde) - désactivé
+        // if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) { ... }
 
         // 7. Forces locales avec orientation correcte + application des scales UI
         const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);

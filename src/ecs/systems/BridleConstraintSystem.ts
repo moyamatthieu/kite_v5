@@ -18,10 +18,12 @@ import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { GeometryComponent } from '../components/GeometryComponent';
 import { BridleComponent, type BridleLengths } from '../components/BridleComponent';
+import { Logger } from '../utils/Logging';
 
 const PRIORITY = 10; // Très haute priorité, avant ConstraintSystem (40)
 const MAX_ITERATIONS = 20; // Nombre max d'itérations pour la trilatération
 const CONVERGENCE_EPSILON = 0.0001; // 0.1mm - seuil de convergence
+const logger = Logger.getInstance();
 
 /**
  * Positionne les points de contrôle en fonction des longueurs des brides.
@@ -49,7 +51,7 @@ export class BridleConstraintSystem extends System {
   initialize(_entityManager: EntityManager): void {
     this.initialized = false;
     this.lastLengths = { nez: 0, inter: 0, centre: 0 };
-    console.log('🔧 [BridleConstraintSystem] System reset - initialized flag cleared');
+    logger.debug('🔧 BridleConstraintSystem reset - initialized flag cleared', 'BridleConstraintSystem');
   }
 
   update(context: SimulationContext): void {
@@ -71,7 +73,7 @@ export class BridleConstraintSystem extends System {
         inter: bridle.lengths.inter,
         centre: bridle.lengths.centre
       };
-      console.log(`🔧 [BridleConstraintSystem] Initialisation des positions CTRL via trilatération`);
+      logger.debug(`🔧 Initialisation des positions CTRL via trilatération`, 'BridleConstraintSystem');
       this.updateControlPointPositions(geometry, bridle);
       return;
     }
@@ -93,7 +95,7 @@ export class BridleConstraintSystem extends System {
       centre: bridle.lengths.centre
     };
 
-    console.log(`🔧 [BridleConstraintSystem] Longueurs changées: nez=${bridle.lengths.nez}m, inter=${bridle.lengths.inter}m, centre=${bridle.lengths.centre}m`);
+    logger.debug(`🔧 Longueurs changées: nez=${bridle.lengths.nez}m, inter=${bridle.lengths.inter}m, centre=${bridle.lengths.centre}m`, 'BridleConstraintSystem');
 
     // Recalculer les positions des CTRL basées sur les nouvelles longueurs
     this.updateControlPointPositions(geometry, bridle);

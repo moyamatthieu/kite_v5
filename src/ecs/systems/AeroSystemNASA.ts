@@ -110,12 +110,6 @@ export class AeroSystemNASA extends System {
       // Les cerfs-volants sont traités comme des "thin flat plates" avec
       // des formules spécifiques validées expérimentalement.
       surfaceSamples.forEach((sample, index) => {
-        // Debug: Afficher l'orientation du kite (1 fois par seconde, 1ère face seulement)
-        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0 && index === 0) {
-          const euler = new THREE.Euler().setFromQuaternion(transform.quaternion, 'XYZ');
-          console.log(`[AeroSystemNASA] 🪁 Orientation kite: pitch=${(euler.x * 180/Math.PI).toFixed(1)}° yaw=${(euler.y * 180/Math.PI).toFixed(1)}° roll=${(euler.z * 180/Math.PI).toFixed(1)}°`);
-        }
-        
         // 1. Vitesse locale du centroïde (translation + rotation)
         const leverArm = sample.centroid.clone().sub(transform.position);
         const rotationVelocity = new THREE.Vector3().crossVectors(physics.angularVelocity, leverArm);
@@ -188,14 +182,8 @@ export class AeroSystemNASA extends System {
         // NASA: "drag acts in the direction of the wind"
         const dragDir = localWindDir.clone();
 
-        // Debug: Logger les informations de chaque face (1 fois par seconde)
-        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
-          const alphaDeg = alphaRad * 180 / Math.PI;
-          console.log(`[AeroSystemNASA] 🪁 Face: ${sample.descriptor.name}`);
-          console.log(`  α: ${alphaDeg.toFixed(1)}° | Clo: ${Clo.toFixed(3)} | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
-          console.log(`  Cdo: ${Cdo.toFixed(3)} | Induced: ${inducedDragCoeff.toFixed(3)} | AR: ${aspectRatio.toFixed(2)}`);
-          console.log(`  Wind speed: ${localWindSpeed.toFixed(1)} m/s | q: ${q.toFixed(1)} Pa`);
-        }
+        // Debug: Logger les informations de chaque face (1 fois par seconde) - désactivé
+        // if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) { ... }
 
         // 7. ✨ FORCES SELON ÉQUATIONS NASA ✨
         // L = Cl × A × ρ × 0.5 × V²
@@ -344,8 +332,6 @@ export class AeroSystemNASA extends System {
    */
   public setDebugFaces(enabled: boolean): void {
     this.debugFaces = enabled;
-    if (enabled) {
-      console.log('[AeroSystemNASA] 🪁 Debug faces activé - formules NASA');
-    }
+    // Debug log removed
   }
 }

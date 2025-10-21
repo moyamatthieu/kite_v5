@@ -33,32 +33,24 @@ export class DebugSystem extends System {
   }
 
   initialize(entityManager: EntityManager): void {
-    console.log('🐛 [DebugSystem] Initializing...');
-    
     // Chercher l'InputComponent
     const inputEntities = entityManager.query(['Input']);
     if (inputEntities.length > 0) {
       const comp = inputEntities[0].getComponent('Input');
       if (comp) {
         this.inputComponent = comp as InputComponent;
-        console.log('🐛 [DebugSystem] InputComponent found');
       }
     }
 
     // Récupérer l'entité debug
     const debugEntities = entityManager.query(['debug']);
-    console.log('🐛 [DebugSystem] Debug entities found:', debugEntities.length);
     
     let debugEntity = debugEntities.find(e => e.id === 'debug-helper');
     
     if (!debugEntity) {
-      console.log('🐛 [DebugSystem] Creating new debug entity...');
       // Créer une nouvelle entité debug si elle n'existe pas
       debugEntity = DebugFactory.create();
       entityManager.register(debugEntity);
-      console.log('🐛 [DebugSystem] Debug entity created and registered');
-    } else {
-      console.log('🐛 [DebugSystem] Debug entity found:', debugEntity.id);
     }
     
     this.debugEntity = debugEntity ?? null;
@@ -84,16 +76,11 @@ export class DebugSystem extends System {
 
     // Si le mode debug vient d'être activé, ajouter le groupe à la scène
     if (this.inputComponent.debugMode && !this.prevDebugMode) {
-      console.log('🐛 [DebugSystem] DEBUG MODE ACTIVATED');
-      console.log('  - RenderSystem scene:', this.renderSystem.scene);
-      console.log('  - DebugGroup:', debugComp.debugGroup);
       this.renderSystem.scene.add(debugComp.debugGroup);
-      console.log('  - DebugGroup added to scene');
       this.lastLogTime = currentTime;
     }
     // Si le mode debug vient d'être désactivé, enlever le groupe
     else if (!this.inputComponent.debugMode && this.prevDebugMode) {
-      console.log('🐛 [DebugSystem] DEBUG MODE DEACTIVATED');
       this.renderSystem.scene.remove(debugComp.debugGroup);
       debugComp.clearAll(); // Nettoyer TOUT, y compris les labels persistants
       this.lastLogTime = currentTime;
@@ -111,7 +98,6 @@ export class DebugSystem extends System {
     // Chercher le kite et afficher les forces
     const kiteEntity = context.entityManager.query(['physics', 'transform']).find(e => e.id === 'kite');
     if (!kiteEntity) {
-      console.warn('🐛 [DebugSystem] Kite entity not found');
       return;
     }
 
@@ -119,24 +105,15 @@ export class DebugSystem extends System {
     const transform = kiteEntity.getComponent('transform') as TransformComponent | null;
 
     if (!physics || !transform) {
-      console.warn('🐛 [DebugSystem] Physics or Transform component missing');
       return;
     }
 
     // Log uniquement si demandé (toutes les 5 secondes)
-    if (shouldLog) {
-      console.log(`🐛 [DebugSystem] Face forces: ${physics.faceForces.length} faces avec portance/traînée`);
-      this.lastLogTime = currentTime;
-    }
+    // Désactivé pour réduire le bruit de logs
     
     // === Afficher les forces par face (aux positions exactes de calcul) ===
     // Afficher les forces de portance, traînée et gravité pour chaque face
     physics.faceForces.forEach((faceForce, index) => {
-      // Debug: afficher la magnitude de la portance
-      if (shouldLog) {
-        console.log(`🐛 Face ${index + 1}: Lift magnitude = ${faceForce.lift.length().toFixed(4)} N`);
-      }
-      
       // Portance (bleu ciel) - TOUJOURS afficher même si petite
       if (faceForce.lift.length() > DebugConfig.LIFT_THRESHOLD) {
         debugComp.addForceArrow(
@@ -145,8 +122,6 @@ export class DebugSystem extends System {
           0x87CEEB, // Bleu ciel
           `lift-face-${index}`
         );
-      } else if (shouldLog) {
-        console.log(`⚠️ Face ${index + 1}: Lift trop faible ou nulle!`);
       }
       
       // Traînée (rouge)
@@ -217,7 +192,6 @@ export class DebugSystem extends System {
     // Marquer les labels comme créés après la première passe
     if (!debugComp.labelsCreated && physics.faceForces.length > 0) {
       debugComp.labelsCreated = true;
-      console.log('🏷️ [DebugSystem] Labels de faces créés (une seule fois)');
     }
 
     // === Afficher les tensions des lignes (magenta) ===
@@ -408,15 +382,12 @@ export class DebugSystem extends System {
 
     const debugComp = this.debugEntity.getComponent('debug') as DebugComponent | null;
     if (debugComp) {
-      console.log('🐛 [DebugSystem] Resetting debug state...');
-
       // Nettoyer toutes les flèches
       debugComp.clearArrows();
 
       // Retirer le groupe de la scène
       if (debugComp.debugGroup.parent) {
         this.renderSystem.scene.remove(debugComp.debugGroup);
-        console.log('🐛 [DebugSystem] DebugGroup removed from scene');
       }
 
       // Réinitialiser le flag prevDebugMode pour forcer la ré-ajout si debug activé

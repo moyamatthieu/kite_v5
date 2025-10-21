@@ -1,4 +1,5 @@
 import { Component } from '../core/Component';
+import { Logger } from '../utils/Logging';
 
 /**
  * Contient l'état des entrées utilisateur provenant de l'interface.
@@ -8,14 +9,40 @@ export class InputComponent extends Component {
   public static readonly type = 'Input';
   public readonly type = 'Input';
 
+  private logger = Logger.getInstance();
+  
   // === Vent ===
   windSpeed: number; // m/s
   windDirection: number; // degrés
   windTurbulence: number; // %
 
-  // === Lignes ===
-  constraintMode: 'pbd' | 'spring-force';
-  aeroMode: 'perso' | 'nasa'; // Mode aérodynamique
+  // === Lignes (avec backing fields pour détection de changements) ===
+  private _constraintMode: 'pbd' | 'spring-force' = 'spring-force';
+  private _aeroMode: 'perso' | 'nasa' = 'perso';
+
+  get constraintMode(): 'pbd' | 'spring-force' {
+    return this._constraintMode;
+  }
+
+  set constraintMode(value: 'pbd' | 'spring-force') {
+    if (this._constraintMode !== value) {
+      const oldMode = this._constraintMode;
+      this._constraintMode = value;
+      this.logger.info(`📋 Constraint mode changed: ${oldMode} → ${value}`, 'InputComponent');
+    }
+  }
+
+  get aeroMode(): 'perso' | 'nasa' {
+    return this._aeroMode;
+  }
+
+  set aeroMode(value: 'perso' | 'nasa') {
+    if (this._aeroMode !== value) {
+      const oldMode = this._aeroMode;
+      this._aeroMode = value;
+      this.logger.info(`🌪️  Aero mode changed: ${oldMode} → ${value}`, 'InputComponent');
+    }
+  }
   lineLength: number; // m
   bridleNez: number; // m
   bridleInter: number; // m

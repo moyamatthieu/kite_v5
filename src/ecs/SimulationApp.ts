@@ -37,6 +37,7 @@ import {
 } from './systems';
 import { AeroSystemNASA } from './systems/AeroSystemNASA';
 import { CONFIG } from './config/Config';
+import { Logger } from './utils/Logging';
 import type { SimulationContext } from './core/System';
 import type { RenderSystem as RenderSystemType } from './systems/RenderSystem';
 import type { DebugSystem as DebugSystemType } from './systems/DebugSystem';
@@ -50,6 +51,7 @@ export class SimulationApp {
   private systemManager: SystemManager;
   private lastTime = 0;
   private paused = !CONFIG.simulation.autoStart; // Lecture depuis la config (autoStart: true => paused: false)
+  private logger = Logger.getInstance();
   
   // Systèmes aérodynamiques (bascule NASA/Perso)
   private aeroSystemPerso!: AeroSystem;
@@ -230,12 +232,12 @@ export class SimulationApp {
       // Mode Perso (Rayleigh)
       this.systemManager.setSystemEnabled('AeroSystem', true);
       this.systemManager.setSystemEnabled('AeroSystemNASA', false);
-      console.log('[SimulationApp] 🔄 Basculé vers AeroSystem (Perso/Rayleigh)');
+      this.logger.info('🔄 Basculé vers AeroSystem (Perso/Rayleigh)', 'SimulationApp');
     } else {
       // Mode NASA (Officiel)
       this.systemManager.setSystemEnabled('AeroSystem', false);
       this.systemManager.setSystemEnabled('AeroSystemNASA', true);
-      console.log('[SimulationApp] 🔄 Basculé vers AeroSystemNASA (Officiel)');
+      this.logger.info('🔄 Basculé vers AeroSystemNASA (Officiel)', 'SimulationApp');
     }
 
     this.currentAeroMode = aeroMode;
@@ -369,6 +371,9 @@ export class SimulationApp {
       const inputComp = uiEntity.getComponent('Input') as any;
       if (inputComp) {
         inputComp.isPaused = wasPaused;
+        
+        // 📋 LOG les modes restaurés après reset via le système de logging
+        this.logger.info(`🔄 RESET COMPLETE | Constraint: ${inputComp.constraintMode} | Aero: ${inputComp.aeroMode}`, 'SimulationApp');
       }
     }
   }

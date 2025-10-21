@@ -11,6 +11,9 @@ import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { InputComponent } from '../components/InputComponent';
 import { LineComponent } from '../components/LineComponent';
+import { Logger } from '../utils/Logging';
+
+const logger = Logger.getInstance();
 
 export class InputSyncSystem extends System {
   private lastLineLength: number = 0;
@@ -54,7 +57,7 @@ export class InputSyncSystem extends System {
     // SYNCHRONISER LES CHANGEMENTS DE LINE LENGTH
     // ========================================================================
     if (input.lineLength !== this.lastLineLength) {
-      console.log(`🔗 [InputSyncSystem] Line length changed: ${this.lastLineLength} → ${input.lineLength} m`);
+      logger.debug(`🔗 Line length changed: ${this.lastLineLength} → ${input.lineLength} m`, 'InputSyncSystem');
       this.updateLineLength(entityManager, input.lineLength);
       this.lastLineLength = input.lineLength;
     }
@@ -63,19 +66,19 @@ export class InputSyncSystem extends System {
     // SYNCHRONISER LES CHANGEMENTS DE BRIDES
     // ========================================================================
     if (input.bridleNez !== this.lastBridleNez) {
-      console.log(`🌉 [InputSyncSystem] Bridle Nez changed: ${this.lastBridleNez} → ${input.bridleNez} m`);
+      logger.debug(`🌉 Bridle Nez changed: ${this.lastBridleNez} → ${input.bridleNez} m`, 'InputSyncSystem');
       this.updateBridleNez(entityManager, input.bridleNez);
       this.lastBridleNez = input.bridleNez;
     }
 
     if (input.bridleInter !== this.lastBridleInter) {
-      console.log(`🌉 [InputSyncSystem] Bridle Inter changed: ${this.lastBridleInter} → ${input.bridleInter} m`);
+      logger.debug(`🌉 Bridle Inter changed: ${this.lastBridleInter} → ${input.bridleInter} m`, 'InputSyncSystem');
       this.updateBridleInter(entityManager, input.bridleInter);
       this.lastBridleInter = input.bridleInter;
     }
 
     if (input.bridleCentre !== this.lastBridleCentre) {
-      console.log(`🌉 [InputSyncSystem] Bridle Centre changed: ${this.lastBridleCentre} → ${input.bridleCentre} m`);
+      logger.debug(`🌉 Bridle Centre changed: ${this.lastBridleCentre} → ${input.bridleCentre} m`, 'InputSyncSystem');
       this.updateBridleCentre(entityManager, input.bridleCentre);
       this.lastBridleCentre = input.bridleCentre;
     }
@@ -84,13 +87,13 @@ export class InputSyncSystem extends System {
     // SYNCHRONISER LES CHANGEMENTS DE DAMPING
     // ========================================================================
     if (input.linearDamping !== this.lastLinearDamping) {
-      console.log(`📉 [InputSyncSystem] Linear damping changed: ${this.lastLinearDamping} → ${input.linearDamping}`);
+      logger.debug(`📉 Linear damping changed: ${this.lastLinearDamping} → ${input.linearDamping}`, 'InputSyncSystem');
       this.updateLinearDamping(entityManager, input.linearDamping);
       this.lastLinearDamping = input.linearDamping;
     }
 
     if (input.angularDamping !== this.lastAngularDamping) {
-      console.log(`📉 [InputSyncSystem] Angular damping changed: ${this.lastAngularDamping} → ${input.angularDamping}`);
+      logger.debug(`📉 Angular damping changed: ${this.lastAngularDamping} → ${input.angularDamping}`, 'InputSyncSystem');
       this.updateAngularDamping(entityManager, input.angularDamping);
       this.lastAngularDamping = input.angularDamping;
     }
