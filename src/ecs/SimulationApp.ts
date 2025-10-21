@@ -28,7 +28,6 @@ import {
   GeometryRenderSystem,
   LineRenderSystem,
   RenderSystem,
-  LoggingSystem,
   EnvironmentSystem,
   CameraControlsSystem,
   UISystem,
@@ -178,7 +177,6 @@ export class SimulationApp {
     this.systemManager.add(new GeometryRenderSystem()); // Priority 60
 
     this.systemManager.add(renderSystem); // Priority 70
-    this.systemManager.add(new LoggingSystem()); // Priority 80
     this.systemManager.add(debugSystem); // Priority 88
     this.systemManager.add(new UISystem()); // Priority 90
 

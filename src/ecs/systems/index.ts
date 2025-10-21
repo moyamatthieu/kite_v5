@@ -14,7 +14,6 @@ export { PhysicsSystem } from './PhysicsSystem';
 export { GeometryRenderSystem } from './GeometryRenderSystem';
 export { LineRenderSystem } from './LineRenderSystem';
 export { RenderSystem } from './RenderSystem';
-export { LoggingSystem } from './LoggingSystem';
 export { EnvironmentSystem } from './EnvironmentSystem';
 export { CameraControlsSystem } from './CameraControlsSystem';
 export { UISystem } from './UISystem';
