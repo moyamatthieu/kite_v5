@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { EntityManager } from './core/EntityManager';
 import { SystemManager } from './core/SystemManager';
 import { TransformComponent } from './components/TransformComponent';
+import { InputComponent } from './components/InputComponent';
 import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory, BridleFactory } from './entities';
 import { DebugFactory } from './entities/DebugFactory';
 import {
@@ -34,6 +35,7 @@ import {
   DebugSystem,
   SimulationLogger,
 } from './systems';
+import { AeroSystemNASA } from './systems/AeroSystemNASA';
 import { CONFIG } from './config/Config';
 import type { SimulationContext } from './core/System';
 import type { RenderSystem as RenderSystemType } from './systems/RenderSystem';
@@ -48,6 +50,11 @@ export class SimulationApp {
   private systemManager: SystemManager;
   private lastTime = 0;
   private paused = !CONFIG.simulation.autoStart; // Lecture depuis la config (autoStart: true => paused: false)
+  
+  // Systèmes aérodynamiques (bascule NASA/Perso)
+  private aeroSystemPerso!: AeroSystem;
+  private aeroSystemNASA!: AeroSystemNASA;
+  private currentAeroMode: 'perso' | 'nasa' = 'perso';
   private animationFrameId: number | null = null;
   
   constructor(private canvas: HTMLCanvasElement) {
@@ -141,6 +148,10 @@ export class SimulationApp {
     // Créer DebugSystem (on passera le renderSystem après)
     const debugSystem = new DebugSystem();
 
+    // Initialiser les deux systèmes aérodynamiques
+    this.aeroSystemPerso = new AeroSystem();
+    this.aeroSystemNASA = new AeroSystemNASA();
+
     // Ajouter les systèmes dans l'ordre de priorité
     this.systemManager.add(new EnvironmentSystem(scene)); // Priority 1
     this.systemManager.add(
@@ -150,7 +161,12 @@ export class SimulationApp {
     this.systemManager.add(new BridleConstraintSystem()); // Priority 10 - Met à jour positions des brides via trilatération
     this.systemManager.add(new InputSystem()); // Priority 10
     this.systemManager.add(new WindSystem()); // Priority 20
-    this.systemManager.add(new AeroSystem()); // Priority 30
+    this.systemManager.add(this.aeroSystemPerso); // Priority 30 - Démarre avec système Perso
+    this.systemManager.add(this.aeroSystemNASA); // Priority 30 - Ajouté mais désactivé
+    
+    // Désactiver le système NASA au démarrage
+    this.aeroSystemNASA.setEnabled(false);
+    
     this.systemManager.add(new ConstraintSystem()); // Priority 40 - AVANT PhysicsSystem
     this.systemManager.add(new SimulationLogger()); // Priority 45 - APRÈS ConstraintSystem, AVANT PhysicsSystem
     this.systemManager.add(new PhysicsSystem()); // Priority 50 - LIT forces accumulées
@@ -199,6 +215,31 @@ export class SimulationApp {
     this.lastTime = performance.now();
     this.update();
   }
+
+  /**
+   * Bascule entre les systèmes aérodynamiques selon le mode aeroMode
+   * 'perso' = Système Perso (Rayleigh), 'nasa' = Système NASA (officiel)
+   */
+  private switchAeroSystem(aeroMode: 'perso' | 'nasa'): void {
+    if (aeroMode === this.currentAeroMode) {
+      return; // Pas de changement
+    }
+
+    // Désactiver/Activer les systèmes selon le mode
+    if (aeroMode === 'perso') {
+      // Mode Perso (Rayleigh)
+      this.systemManager.setSystemEnabled('AeroSystem', true);
+      this.systemManager.setSystemEnabled('AeroSystemNASA', false);
+      console.log('[SimulationApp] 🔄 Basculé vers AeroSystem (Perso/Rayleigh)');
+    } else {
+      // Mode NASA (Officiel)
+      this.systemManager.setSystemEnabled('AeroSystem', false);
+      this.systemManager.setSystemEnabled('AeroSystemNASA', true);
+      console.log('[SimulationApp] 🔄 Basculé vers AeroSystemNASA (Officiel)');
+    }
+
+    this.currentAeroMode = aeroMode;
+  }
   
   /**
    * Boucle de mise à jour principale
@@ -210,6 +251,15 @@ export class SimulationApp {
     
     // Vérifier les commandes UI (pause/reset)
     this.checkUICommands();
+    
+    // Vérifier le changement de mode aérodynamique
+    const inputEntities = this.entityManager.query(['Input']);
+    if (inputEntities.length > 0) {
+      const inputComp = inputEntities[0].getComponent<InputComponent>('Input');
+      if (inputComp) {
+        this.switchAeroSystem(inputComp.aeroMode);
+      }
+    }
     
     const context: SimulationContext = {
       deltaTime: this.paused ? 0 : deltaTime, // Pas de deltaTime en pause

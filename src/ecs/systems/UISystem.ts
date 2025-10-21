@@ -277,6 +277,24 @@ export class UISystem extends System {
         this.logger.info('Reset simulation requested after constraint mode change', 'UISystem');
       });
     }
+
+    // Toggle Mode Aérodynamique  
+    const aeroModeToggle = document.getElementById('aero-mode-toggle') as HTMLInputElement;
+    if (aeroModeToggle) {
+      // Initialiser l'état du toggle selon inputComponent.aeroMode
+      // Unchecked = 'perso', Checked = 'nasa'
+      aeroModeToggle.checked = this.inputComponent.aeroMode === 'nasa';
+      
+      this.logger.info(`Aero mode initialized to: ${this.inputComponent.aeroMode}, toggle checked: ${aeroModeToggle.checked}`, 'UISystem');
+
+      // Event listener pour mettre à jour le mode aérodynamique
+      aeroModeToggle.addEventListener('change', () => {
+        this.inputComponent.aeroMode = aeroModeToggle.checked ? 'nasa' : 'perso';
+        this.logger.info(`Aero mode changed to: ${this.inputComponent.aeroMode}`, 'UISystem');
+        
+        // Pas besoin de reset pour le changement de mode aéro (bascule à chaud)
+      });
+    }
   }
 
   /**

@@ -45,6 +45,14 @@ export const UI_METADATA = {
       },
       label: 'Mode de contrainte'
     },
+    aeroMode: {
+      options: ['perso', 'nasa'] as const,
+      labels: {
+        perso: 'Perso (Rayleigh)',
+        nasa: 'NASA (Officiel)'
+      },
+      label: 'Mode aérodynamique'
+    },
     length: {
       min: 5,
       max: 300,

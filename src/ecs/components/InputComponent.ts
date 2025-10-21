@@ -15,6 +15,7 @@ export class InputComponent extends Component {
 
   // === Lignes ===
   constraintMode: 'pbd' | 'spring-force';
+  aeroMode: 'perso' | 'nasa'; // Mode aérodynamique
   lineLength: number; // m
   bridleNez: number; // m
   bridleInter: number; // m
@@ -48,6 +49,7 @@ export class InputComponent extends Component {
 
     // Lignes
     this.constraintMode = initialValues.constraintMode ?? 'spring-force';
+    this.aeroMode = initialValues.aeroMode ?? 'perso'; // Défaut : mode Perso
     this.lineLength = initialValues.lineLength ?? 150; // m
     this.bridleNez = initialValues.bridleNez ?? 1.5; // m
     this.bridleInter = initialValues.bridleInter ?? 2.0; // m
