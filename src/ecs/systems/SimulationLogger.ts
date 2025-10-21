@@ -82,7 +82,7 @@ export class SimulationLogger extends System {
   private frameNumber = 0;
   private logHistory: LogEntry[] = [];
   private lastLogTime = 0;
-  private logInterval = 100; // Log tous les 100ms
+  private logInterval = 1000; // Log tous les 1000ms (1 seconde) - état système
   private isLogging = false;
   private logBuffer: string[] = [];
 

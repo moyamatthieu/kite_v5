@@ -206,7 +206,6 @@ export class PilotSystem extends System {
 
     // Mettre à jour l'angle de rotation selon l'input (-1, 0, ou 1)
     const rotationInput = inputComp.barRotationInput;
-    console.log('🎯 PilotSystem: rotationInput =', rotationInput, 'barRotationAngle =', this.barRotationAngle.toFixed(1));
     
     if (rotationInput !== 0) {
       // Appliquer la rotation progressive
@@ -215,7 +214,6 @@ export class PilotSystem extends System {
         -this.MAX_ROTATION_ANGLE,
         Math.min(this.MAX_ROTATION_ANGLE, this.barRotationAngle + rotationDelta)
       );
-      console.log('🔄 PilotSystem: Rotation applied → new angle =', this.barRotationAngle.toFixed(1));
     } else {
       // Retour progressif au centre quand aucun input
       const RETURN_SPEED_FACTOR = 2.0;
