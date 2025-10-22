@@ -1,0 +1,443 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Torque (Moment)</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="aircraft, motion, aircraft motion, rotation, torques, roll, pitch, yaw, center of gravity, trim, stability, maneuvers
+">
+
+<link href="portal.css" rel="stylesheet" type="text/css">
+</head>
+
+<body bgcolor="#000000">
+<table width="730" border="0" align="center" cellpadding="10" cellspacing="0" bgcolor="#FFFFFF">
+  <tr>
+    <td>
+
+<!-- Header Begins-->
+
+	<table width="100%" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr> 
+          <td width="365" height="68" bgcolor="#CCCCCC"><a href="http://www.nasa.gov"><img src="Images/logo_nasa.gif" alt="NASA Logo - Web Link to NASA.gov" width="288" height="51" border="0"></a></td>
+          <td width="20" height="68" bgcolor="#CCCCCC"></td>
+          <td width="170" height="68" align="left" valign="middle" bgcolor="#CCCCCC"><p><font color="#333333" size="-2" face="Verdana, Arial, Helvetica, sans-serif"><a class="bodygray" href="#">+ 
+              Text Only Site</a><br>
+              <a class="bodygray" href="#">+ Non-Flash Version</a><br>
+              <a class="bodygray" href="http://www.nasa.gov/centers/glenn/about/contact_us.html" target="_blank">+ 
+              Contact Glenn</a></font></p></td>
+          <td width="175" height="68" bgcolor="#006699"><table cellpadding="0" cellspacing="0" border="0"><form name="search" id="search" method="GET" action="http://search.nasa.gov/nasasearch/search/search.jsp"><tr><td rowspan="2" width="20"></td><td colspan="3"><label for="searchfield"><img src="Images/title_find_it_sm.gif" width="92" height="16" alt="FIND IT @ NASA" title="FIND IT @ NASA" border="0"></label></td></tr><tr><td valign="top"><input type="text" size="9" class="search" title="searchfield" id="searchfield" name="nasaInclude" value=""></td><td width="8"><img border="0" alt="" height="1" width="1" src="Images/spacer.gif"></td><td valign="top"><a href="javascript:document.search.submit();"><img name="Go" src="Images/button_go.gif" width="38" height="20" alt="Go" title="Go" border="0"></a></td></tr></form></table>
+			
+			</td>
+        </tr>
+        <tr> 
+          <td colspan="4"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr align="center"> 
+                
+     <td><a href="http://www.nasa.gov/about/highlights/index.html">
+           <img src="Images/nav_top_0_0.gif"
+           alt="ABOUT NASA" height="25" width="123" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/news/highlights/index.html">
+           <img src="Images/nav_top_1_0.gif"
+            alt="NEWS AND EVENTS" height="25" width="140" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/multimedia/highlights/index.html">
+           <img src="Images/nav_top_2_0.gif"
+           alt="MULTIMEDIA" height="25" width="119" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/missions/highlights/index.html">
+           <img src="Images/nav_top_3_0.gif"
+           alt="MISSIONS" height="25" width="106" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://mynasa.nasa.gov/portal/site/mynasa/index.jsp?bandwidth=high">
+           <img src="Images/nav_top_4_0.gif"
+           alt="MyNASA" height="25" width="101" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/about/career/index.html">
+           <img src="Images/nav_top_5_0.gif"
+           alt="WORK FOR NASA" height="25" width="141" border=0 align=bottom></a>
+     </td>
+        </tr>
+            </table></td>
+        </tr>
+        <tr> 
+          <td colspan="4"> 
+<!-- Header Ends -->			
+
+			<table width="98%" border="0" align="center" cellpadding="0" cellspacing="0">
+              <tr> 
+                <td>
+<font size="2" face="Arial, Helvetica, sans-serif">
+<CENTER>
+<IMG SRC="Images/torque.gif"
+ALT = "Computer drawing of a bar with a weights at the end. Torque
+ equals force times perpendicular distance from force to pivot."
+WIDTH=709 HEIGHT=532 ALIGN=bottom></CENTER>
+
+<P>
+A <A HREF="newton2.html">force</A> may be thought of as a push or
+pull in a specific direction. When a force is applied to an object,
+the resulting motion of the object depends on where the
+force is applied and how the object is confined.
+If the object is unconfined and the force is applied through the
+<A HREF="cg.html">center of gravity</A>,
+the object moves in pure
+<A HREF="translations.html">translation</A>,
+as described by Newton's
+<A HREF="newton.html">laws of motion</A>.
+If the object is confined (or pinned) at some location called a
+<b>pivot</b>, the object
+<A HREF="rotations.html">rotates</A>
+about the pivot, but does not translate.
+The force is transmitted through the pivot
+and the details of the rotation depend on the distance from
+the applied force to the pivot.
+If the object is unconfined and the force is applied at some
+distance from the center of gravity, the object both translates
+and rotates about the center of gravity.
+The details of the rotation depend on the distance from the
+applied force to the center of gravity.
+The motion of flying objects is
+<A HREF="bmotion.html">described</A>
+by this third type of motion; a combination of translation and rotation.
+</P>
+<p>
+A force <b>F</b> is a
+<A HREF="vectors.html">vector quantity</A>,
+which means that it has both a magnitude and
+a direction associated with it. The
+<A HREF="vectcomp.html">direction</A> of the force
+is important because the resulting motion of the object
+is in the same direction as the force.
+The product of the force and the <b>perpendicular distance</b> to the
+center of gravity for an unconfined object,
+or to the pivot for a confined object, is^M
+called the <b>torque</b> or the <b> moment</b>.
+A torque is  also a vector quantity and produces a rotation
+in the same way that a force produces a translation. Namely, an object at
+rest, or rotating at a constant angular velocity, will continue to do so
+until it is subject to an external torque. A torque produces a change
+in angular velocity which is called an angular acceleration.
+</p>
+<p>
+The distance <b>L</b> used to determine the torque <b>T</b> is the distance from the
+pivot <b>p</b> to the force, but measured perpendicular to the
+direction of the force.
+On the figure, we show four examples of torques to illustrate the basic
+principles governing torques.
+In each example a blue weight <b>W</b> is acting on a red bar, which is called
+an arm.
+</p>
+<p>
+In Example 1, the force (weight) is applied perpendicular
+to the arm. In this case, the perpendicular distance is the length of the
+bar and the torque is equal to the product of the length and the force.
+</p>
+<CENTER>
+<p>
+T = F * L
+</p>
+</CENTER>
+<p>
+In Example 2, the same force is applied to the arm,
+but the force now acts right through the
+pivot. In this case, the distance from the pivot perpendicular to the force
+is zero. So, in this case,  the torque is also zero.
+Think of a hinged door. If you push on
+the edge of the door, towards the hinge, the door doesn't move
+because the torque is zero.
+</p>
+<p>
+Example 3 is the general case in which the force is applied
+at some angle <b>a</b> to
+the arm. The perpendicular distance is given by
+<A HREF="trig.html">trigonometry</A>
+as the length of the arm (L) times the
+<A HREF="sincos.html">cosine (cos)</A>
+of the angle.
+The torque is then given by:
+</p>
+<CENTER>
+<p>
+T = F * L * cos(a)
+</p>
+</CENTER>
+<p>
+Examples 1 and 2 can be derived from this general formula,
+since the
+<A HREF="function.html">cosine of</A>
+0 degrees is 1.0 (Example 1), and the cosine of 90 degrees is 0.0 (Example 2).
+</p>
+<p>
+In Example 4, the pivot has been moved from the end of the bar to
+a location near the middle of the bar. Weights are added to both sides
+of the pivot.
+To the right a single weight <b>W</b> produces a force <b>F1</b> acting
+at a distance <b>L1</b> from the pivot. This creates a torque <b>T1</b> equal to the
+product of the force and the distance.
+</p>
+<CENTER>
+<p>
+ T1 = F1 * L1
+</p>
+</CENTER>
+<p>
+To the left of the
+pivot two weights <b>W</b> produce a force <b>F2</b> at a distance <b>L2</b>.
+This produces
+a torque <b>T2</b> in a direction opposite from T1 because the distance
+is in the opposite direction.
+</p>
+<CENTER>
+<p>
+ T2 = F2 * L2
+</p>
+</CENTER>
+<p>
+If the system were in <b>equilibrium</b>,
+or balanced, the torques would be equal and no net torque would act on the system.
+</p>
+<CENTER>
+<p>
+T1 = T2  or T1 - T2 = 0
+</p>
+<p>
+F1 * L1 = F2 * L2
+</p>
+</CENTER>
+<p>
+If the system is not in equilibrium, or unbalanced, the bar rotates
+about the pivot in the direction of the higher torque.
+If F2 = 2 * F1,
+what is the relation between L1 and L2 to balance the system? If F2 = 2 * F1,
+and L1 = L2, in which direction would the system rotate?
+</p>
+<p>
+Aeronautical engineers use the torque generated by aerodynamic surfaces
+to stabilize and control aircraft.
+On airplanes, the control surfaces produce
+<A HREF="presar.html">aerodynamic forces</A>.
+These forces are applied at some distance from the
+<A HREF="acg.html">aircraft cg </A>
+and therefore
+cause the aircraft to rotate. The
+<A HREF="elv.html">elevators</A> produce a
+<A HREF="pitch.html">pitching</A> moment, the
+<A HREF="rud.html">rudder</A> produce a
+<A HREF="yaw.html">yawing</A> moment, and the
+<A HREF="alr.html">ailerons</A> produce a
+<A HREF="roll.html">rolling</A> moment.  The ability to vary the amount of
+the force and the moment allows the pilot to maneuver or to
+<A HREF="trim.html">trim</A> the aircraft.
+On model rockets, the
+<A HREF="rktparts.html">fins</A>
+are used to generate a torque about the rocket
+<A HREF="rktcg.html">center of gravity</A>
+to provide
+<A HREF="rktstab.html">stability</A>
+during powered flight.
+On kites, the aerodynamic and weight forces
+produce a torque about the
+<A HREF="kitepart.html">bridle point</A>.
+The distance from the bridle point and the magnitude of the
+forces has a strong effect on the
+<A HREF="kiteaero.html">performance</A>
+of the kite.
+</p>
+
+<hr>
+<b>Activities:</b>
+<br>
+<A HREF="../BGA/Sheri/rudder_yaw_act.htm"><IMG SRC="Images/butp912.gif"
+ALT="Button to Display Grade 9-12 Activity"
+WIDTH=100 HEIGHT=30 BORDER=0 ALIGN=bottom></A>
+
+<A HREF="../BGA/Dan/aircraft_trim_act.htm"><IMG SRC="Images/butp912.gif"
+ALT="Button to Display Grade 9-12 Activity"
+WIDTH=100 HEIGHT=30 BORDER=0 ALIGN=bottom></A>
+
+<A HREF="../WindTunnel/Activities/balance_of_forces.html"><IMG SRC="Images/butp912.gif"ALT="Button to Display Grade 9-12 Activity"
+WIDTH=100 HEIGHT=30 BORDER=0 ALIGN=bottom></A>
+
+<A HREF="../BGA/Melissa/center_of_gravity_act.htm"><IMG SRC="Images/butp12.gif"
+ALT="Button to Display Grade 11-12 Activity"
+WIDTH=100 HEIGHT=30 BORDER=0 ALIGN=bottom></A>
+<HR>
+<b><A HREF="guided.htm">Guided Tours</a></b>
+<UL>
+  <LI>
+         <A HREF="translations.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"^M
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+      <b> Forces, Torques and Motion:</b>
+        <A HREF="rotations.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="trim.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Basic Aircraft Motion:</b>
+        <A HREF="guided.htm"><IMG SRC="Images/butndtr.gif"
+         ALT="Button to Return to Guided Tour Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="spoil.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Aircraft Roll Motion:</b>
+        <A HREF="guided.htm"><IMG SRC="Images/butndtr.gif"
+         ALT="Button to Return to Guided Tour Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="stablator.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Aircraft Pitch Motion:</b>
+        <A HREF="guided.htm"><IMG SRC="Images/butndtr.gif"
+         ALT="Button to Return to Guided Tour Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="rud.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Aircraft Yaw Motion:</b>
+        <A HREF="guided.htm"><IMG SRC="Images/butndtr.gif"
+         ALT="Button to Return to Guided Tour Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="shape.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Ailerons:</b>
+        <A HREF="roll.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="spoil.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Spoilers:</b>
+        <A HREF="roll.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="shape.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Elevators:</b>
+        <A HREF="pitch.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="incline.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Stabilators:</b>
+        <A HREF="pitch.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="shape.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Rudder:</b>
+        <A HREF="yaw.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+  <LI>
+        <A HREF="presar.html"><IMG SRC="Images/butpre.gif"
+         ALT="Button to Display Previous Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+    <b> Stability of a Model Rocket:</b>
+        <A HREF="rktcock.html"><IMG SRC="Images/butnex.gif"
+         ALT="Button to Display Next Page"
+         WIDTH=100 HEIGHT=20 BORDER=0 ALIGN=top></A>
+  </LI>
+
+</UL>
+<HR>
+<P><b>Navigation..</b></P>
+<A HREF="short.html"><IMG SRC="Images/butai.gif"
+ALT="Button to Display Aerodynamics Index"
+WIDTH=163 HEIGHT=31 BORDER=0 ALIGN=bottom></A>
+<A HREF="shortp.html"><IMG SRC="Images/butpi.gif"
+ALT="Button to Display Propulsion Index"
+WIDTH=145 HEIGHT=31 BORDER=0 ALIGN=bottom></A>
+<A HREF="shortr.html"><IMG SRC="Images/butmr.gif"
+ALT="Button to Display Model Rocket Index"
+WIDTH=145 HEIGHT=31 BORDER=0 ALIGN=bottom></A>
+<A HREF="shortk.html"><IMG SRC="Images/butki.gif"
+ALT="Button to Display Kite Index"
+WIDTH=127 HEIGHT=31 BORDER=0 ALIGN=bottom></A>
+<A HREF="shortt.html"><IMG SRC="Images/butwtn.gif"
+ALT="Button to Display Wind Tunnel Index"
+WIDTH=152 HEIGHT=29 BORDER=0 ALIGN=bottom></A>
+<A HREF="../../Wright/airplane/shortw.html"><IMG SRC="Images/butwi.gif"
+ALT="Button to Display Wright Brothers Index"
+WIDTH=150 HEIGHT=31 BORDER=0 ALIGN=bottom></A>
+<BR>
+<DL>
+   <DT><A HREF="index.html">Beginner's Guide Home Page</A></DT>
+</DL>
+
+
+ 
+</font>
+					
+         	</td>
+              </tr>
+            </table>
+<!-- Footer Begins -->		  
+
+            <p>&nbsp;</p>
+		  </td>
+        </tr>
+        <tr bgcolor="#CCCCCC"> 
+          <td colspan="4"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+
+                <td width="155" valign="top">&nbsp;&nbsp;&nbsp;&nbsp;
+                  <A HREF="http://www.firstgov.gov/"><img src="Images/logo_first_gov.gif" alt="First Gov Image" width="125" height="42" border="0"><a></td>
+                <td width="251"><p><font size="-1" face="Verdana, Arial, Helvetica, sans-serif"><br>
+                    <font size="-2">
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/oig/hq/hotline.html" target="_blank">+ Inspector General Hotline</a><br>
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/codee/nofear.html" target="_blank">+ Equal Employment Opportunity Data Posted Pursuant to the No Fear Act</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/budget/index.html" target="_blank">+ Budgets, Strategic Plans and Accountability Reports</a><br>
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/pao/FOIA/agency/" target="_blank">+ Freedom of Information Act</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Management.html" target="_blank">+ The President's Management Agenda</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Privacy.html" target="_blank">+ NASA Privacy Statement, Disclaimer,</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Privacy.html" target="_blank"> and Accessibility Certification</a></font></font></p>
+                  <p>&nbsp;</p></td>
+
+                <td align="right" valign="top"><img src="Images/logo_nasa_self.gif" alt="NASA Logo"  width="49" height="48">&nbsp;&nbsp;&nbsp;</td>
+                <td width="200" valign="top"><font size="-2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+                  <font color="#333333">Editor: <a class="bodygray" href="mailto:nancy.r.hall@nasa.gov">Nancy Hall</a><br> 
+                  NASA Official: <a class="bodygray" href="mailto:nancy.r.hall@nasa.gov">Nancy Hall</a><br> 
+                  Last Updated:   May 13 2021</font><br>
+                  <a class="bodygray" href="http://www.nasa.gov/centers/glenn/about/contact_us.html" target="_blank">+ 
+                  Contact Glenn</a></font></td>
+              </tr>
+            </table></td>
+        </tr>
+      </table></td>
+  </tr>
+</table>
+
+<!-- Footer Ends -->
+
+<!-- We participate in the US government's analytics program. See the data at analytics.usa.gov. -->
+<script async type="text/javascript" src="https://dap.digitalgov.gov/Universal-Federated-Analytics-Min.js?agency=NASA&subagency=GRC" id="_fed_an_ua_tag"></script>
+
+</body>
+</html>

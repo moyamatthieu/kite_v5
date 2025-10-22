@@ -7,6 +7,8 @@
  */
 
 import * as THREE from 'three';
+import { EnvironmentConfig } from '../config/Config';
+import { MathUtils } from '../utils/MathUtils';
 
 import { Component } from '../core/Component';
 
@@ -58,10 +60,8 @@ export class PhysicsComponent extends Component {
     
     const DEFAULT_MASS = 1.0;
     const DEFAULT_INERTIA_SPHERE = 0.4;
-    const DEFAULT_LINEAR_DAMPING = 0.99;
-    const DEFAULT_ANGULAR_DAMPING = 0.98;
-    
-    this.mass = options.mass ?? DEFAULT_MASS;
+
+    this.mass = MathUtils.initializeProperty(options, 'mass', DEFAULT_MASS);
     this.invMass = this.mass > 0 ? 1 / this.mass : 0;
     
     this.velocity = options.velocity?.clone() || new THREE.Vector3(0, 0, 0);
@@ -90,10 +90,10 @@ export class PhysicsComponent extends Component {
     // Initialiser les forces par face (pour le debug et application distribuée)
     this.faceForces = [];
     
-    this.linearDamping = options.linearDamping ?? DEFAULT_LINEAR_DAMPING;
-    this.angularDamping = options.angularDamping ?? DEFAULT_ANGULAR_DAMPING;
-    
+    this.linearDamping = MathUtils.initializeProperty(options, 'linearDamping', EnvironmentConfig.LINEAR_DAMPING);
+    this.angularDamping = MathUtils.initializeProperty(options, 'angularDamping', EnvironmentConfig.ANGULAR_DAMPING);
+
     // Objet cinématique (fixe) par défaut à false
-    this.isKinematic = options.isKinematic ?? false;
+        this.isKinematic = MathUtils.initializeProperty(options, 'isKinematic', false);
   }
 }

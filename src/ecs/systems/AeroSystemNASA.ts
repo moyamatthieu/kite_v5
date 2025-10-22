@@ -43,18 +43,42 @@ interface SurfaceSample {
 namespace NASAAeroConfig {
   /** Densité de l'air standard au niveau de la mer (kg/m³) */
   export const AIR_DENSITY_SEA_LEVEL = 1.229;
-  
+
   /** Coefficient de pression dynamique = 0.5 */
   export const DYNAMIC_PRESSURE_COEFF = 0.5;
-  
+
   /** Facteur d'efficacité pour ailes rectangulaires (NASA: 0.7) */
   export const RECTANGULAR_WING_EFFICIENCY = 0.7;
-  
+
   /** Coefficient pour plaque plane perpendiculaire (NASA: 1.28) */
   export const FLAT_PLATE_DRAG_COEFF = 1.28;
-  
+
   /** Constante π */
   export const PI = Math.PI;
+
+  // === STALL MODELING ===
+  /** Angle de décrochage (stall) en radians - ~15° pour plaque plane */
+  export const STALL_ANGLE_RAD = (15 * Math.PI) / 180;
+
+  /** Post-stall CL max (coefficient de portance au stall) */
+  export const CL_MAX = 1.2;
+
+  /** Post-stall CD (traînée augmentée après stall) */
+  export const CD_STALL = 1.8;
+
+  // === MOMENT COEFFICIENTS ===
+  /** Coefficient de moment de tangage (pitch) - Négatif = stable */
+  export const CM_PITCH = -0.05;
+
+  /** Coefficient de moment de lacet (yaw) dû à l'asymétrie */
+  export const CM_YAW = -0.02;
+
+  /** Coefficient de moment de roulis (roll) dû à l'asymétrie */
+  export const CM_ROLL = -0.03;
+
+  // === CENTER OF PRESSURE ===
+  /** Position du centre de pression par rapport au centre géométrique (% chord) */
+  export const CP_POSITION_RATIO = 0.25;
 }
 
 export class AeroSystemNASA extends System {
@@ -143,30 +167,30 @@ export class AeroSystemNASA extends System {
           return;
         }
 
-        // Angle d'attaque en radians (0 = parallèle, π/2 = perpendiculaire)
-        const alphaRad = Math.acos(Math.min(1.0, Math.abs(dotNW)));
+        // ✅ CORRECTION NASA: Alpha = angle entre SURFACE et vent
+        // NASA: α = 0° → surface parallèle au vent (pas de portance)
+        //       α = 90° → surface perpendiculaire au vent (portance max)
+        // dotNW = cos(angle entre normale et vent)
+        // Alpha = π/2 - angle_normale = asin(dotNW)
+        const alphaRad = Math.asin(Math.min(1.0, Math.abs(dotNW)));
 
-        // 4. ✨ FORMULES NASA OFFICIELLES ✨
-        
-        // === COEFFICIENT DE PORTANCE (NASA) ===
-        // Clo = 2 × π × α (pour plaque plane, petits angles)
-        const Clo = 2.0 * NASAAeroConfig.PI * alphaRad;
-        
-        // Correction pour faible aspect ratio (obligatoire pour cerfs-volants)
-        // Cl = Clo / (1 + Clo / (π × AR))
+        // 4. ✨ FORMULES NASA OFFICIELLES PURES ✨
+        // Sources: kitelift.html, kitedrag.html, kitedown.html
+
         const aspectRatio = Math.max(kiteComp.aspectRatio, 0.1); // Éviter division par 0
-        const CL = Clo / (1.0 + Clo / (NASAAeroConfig.PI * aspectRatio));
-        
-        // === COEFFICIENT DE TRAÎNÉE (NASA) ===
-        // Cdo = 1.28 × sin(α) (pour plaque plane perpendiculaire)
-        const Cdo = NASAAeroConfig.FLAT_PLATE_DRAG_COEFF * Math.sin(alphaRad);
-        
-        // Traînée induite (drag due to lift)
-        // Cd_induced = Cl² / (0.7 × π × AR)
-        const inducedDragCoeff = (CL * CL) / (NASAAeroConfig.RECTANGULAR_WING_EFFICIENCY * NASAAeroConfig.PI * aspectRatio);
-        
-        // Traînée totale
-        const CD = Cdo + inducedDragCoeff;
+
+        // === FORMULES NASA POUR PLAQUES PLANES ===
+        // Note: La NASA ne mentionne PAS de décrochage brutal pour les plaques planes.
+        // Les plaques planes ont un comportement linéaire jusqu'à ~30-40° contrairement aux profils aérodynamiques.
+
+        // Coefficient de portance (Source: kitelift.html lignes 173-210)
+        const Clo = 2.0 * NASAAeroConfig.PI * alphaRad;  // Formule linéaire théorique
+        const CL = Clo / (1.0 + Clo / (NASAAeroConfig.PI * aspectRatio)); // Correction aspect ratio + downwash
+
+        // Coefficient de traînée (Source: kitedrag.html lignes 178-213)
+        const Cdo = NASAAeroConfig.FLAT_PLATE_DRAG_COEFF * Math.sin(alphaRad);  // Traînée de forme
+        const inducedDrag = (CL * CL) / (NASAAeroConfig.RECTANGULAR_WING_EFFICIENCY * NASAAeroConfig.PI * aspectRatio); // Traînée induite
+        const CD = Cdo + inducedDrag;  // Traînée totale
 
         // 5. Pression dynamique selon NASA: q = 0.5 × ρ × V²
         const airDensity = aero.airDensity || NASAAeroConfig.AIR_DENSITY_SEA_LEVEL;
@@ -196,14 +220,39 @@ export class AeroSystemNASA extends System {
 
         // 9. Application des forces et couples
         const panelForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
-        
+
         this.addForce(physics, panelLift);
         this.addForce(physics, panelDrag);
         this.addForce(physics, gravityPerFace);
-        
+
         // Couple = bras de levier × force
         const panelTorque = leverArm.clone().cross(panelForce);
         this.addTorque(physics, panelTorque);
+
+        // === 9b. MOMENTS AERODYNAMIQUES (Pitch, Yaw, Roll) ===
+        // Les moments aérodynamiques sont essentiels pour la stabilité
+        // M = CM × q × S × chord (pour pitch)
+
+        // Chord du kite (longueur caractéristique)
+        const chord = kiteComp.chord || 0.65;
+
+        // // Moment de tangage (pitch) - Stabilité longitudinale
+        // const pitchMoment = NASAAeroConfig.CM_PITCH * q * sample.area * chord;
+        // const pitchAxis = new THREE.Vector3(1, 0, 0); // Axe X (latéral)
+        // const pitchTorque = pitchAxis.multiplyScalar(pitchMoment);
+        // this.addTorque(physics, pitchTorque);
+
+        // // Moment de lacet (yaw) - Stabilité directionnelle
+        // const yawMoment = NASAAeroConfig.CM_YAW * q * sample.area * chord;
+        // const yawAxis = new THREE.Vector3(0, 1, 0); // Axe Y (vertical)
+        // const yawTorque = yawAxis.multiplyScalar(yawMoment);
+        // this.addTorque(physics, yawTorque);
+
+        // // Moment de roulis (roll) - Stabilité latérale
+        // const rollMoment = NASAAeroConfig.CM_ROLL * q * sample.area * chord;
+        // const rollAxis = new THREE.Vector3(0, 0, 1); // Axe Z (longitudinal)
+        // const rollTorque = rollAxis.multiplyScalar(rollMoment);
+        // this.addTorque(physics, rollTorque);
 
         // 10. Stockage pour visualisation debug
         physics.faceForces.push({
@@ -285,24 +334,37 @@ export class AeroSystemNASA extends System {
   
   /**
    * Calcule la direction de la portance selon NASA
-   * 
-   * NASA: Pour une plaque plane, la force aérodynamique résultante est NORMALE à la surface.
-   * Cette force est décomposée en:
-   * - Portance (lift) : composante perpendiculaire au vent
-   * - Traînée (drag) : composante parallèle au vent
-   * 
-   * Pour simplifier et suivre exactement la NASA, on utilise directement la normale de surface
-   * comme direction de portance, car pour une plaque plane, c'est la direction de la force
-   * aérodynamique principale.
-   * 
+   *
+   * ✅ CORRECTION NASA (Source: kitelift.html lignes 106-107)
+   * NASA: "lift direction is perpendicular to the wind"
+   *
+   * La force aérodynamique sur une plaque plane est décomposée en:
+   * - Portance (lift) : composante PERPENDICULAIRE au vent
+   * - Traînée (drag) : composante PARALLÈLE au vent
+   *
+   * Méthode: Projection de la normale de surface sur le plan perpendiculaire au vent
+   * liftDir = normale - (normale · vent) * vent, puis normalisé
+   *
    * @param surfaceNormal - Normale de la surface (unitaire)
-   * @param windDir - Direction du vent apparent (non utilisé, gardé pour compatibilité)
-   * @returns Direction de la portance = normale de surface
+   * @param windDir - Direction du vent apparent (unitaire)
+   * @returns Direction de la portance (unitaire, perpendiculaire au vent)
    */
   private calculateNASALiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 {
-    // NASA: Pour plaque plane, la force résultante est normale à la surface
-    // C'est la physique pure d'une plaque plane : la force est perpendiculaire à la plaque
-    return surfaceNormal.clone();
+    // Méthode: Projection de la normale sur le plan perpendiculaire au vent
+    // liftDir = normale - (normale · vent) * vent
+    const projection = surfaceNormal.dot(windDir);
+    const liftDir = surfaceNormal.clone()
+      .sub(windDir.clone().multiplyScalar(projection))
+      .normalize();
+
+    // Protection contre les vecteurs nuls (si normale parallèle au vent)
+    if (liftDir.lengthSq() < 0.0001) {
+      // Si la normale est parallèle au vent, pas de portance
+      // Retourner direction arbitraire vers le haut (Cl sera ~0 de toute façon)
+      return new THREE.Vector3(0, 1, 0);
+    }
+
+    return liftDir;
   }
   
   /**

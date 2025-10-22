@@ -34,7 +34,15 @@
       "Bash(git init:*)",
       "Bash(git remote add:*)",
       "Bash(mv:*)",
-      "Bash(unzip:*)"
+      "Bash(unzip:*)",
+      "Bash(dir /s /b src*.ts)",
+      "Bash(findstr /I \"physics constraint pbd rope line aero verlet\")",
+      "Bash(timeout 5 sleep 5)",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 3\")",
+      "Bash(bash download_nasa_content.sh)",
+      "Bash(bash download_nasa_images.sh)",
+      "Bash(npx cloc src --by-file --json)",
+      "Bash(timeout 30 npm run build)"
     ],
     "deny": [],
     "ask": []

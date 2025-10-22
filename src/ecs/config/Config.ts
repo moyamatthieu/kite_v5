@@ -28,20 +28,113 @@ namespace PhysicsConstants {
   /** Densité de l'air standard (kg/m³) - Niveau mer, 15°C */
   export const AIR_DENSITY = 1.225;
 
-  /** Nombre d'itérations PBD pour convergence */
-  export const PBD_ITERATIONS = 8;
+  // ============================================================================
+  // PBD (Position-Based Dynamics) - Paramètres optimisés
+  // ============================================================================
 
-  /** Compliance PBD (0 = rigide, >0 = souple) */
+  /** Nombre d'itérations PBD pour convergence (10-20 recommandé) */
+  export const PBD_ITERATIONS = 20;
+
+  /** Compliance PBD (inverse de rigidité): α = 1/k
+   * α = 0     → infiniment rigide (hard constraint)
+   * α = 0.001 → très rigide (k ≈ 1000)
+   * α = 0.01  → rigide (k ≈ 100)
+   * α = 0.1   → souple (k ≈ 10)
+   *
+   * Pour lignes de kite: quasi-rigide (hard constraint)
+   */
   export const PBD_COMPLIANCE = 0.00001;
 
-  /** Correction max PBD par frame (m) */
-  export const PBD_MAX_CORRECTION = 2.0;
+  /** Correction max PBD par frame (m) - Sécurité anti-divergence */
+  export const PBD_MAX_CORRECTION = 0.5;
 
-  /** Facteur d'amortissement angulaire PBD (0.95 = 5% damp par frame) */
-  export const PBD_ANGULAR_DAMPING = 0.99;
+  /** Facteur d'amortissement angulaire PBD (0-1)
+   * 0.95 = 5% damp par frame
+   * 0.98 = 2% damp par frame (plus stable)
+   * 0.99 = 1% damp par frame (minimal)
+   */
+  export const PBD_ANGULAR_DAMPING = 0.98;
 
   /** Lambda max pour PBD : limite stricte pour éviter divergence */
-  export const PBD_MAX_LAMBDA = 100;
+  export const PBD_MAX_LAMBDA = 1000;
+
+  /** Epsilon pour calculs numériques (évite division par zéro) */
+  export const EPSILON = 1e-6;
+
+  /** Position du sol (m) - Y = 0 dans Three.js */
+  export const GROUND_Y = 0;
+
+  /** Vitesse angulaire minimale au carré pour intégration rotation */
+  export const MIN_ANGULAR_VELOCITY_SQ = 0.0001;
+
+  /** Facteur pour intégration Euler semi-implicite */
+  export const SEMI_IMPLICIT_SCALE = 0.5;
+}
+
+// ============================================================================
+// 🔗 CONTRAINTES (LIGNES ET BRIDLES)
+// ============================================================================
+
+namespace ConstraintConfig {
+  /** Rigidité physique de la ligne (N/m) - Loi de Hooke F = k × x */
+  export const LINE_STIFFNESS = 25000;
+
+  /** Facteur de relaxation pour projection PBD (0.0-1.0) */
+  export const PBD_PROJECTION_FACTOR = 0.5;
+
+  /** Coefficient d'amortissement PBD (0.1-0.3) */
+  export const PBD_DAMPING = 0.2;
+
+  /** Nombre d'itérations de résolution PBD par frame */
+  export const PBD_ITERATIONS = 5;
+
+  /** Coefficient de stabilisation Baumgarte (0.05-0.2) */
+  export const BAUMGARTE_COEF = 0.1;
+}
+
+// ============================================================================
+// 🎨 CONSTANTES VISUELLES ET RENDU
+// ============================================================================
+
+namespace VisualConstants {
+  /** Seuil de recréation géométrie ligne (m) */
+  export const LINE_GEOMETRY_UPDATE_THRESHOLD = 0.01;
+
+  /** Rayon des tubes de ligne (m) */
+  export const LINE_TUBE_RADIUS = 0.003;
+
+  /** Segments radiaux des tubes */
+  export const LINE_TUBE_SEGMENTS = 8;
+
+  /** Couleur verte (poignée droite) */
+  export const COLOR_GREEN = 0x00ff00;
+
+  /** Couleur rouge (poignée gauche) */
+  export const COLOR_RED = 0xff0000;
+
+  /** Diamètre cylindre barre (m) */
+  export const BAR_CYLINDER_DIAMETER = 0.015;
+
+  /** Diamètre sphère poignée (m) */
+  export const HANDLE_SPHERE_DIAMETER = 0.035;
+
+  /** Segments sphère poignée */
+  export const HANDLE_SPHERE_SEGMENTS = 16;
+
+  /** Diamètre tube bridle (m) */
+  export const BRIDLE_TUBE_DIAMETER = 0.003;
+}
+
+// ============================================================================
+// ⏱️ CONSTANTES DE SIMULATION
+// ============================================================================
+
+namespace SimulationConstants {
+  /** Delta time maximal (s) - Cap à 50ms pour stabilité */
+  export const MAX_DELTA_TIME = 0.05;
+
+  /** Facteur de conversion millisecondes → secondes */
+  export const MS_TO_SECONDS = 1000;
 }
 
 // ============================================================================
@@ -126,7 +219,7 @@ namespace LineSpecs {
   export const LENGTH_M = 15;
 
   /** Tension maximale (N) - ~8× poids du kite */
-  export const MAX_TENSION_N = 10;
+  export const MAX_TENSION_N = 200;
 
   // === Couleur ===
   /** Couleur des lignes en RGB hex */
@@ -138,13 +231,13 @@ namespace LineSpecs {
 
   // === Paramètres Spring-Force ===
   /** Rigidité du ressort (N/m) - Réduit de 500 à 50 pour stabilité */
-  export const STIFFNESS_N_PER_M = 50;
+  export const STIFFNESS_N_PER_M = 500;
 
   /** Fréquence propre : ω = sqrt(k/m) = sqrt(50/0.12) ≈ 20 rad/s (~3 Hz) */
-  export const EXPECTED_FREQUENCY_HZ = 3;
+  export const EXPECTED_FREQUENCY_HZ = 30;
 
   /** Amortissement visqueux (N·s/m) */
-  export const DAMPING_N_S_PER_M = 5;
+  export const DAMPING_N_S_PER_M = 50;
 
   /** Amortissement critique théorique ≈ 4.9 (légèrement sur-amorti) */
   export const DAMPING_RATIO = 0.7; // Légèrement sur-amorti pour stabilité
@@ -203,7 +296,7 @@ namespace AeroConfig {
 
 namespace EnvironmentConfig {
   // === Vent ===
-  /** Vitesse du vent par défaut (m/s) - ~25 km/h (bon pour vol cerf-volant) */
+  /** Vitesse du vent par défaut (m/s) - ~43 km/h (bon pour vol cerf-volant) */
   export const WIND_SPEED_M_S = 12;
 
   /** Direction du vent par défaut (degrés) - 270 = -Z = Nord */
@@ -450,6 +543,40 @@ namespace WindConfig {
 }
 
 // ============================================================================
+// ✈️ MODES PAR DÉFAUT DE LA SIMULATION
+// ============================================================================
+
+namespace SimulationModes {
+  /** 
+   * Mode aérodynamique par défaut : 'nasa' ou 'perso' 
+   * - 'nasa' : Formules officielles NASA (plaques planes)
+   * - 'perso' : Modèle personnalisé (Rayleigh)
+   */
+  export const AERO_MODE = 'nasa' as const;
+}
+
+// ============================================================================
+// 🎯 VALEURS PAR DÉFAUT POUR INPUTCOMPONENT
+// ============================================================================
+
+namespace InputDefaults {
+  /** Valeur par défaut pour lineLength (m) */
+  export const LINE_LENGTH_M = 150;
+  
+  /** Valeur par défaut pour bridleNez (m) */
+  export const BRIDLE_NEZ_M = 1.5;
+  
+  /** Valeur par défaut pour bridleInter (m) */
+  export const BRIDLE_INTER_M = 2.0;
+  
+  /** Valeur par défaut pour bridleCentre (m) */
+  export const BRIDLE_CENTRE_M = 2.5;
+  
+  /** Valeur par défaut pour meshSubdivisionLevel */
+  export const MESH_SUBDIVISION_LEVEL = 2;
+}
+
+// ============================================================================
 // ✨ EXPORT DE LA CONFIGURATION PRINCIPALE
 // ============================================================================
 
@@ -565,6 +692,12 @@ export const CONFIG = {
     showForceVectors: DebugConfig.SHOW_FORCE_VECTORS,
     showPhysicsInfo: DebugConfig.SHOW_PHYSICS_INFO,
     logLevel: DebugConfig.LOG_LEVEL
+  },
+
+  // === MODES ===
+  modes: {
+    aero: SimulationModes.AERO_MODE,
+    constraint: LineSpecs.CONSTRAINT_MODE
   }
 } as const;
 
@@ -575,6 +708,9 @@ export const CONFIG = {
 // Exports des namespaces pour accès direct aux constantes spécialisées
 export {
   PhysicsConstants,
+  ConstraintConfig,
+  VisualConstants,
+  SimulationConstants,
   KiteSpecs,
   BridleConfig,
   LineSpecs,
@@ -586,5 +722,7 @@ export {
   RenderConfig,
   DebugConfig,
   UIConfig,
-  WindConfig
+  WindConfig,
+  SimulationModes,
+  InputDefaults
 };

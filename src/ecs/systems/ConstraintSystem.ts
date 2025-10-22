@@ -21,6 +21,7 @@
  * │     │  forces += F, torques += τ                                │
  * │     │                                                             │
  * │     └─ Step 3: Project position (hard constraint)               │
+ * 
  * │        if distance > restLength:                                │
  * │          project kite closer by distance excess                 │
  * │                                                                   │
@@ -63,35 +64,11 @@ import { PhysicsComponent } from '../components/PhysicsComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
 import { InputComponent } from '../components/InputComponent';
-import { CONFIG } from '../config/Config';
+import { CONFIG, PhysicsConstants, ConstraintConfig } from '../config/Config';
 
-const GROUND_Y = 0;
-const EPSILON = 0.001;
 const PRIORITY = 40;
 
 export class ConstraintSystem extends System {
-  // ========== PBD PARAMETERS ==========
-  // Stiffness : fraction de correction appliquée par itération (0.0-1.0)
-  // 1.0 = correction complète (rigide), 0.5 = correction progressive
-  private readonly PBD_STIFFNESS = 0.8;
-
-  // Damping coefficient : dissipe l'énergie basée sur la vitesse relative
-  // Réduit les oscillations. Valeur typique: 0.1-0.3
-  private readonly PBD_DAMPING = 0.2;
-
-  // Nombre d'itérations de résolution par frame
-  // Plus élevé = meilleure convergence mais coûteux
-  // PhysX recommande 2-4 itérations par frame (120-300 Hz)
-  private readonly PBD_ITERATIONS = 3;
-
-  // Baumgarte stabilization coefficient
-  // Compense les erreurs numériques accumulées
-  // Valeur typique: 0.05-0.2
-  private readonly BAUMGARTE_COEF = 0.1;
-
-  // Epsilon pour les calculs (évite les divisions par zéro)
-  private readonly EPSILON = 1e-6;
-
   constructor() {
     super('ConstraintSystem', PRIORITY);
   }
@@ -160,19 +137,35 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    // === ITÉRATIONS DE RÉSOLUTION MULTIPLES ===
-    // Chaque itération améliore la convergence
-    for (let iter = 0; iter < this.PBD_ITERATIONS; iter++) {
-      this.solvePBDConstraint(
-        leftHandle, ctrlGauche, leftLineComp, kiteTransform, kitePhysics, deltaTime, 'left'
-      );
-      this.solvePBDConstraint(
-        rightHandle, ctrlDroit, rightLineComp, kiteTransform, kitePhysics, deltaTime, 'right'
-      );
-    }
+    // Résoudre les contraintes PBD itérativement
+    this.solvePBDConstraintsIteratively(
+      leftHandle, ctrlGauche, leftLineComp, kiteTransform, kitePhysics, deltaTime
+    );
+    this.solvePBDConstraintsIteratively(
+      rightHandle, ctrlDroit, rightLineComp, kiteTransform, kitePhysics, deltaTime
+    );
 
     // Collision sol
     this.handleGroundCollision(kiteTransform, kitePhysics);
+  }
+
+  /**
+   * Résout itérativement les contraintes PBD pour une ligne.
+   */
+  private solvePBDConstraintsIteratively(
+    handlePos: THREE.Vector3,
+    ctrlPos: THREE.Vector3,
+    lineComp: LineComponent,
+    kiteTransform: TransformComponent,
+    kitePhysics: PhysicsComponent,
+    deltaTime: number
+  ): void {
+    // Chaque itération améliore la convergence
+    for (let iter = 0; iter < ConstraintConfig.PBD_ITERATIONS; iter++) {
+      this.solvePBDConstraint(
+        handlePos, ctrlPos, lineComp, kiteTransform, kitePhysics, deltaTime
+      );
+    }
   }
 
   /**
@@ -185,20 +178,19 @@ export class ConstraintSystem extends System {
     lineComp: LineComponent,
     kiteTransform: TransformComponent,
     kitePhysics: PhysicsComponent,
-    deltaTime: number,
-    side: 'left' | 'right'
+    deltaTime: number
   ): void {
     const direction = handlePos.clone().sub(ctrlPos);
     const distance = direction.length();
 
-    if (distance < this.EPSILON) return;
+    if (distance < PhysicsConstants.EPSILON) return;
 
     direction.normalize(); // direction: du ctrl vers le handle
 
     const elongation = Math.max(0, distance - lineComp.restLength);
 
     // === SLACK LINE : si pas en tension, pas de force ===
-    if (elongation < this.EPSILON) {
+    if (elongation < PhysicsConstants.EPSILON) {
       lineComp.state.isTaut = false;
       lineComp.state.elongation = 0;
       lineComp.state.strainRatio = 0;
@@ -214,8 +206,8 @@ export class ConstraintSystem extends System {
 
     // === CALCUL DES FORCES ===
 
-    // 1. Force du ressort
-    const F_spring = this.PBD_STIFFNESS * elongation;
+    // 1. Force du ressort (Loi de Hooke: F = k * x)
+    const F_spring = ConstraintConfig.LINE_STIFFNESS * elongation;
 
     // 2. Force d'amortissement (basée sur vitesse relative)
     const velocityHandle = new THREE.Vector3(0, 0, 0); // La barre est statique
@@ -226,22 +218,22 @@ export class ConstraintSystem extends System {
     const v_radial = v_relative.dot(direction); // Composante le long de la ligne
 
     // Damping force = -c * v_radial
-    const F_damping = -this.PBD_DAMPING * v_radial;
+    const F_damping = -ConstraintConfig.PBD_DAMPING * v_radial;
 
     // 3. Baumgarte stabilization (corrige les erreurs accumulées)
     // Ajoute une force proportionnelle à l'erreur de contrainte
-    const F_baumgarte = this.BAUMGARTE_COEF * elongation;
+    const F_baumgarte = ConstraintConfig.BAUMGARTE_COEF * elongation;
 
     // Force totale (clamped pour éviter les valeurs négatives)
-    const F_total = Math.max(0, F_spring + F_damping + F_baumgarte);
+    const totalForce = Math.max(0, F_spring + F_damping + F_baumgarte);
 
     // === APPLICATION DE LA FORCE ===
     // Force appliquée au point de contrôle du kite
-    const force = direction.clone().multiplyScalar(F_total);
+    const force = direction.clone().multiplyScalar(totalForce);
     kitePhysics.forces.add(force);
 
     // Mise à jour de la tension (approximation)
-    lineComp.currentTension = F_total;
+    lineComp.currentTension = totalForce;
 
     // === GÉNÉRATION DU TORQUE ===
     // Crucial pour l'orientation du kite!
@@ -253,9 +245,9 @@ export class ConstraintSystem extends System {
     // === PROJECTION DE POSITION (hard constraint) ===
     // Si la distance dépasse encore la limite après les forces, corriger directement
     const currentDist = handlePos.distanceTo(ctrlPos);
-    if (currentDist > lineComp.restLength + this.EPSILON) {
+    if (currentDist > lineComp.restLength) {
       const excess = currentDist - lineComp.restLength;
-      const correction = direction.clone().multiplyScalar(excess * this.PBD_STIFFNESS);
+      const correction = direction.clone().multiplyScalar(excess * ConstraintConfig.PBD_PROJECTION_FACTOR);
       kiteTransform.position.add(correction);
     }
   }
@@ -375,7 +367,7 @@ export class ConstraintSystem extends System {
     const diff = handleWorld.clone().sub(ctrlWorld);
     const distance = diff.length();
 
-    if (distance < EPSILON) {
+    if (distance < PhysicsConstants.EPSILON) {
       return;
     }
 
@@ -384,7 +376,7 @@ export class ConstraintSystem extends System {
 
     // Mettre à jour état ligne
     lineComponent.currentLength = distance;
-    lineComponent.state.currentLength = distance;
+
 
     // Contrainte unilatérale : seulement tension
     if (extension <= 0) {
@@ -464,7 +456,7 @@ export class ConstraintSystem extends System {
     _deltaQuaternion: THREE.Quaternion,
     deltaTime: number
   ): void {
-    if (deltaTime < EPSILON) return;
+    if (deltaTime < PhysicsConstants.EPSILON) return;
 
     // Appliquer un amortissement adaptatif basé sur la correction
     // Plus la correction est grande, plus on amortit
@@ -479,8 +471,8 @@ export class ConstraintSystem extends System {
    * Gère la collision avec le sol
    */
   private handleGroundCollision(transform: TransformComponent, physics: PhysicsComponent): void {
-    if (transform.position.y < GROUND_Y) {
-      transform.position.y = GROUND_Y;
+    if (transform.position.y < PhysicsConstants.GROUND_Y) {
+      transform.position.y = PhysicsConstants.GROUND_Y;
 
       if (physics.velocity.y < 0) {
         physics.velocity.y = 0;

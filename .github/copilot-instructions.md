@@ -70,6 +70,9 @@ Utilisez les commandes npm définies dans `package.json` pour les tâches couran
 -   **Build** : `npm run build`
     *   Crée une version de production optimisée dans le répertoire `dist/`.
 
+j'aimerais que tu lise tout le projet en details pour bien comprendre le fonctionnement et objectif global du projet. mais ne te laisse pas influencer par de potentiel erreurs dans le code ou commentaire, la vision global et l'objectif prime
+
+
 ## 🎨 Rendu 3D avec Three.js
 
 -   Le rendu est géré par `RenderSystem.ts` et `GeometryRenderSystem.ts`.

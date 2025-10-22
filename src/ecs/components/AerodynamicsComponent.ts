@@ -13,19 +13,22 @@ import { Component } from '../core/Component';
 export interface AeroCoefficients {
   /** Coefficient de portance (Lift) */
   CL: number;
-  
+
   /** Coefficient de traînée (Drag) */
   CD: number;
-  
+
+  /** Coefficient de traînée parasite (Drag at zero lift) */
+  CD0: number;
+
   /** Coefficient de moment de tangage (Pitching Moment) */
   CM: number;
-  
+
   /** Pente dCL/dα (par degré) */
   CLAlpha: number;
-  
+
   /** Angle d'attaque de portance nulle (degrés) */
   alpha0: number;
-  
+
   /** Angle d'attaque optimal (degrés) */
   alphaOptimal: number;
 }

@@ -1,5 +1,6 @@
 import { Component } from '../core/Component';
 import { Logger } from '../utils/Logging';
+import { CONFIG, InputDefaults } from '../config/Config';
 
 /**
  * Contient l'état des entrées utilisateur provenant de l'interface.
@@ -17,8 +18,8 @@ export class InputComponent extends Component {
   windTurbulence: number; // %
 
   // === Lignes (avec backing fields pour détection de changements) ===
-  private _constraintMode: 'pbd' | 'spring-force' = 'spring-force';
-  private _aeroMode: 'perso' | 'nasa' = 'perso';
+  private _constraintMode: 'pbd' | 'spring-force' = CONFIG.modes.constraint;
+  private _aeroMode: 'perso' | 'nasa' = CONFIG.modes.aero;
 
   get constraintMode(): 'pbd' | 'spring-force' {
     return this._constraintMode;
@@ -70,32 +71,34 @@ export class InputComponent extends Component {
   constructor(initialValues: Partial<InputComponent> = {}) {
     super();
     // Vent
-    this.windSpeed = initialValues.windSpeed ?? 10; // m/s
-    this.windDirection = initialValues.windDirection ?? 0; // degrés
-    this.windTurbulence = initialValues.windTurbulence ?? 10; // %
+    this.windSpeed = initialValues.windSpeed ?? CONFIG.wind.speed;
+    this.windDirection = initialValues.windDirection ?? CONFIG.wind.direction;
+    this.windTurbulence = initialValues.windTurbulence ?? CONFIG.wind.turbulence;
 
-    // Lignes
-    this.constraintMode = initialValues.constraintMode ?? 'spring-force';
-    this.aeroMode = initialValues.aeroMode ?? 'perso'; // Défaut : mode Perso
-    this.lineLength = initialValues.lineLength ?? 150; // m
-    this.bridleNez = initialValues.bridleNez ?? 1.5; // m
-    this.bridleInter = initialValues.bridleInter ?? 2.0; // m
-    this.bridleCentre = initialValues.bridleCentre ?? 2.5; // m
+    // Lignes - Modes
+    this.constraintMode = initialValues.constraintMode ?? CONFIG.modes.constraint;
+    this.aeroMode = initialValues.aeroMode ?? CONFIG.modes.aero;
+    
+    // Lignes - Dimensions
+    this.lineLength = initialValues.lineLength ?? InputDefaults.LINE_LENGTH_M;
+    this.bridleNez = initialValues.bridleNez ?? InputDefaults.BRIDLE_NEZ_M;
+    this.bridleInter = initialValues.bridleInter ?? InputDefaults.BRIDLE_INTER_M;
+    this.bridleCentre = initialValues.bridleCentre ?? InputDefaults.BRIDLE_CENTRE_M;
 
     // Physique
-    this.linearDamping = initialValues.linearDamping ?? 0.99;
-    this.angularDamping = initialValues.angularDamping ?? 0.98;
-    this.meshSubdivisionLevel = initialValues.meshSubdivisionLevel ?? 2;
+    this.linearDamping = initialValues.linearDamping ?? CONFIG.physics.linearDamping;
+    this.angularDamping = initialValues.angularDamping ?? CONFIG.physics.angularDamping;
+    this.meshSubdivisionLevel = initialValues.meshSubdivisionLevel ?? InputDefaults.MESH_SUBDIVISION_LEVEL;
 
     // Aérodynamique
-    this.liftScale = initialValues.liftScale ?? 1.0;
-    this.dragScale = initialValues.dragScale ?? 1.0;
-    this.forceSmoothing = initialValues.forceSmoothing ?? 0.5;
+    this.liftScale = initialValues.liftScale ?? CONFIG.aero.liftScale;
+    this.dragScale = initialValues.dragScale ?? CONFIG.aero.dragScale;
+    this.forceSmoothing = initialValues.forceSmoothing ?? CONFIG.aero.forceSmoothing;
 
     // Actions
     this.resetSimulation = initialValues.resetSimulation ?? false;
-    this.isPaused = initialValues.isPaused ?? false;
-    this.debugMode = initialValues.debugMode ?? false;
+    this.isPaused = initialValues.isPaused ?? !CONFIG.simulation.autoStart;
+    this.debugMode = initialValues.debugMode ?? CONFIG.debug.enabled;
 
     // Contrôle barre
     this.barRotationInput = initialValues.barRotationInput ?? 0;

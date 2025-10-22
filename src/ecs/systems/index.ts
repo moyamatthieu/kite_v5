@@ -10,6 +10,7 @@ export { AeroSystem } from './AeroSystem';
 export { BridleConstraintSystem } from './BridleConstraintSystem';
 export { BridleRenderSystem } from './BridleRenderSystem';
 export { ConstraintSystem } from './ConstraintSystem';
+// PBDConstraintSystem déplacé vers experimental/ (système expérimental non utilisé)
 export { PhysicsSystem } from './PhysicsSystem';
 export { GeometryRenderSystem } from './GeometryRenderSystem';
 export { LineRenderSystem } from './LineRenderSystem';

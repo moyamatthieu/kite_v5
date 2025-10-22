@@ -11,7 +11,6 @@ import * as THREE from 'three';
 
 import { EntityManager } from './core/EntityManager';
 import { SystemManager } from './core/SystemManager';
-import { TransformComponent } from './components/TransformComponent';
 import { InputComponent } from './components/InputComponent';
 import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory, BridleFactory } from './entities';
 import { DebugFactory } from './entities/DebugFactory';
@@ -22,7 +21,6 @@ import {
   AeroSystem,
   BridleConstraintSystem,
   BridleRenderSystem,
-  ConstraintSystem,
   PhysicsSystem,
   PilotSystem,
   GeometryRenderSystem,
@@ -35,15 +33,12 @@ import {
   SimulationLogger,
 } from './systems';
 import { AeroSystemNASA } from './systems/AeroSystemNASA';
-import { CONFIG } from './config/Config';
+import { ConstraintSystem } from './systems/ConstraintSystem';
+import { CONFIG, SimulationConstants } from './config/Config';
 import { Logger } from './utils/Logging';
 import type { SimulationContext } from './core/System';
 import type { RenderSystem as RenderSystemType } from './systems/RenderSystem';
 import type { DebugSystem as DebugSystemType } from './systems/DebugSystem';
-
-// Constantes de simulation
-const MAX_DELTA_TIME = 0.05; // 50ms cap pour stabilité
-const MS_TO_SECONDS = 1000;
 
 export class SimulationApp {
   private entityManager: EntityManager;
@@ -55,7 +50,12 @@ export class SimulationApp {
   // Systèmes aérodynamiques (bascule NASA/Perso)
   private aeroSystemPerso!: AeroSystem;
   private aeroSystemNASA!: AeroSystemNASA;
-  private currentAeroMode: 'perso' | 'nasa' = 'perso';
+  private currentAeroMode: 'perso' | 'nasa' = CONFIG.modes.aero;
+  
+  // Système de contraintes (dual-mode: PBD et Spring-Force)
+  private constraintSystem!: ConstraintSystem;
+  private currentConstraintMode: 'pbd' | 'spring-force' = CONFIG.modes.constraint;
+  
   private animationFrameId: number | null = null;
   
   constructor(private canvas: HTMLCanvasElement) {
@@ -133,55 +133,88 @@ export class SimulationApp {
    * Crée et enregistre les systèmes
    */
   private createSystems(): void {
-    // === Créer RenderSystem en premier pour accéder au canvas et camera ===
-    const renderSystem = new RenderSystem();
+    // === Créer RenderSystem avec le canvas fourni au constructeur ===
+    const renderSystem = new RenderSystem(this.canvas);
     const scene = renderSystem.scene;
     const camera = renderSystem.camera;
 
-    // CRITIQUE : Attacher le canvas au DOM AVANT de créer les OrbitControls
-    // Les OrbitControls attachent leurs event listeners lors de la construction
-    const rendererCanvas = renderSystem.getCanvas();
-    if (this.canvas.parentElement) {
-      this.canvas.parentElement.replaceChild(rendererCanvas, this.canvas);
-    }
-    rendererCanvas.id = 'simulation-canvas';
+    // Le canvas est déjà attaché au DOM (fourni par main.ts)
+    // Pas besoin de l'attacher à nouveau
 
-    // Créer DebugSystem (on passera le renderSystem après)
+    // Créer DebugSystem
     const debugSystem = new DebugSystem();
 
-    // Initialiser les deux systèmes aérodynamiques
+    // Initialiser les systèmes aérodynamiques et de contraintes
+    this.initializeAeroSystems();
+    this.initializeConstraintSystems();
+
+    // Configurer le pipeline de systèmes
+    this.setupSystemPipeline(scene, this.canvas, camera, debugSystem, renderSystem);
+
+    // Stocker le renderSystem dans le debugSystem
+    (debugSystem as DebugSystemType).renderSystem = renderSystem;
+  }
+
+  /**
+   * Initialise les systèmes aérodynamiques selon la configuration
+   */
+  private initializeAeroSystems(): void {
     this.aeroSystemPerso = new AeroSystem();
     this.aeroSystemNASA = new AeroSystemNASA();
 
-    // Ajouter les systèmes dans l'ordre de priorité
+    // Activer le système selon la config
+    const isNasaMode = CONFIG.modes.aero === 'nasa';
+    this.aeroSystemPerso.setEnabled(!isNasaMode);
+    this.aeroSystemNASA.setEnabled(isNasaMode);
+  }
+
+  /**
+   * Initialise le système de contraintes selon la configuration
+   */
+  private initializeConstraintSystems(): void {
+    this.constraintSystem = new ConstraintSystem();
+    this.constraintSystem.setEnabled(true);
+
+    // Note: ConstraintSystem gère en interne les deux modes:
+    // - 'pbd': Position-Based Dynamics avec amortissement et Baumgarte
+    // - 'spring-force': Ressorts classiques avec amortissement
+    // Le mode est sélectionné via InputComponent.constraintMode
+  }
+
+  /**
+   * Configure le pipeline de systèmes dans l'ordre de priorité
+   */
+  private setupSystemPipeline(
+    scene: THREE.Scene, 
+    canvas: HTMLCanvasElement, 
+    camera: THREE.PerspectiveCamera,
+    debugSystem: DebugSystem,
+    renderSystem: RenderSystemType
+  ): void {
+    // Ordre critique : respecte le flux ECS (Input → Physics → Render)
     this.systemManager.add(new EnvironmentSystem(scene)); // Priority 1
-    this.systemManager.add(
-      new CameraControlsSystem(rendererCanvas, camera)
-    ); // Priority 1 (bis)
-    this.systemManager.add(new InputSyncSystem()); // Priority 5 - Synchronise UI → Composants
-    this.systemManager.add(new BridleConstraintSystem()); // Priority 10 - Met à jour positions des brides via trilatération
+    this.systemManager.add(new CameraControlsSystem(canvas, camera)); // Priority 1
+    this.systemManager.add(new InputSyncSystem()); // Priority 5
+    this.systemManager.add(new BridleConstraintSystem()); // Priority 10
     this.systemManager.add(new InputSystem()); // Priority 10
     this.systemManager.add(new WindSystem()); // Priority 20
-    this.systemManager.add(this.aeroSystemPerso); // Priority 30 - Démarre avec système Perso
-    this.systemManager.add(this.aeroSystemNASA); // Priority 30 - Ajouté mais désactivé
     
-    // Désactiver le système NASA au démarrage
-    this.aeroSystemNASA.setEnabled(false);
-    
-    this.systemManager.add(new ConstraintSystem()); // Priority 40 - AVANT PhysicsSystem
-    this.systemManager.add(new SimulationLogger()); // Priority 45 - APRÈS ConstraintSystem, AVANT PhysicsSystem
-    this.systemManager.add(new PhysicsSystem()); // Priority 50 - LIT forces accumulées
-    this.systemManager.add(new PilotSystem()); // Priority 55
-    this.systemManager.add(new LineRenderSystem()); // Priority 55 (bis)
-    this.systemManager.add(new BridleRenderSystem()); // Priority 56 - Rend les brides dynamiquement
-    this.systemManager.add(new GeometryRenderSystem()); // Priority 60
+    // Systèmes aérodynamiques (un seul actif à la fois)
+    this.systemManager.add(this.aeroSystemPerso); // Priority 30
+    this.systemManager.add(this.aeroSystemNASA); // Priority 30
 
-    this.systemManager.add(renderSystem); // Priority 70
+    // Système de contraintes (dual-mode interne)
+    this.systemManager.add(this.constraintSystem); // Priority 40
+    
+    this.systemManager.add(new SimulationLogger()); // Priority 45
+    this.systemManager.add(new PhysicsSystem()); // Priority 50
+    this.systemManager.add(new PilotSystem()); // Priority 55
+    this.systemManager.add(new LineRenderSystem()); // Priority 55
+    this.systemManager.add(new BridleRenderSystem()); // Priority 56
+    this.systemManager.add(new GeometryRenderSystem()); // Priority 60
+    this.systemManager.add(renderSystem); // Priority 70 - Utiliser l'instance déjà créée
     this.systemManager.add(debugSystem); // Priority 88
     this.systemManager.add(new UISystem()); // Priority 90
-
-    // Stocker le renderSystem dans le debugSystem (via propriété publique)
-    (debugSystem as DebugSystemType).renderSystem = renderSystem;
   }
   
   /**
@@ -240,30 +273,54 @@ export class SimulationApp {
 
     this.currentAeroMode = aeroMode;
   }
+
+  /**
+   * Bascule entre les systèmes de contraintes selon le mode constraintMode
+   * Note: Pour l'instant, on utilise toujours ConstraintSystem (hybride)
+   * qui gère en interne 'pbd' et 'spring-force'
+   */
+  private switchConstraintSystem(constraintMode: 'pbd' | 'spring-force'): void {
+    if (constraintMode === this.currentConstraintMode) {
+      return; // Pas de changement
+    }
+
+    // ConstraintSystem lit automatiquement InputComponent.constraintMode
+    // et bascule entre updatePBD() et updateSpringForce() en interne
+    this.logger.info(
+      `🔗 Mode contrainte changé: ${this.currentConstraintMode} → ${constraintMode}`,
+      'SimulationApp'
+    );
+
+    this.currentConstraintMode = constraintMode;
+  }
   
   /**
    * Boucle de mise à jour principale
    */
   private update = (): void => {
     const currentTime = performance.now();
-    const deltaTime = Math.min((currentTime - this.lastTime) / MS_TO_SECONDS, MAX_DELTA_TIME);
+    const deltaTime = Math.min(
+      (currentTime - this.lastTime) / SimulationConstants.MS_TO_SECONDS, 
+      SimulationConstants.MAX_DELTA_TIME
+    );
     this.lastTime = currentTime;
     
     // Vérifier les commandes UI (pause/reset)
     this.checkUICommands();
     
-    // Vérifier le changement de mode aérodynamique
+    // Vérifier le changement de modes (aérodynamique et contraintes)
     const inputEntities = this.entityManager.query(['Input']);
     if (inputEntities.length > 0) {
       const inputComp = inputEntities[0].getComponent<InputComponent>('Input');
       if (inputComp) {
         this.switchAeroSystem(inputComp.aeroMode);
+        this.switchConstraintSystem(inputComp.constraintMode);
       }
     }
     
     const context: SimulationContext = {
       deltaTime: this.paused ? 0 : deltaTime, // Pas de deltaTime en pause
-      totalTime: currentTime / MS_TO_SECONDS,
+      totalTime: currentTime / SimulationConstants.MS_TO_SECONDS,
       entityManager: this.entityManager
     };
     
@@ -310,68 +367,98 @@ export class SimulationApp {
    * Réinitialise la simulation
    */
   async reset(): Promise<void> {
-    // Sauvegarder l'état pause AVANT de reset
     const wasPaused = this.paused;
+    const savedInputValues = this.saveInputState();
+    
+    this.cleanupBeforeReset();
+    this.removeAllEntities();
+    
+    this.createEntities(savedInputValues);
+    await this.systemManager.initializeAll(this.entityManager);
+    
+    this.restorePauseState(wasPaused);
+    this.logResetComplete();
+  }
 
-    // ✨ SAUVEGARDER LES VALEURS UI AVANT DE SUPPRIMER LES ENTITÉS ✨
-    let savedInputValues: any = null;
-    const oldUiEntity = this.entityManager.query(['Input'])[0];
-    if (oldUiEntity) {
-      const oldInput = oldUiEntity.getComponent('Input') as any;
-      if (oldInput) {
-        // Sauvegarder TOUS les paramètres importants
-        savedInputValues = {
-          windSpeed: oldInput.windSpeed,
-          windDirection: oldInput.windDirection,
-          windTurbulence: oldInput.windTurbulence,
-          lineLength: oldInput.lineLength,
-          bridleNez: oldInput.bridleNez,
-          bridleInter: oldInput.bridleInter,
-          bridleCentre: oldInput.bridleCentre,
-          constraintMode: oldInput.constraintMode, // ✨ IMPORTANT : sauvegarder le mode !
-          linearDamping: oldInput.linearDamping,
-          angularDamping: oldInput.angularDamping,
-          meshSubdivisionLevel: oldInput.meshSubdivisionLevel,
-          liftScale: oldInput.liftScale,
-          dragScale: oldInput.dragScale,
-          forceSmoothing: oldInput.forceSmoothing,
-          debugMode: oldInput.debugMode
-        };
-      }
-    }
+  /**
+   * Sauvegarde l'état actuel de l'InputComponent
+   */
+  private saveInputState(): any {
+    const uiEntity = this.entityManager.query(['Input'])[0];
+    if (!uiEntity) return null;
 
-    // Nettoyer l'état du rendu AVANT de supprimer les entités
+    const input = uiEntity.getComponent('Input') as any;
+    if (!input) return null;
+
+    return {
+      windSpeed: input.windSpeed,
+      windDirection: input.windDirection,
+      windTurbulence: input.windTurbulence,
+      lineLength: input.lineLength,
+      bridleNez: input.bridleNez,
+      bridleInter: input.bridleInter,
+      bridleCentre: input.bridleCentre,
+      constraintMode: input.constraintMode,
+      aeroMode: input.aeroMode,
+      linearDamping: input.linearDamping,
+      angularDamping: input.angularDamping,
+      meshSubdivisionLevel: input.meshSubdivisionLevel,
+      liftScale: input.liftScale,
+      dragScale: input.dragScale,
+      forceSmoothing: input.forceSmoothing,
+      debugMode: input.debugMode
+    };
+  }
+
+  /**
+   * Nettoie les états des systèmes avant le reset
+   */
+  private cleanupBeforeReset(): void {
     const renderSystem = this.systemManager.getSystem('RenderSystem') as any;
-    if (renderSystem && renderSystem.resetRenderState) {
+    if (renderSystem?.resetRenderState) {
       renderSystem.resetRenderState();
     }
 
-    // Nettoyer l'état du debug AVANT de supprimer les entités
     const debugSystem = this.systemManager.getSystem('DebugSystem') as any;
-    if (debugSystem && debugSystem.resetDebugState) {
+    if (debugSystem?.resetDebugState) {
       debugSystem.resetDebugState();
     }
-    
-    // Supprimer uniquement les entités (pas les systèmes pour conserver les event listeners)
+  }
+
+  /**
+   * Supprime toutes les entités
+   */
+  private removeAllEntities(): void {
     const entities = this.entityManager.getAllEntities();
     entities.forEach(entity => this.entityManager.removeEntity(entity.id));
-    
-    // Recréer les entités avec les valeurs sauvegardées
-    this.createEntities(savedInputValues);
-    
-    // Ré-initialiser les systèmes avec les nouvelles entités
-    await this.systemManager.initializeAll(this.entityManager);
-    
-    // Restaurer l'état pause/play APRÈS recréation des entités
+  }
+
+  /**
+   * Restaure l'état de pause après le reset
+   */
+  private restorePauseState(wasPaused: boolean): void {
     this.paused = wasPaused;
     const uiEntity = this.entityManager.query(['Input'])[0];
     if (uiEntity) {
       const inputComp = uiEntity.getComponent('Input') as any;
       if (inputComp) {
         inputComp.isPaused = wasPaused;
-        
-        // 📋 LOG les modes restaurés après reset via le système de logging
-        this.logger.info(`🔄 RESET COMPLETE | Constraint: ${inputComp.constraintMode} | Aero: ${inputComp.aeroMode}`, 'SimulationApp');
+      }
+    }
+  }
+
+  /**
+   * Log la confirmation du reset
+   */
+  private logResetComplete(): void {
+    const uiEntity = this.entityManager.query(['Input'])[0];
+    if (uiEntity) {
+      const inputComp = uiEntity.getComponent('Input') as any;
+      if (inputComp) {
+        this.logger.info(
+          `🔄 RESET COMPLETE | Constraint: ${inputComp.constraintMode} | Aero: ${inputComp.aeroMode}`, 
+          'SimulationApp'
+        );
       }
     }
   }

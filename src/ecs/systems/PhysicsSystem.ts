@@ -10,10 +10,8 @@ import * as THREE from 'three';
 import { System, SimulationContext } from '../core/System';
 import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
-
-// Constantes physiques
-const SEMI_IMPLICIT_SCALE = 0.5; // Facteur pour intégration Euler semi-implicite
-const MIN_ANGULAR_VELOCITY_SQ = 0.0001; // Seuil minimum pour rotation
+import { PhysicsConstants } from '../config/Config';
+import { MathUtils } from '../utils/MathUtils';
 
 export class PhysicsSystem extends System {
   constructor() {
@@ -70,8 +68,8 @@ export class PhysicsSystem extends System {
         console.error('  forces:', physics.forces, 'mass:', physics.mass);
       }
       
-      // --- Dynamique angulaire ---
-      // ω_new = ω_old + (I^-1 × τ) × dt
+// --- Angular dynamics ---
+      // w_new = w_old + (I^-1 * t) * dt
       const angularAcceleration = this.multiplyMatrix3Vector(physics.invInertia, physics.torques);
       physics.angularVelocity.add(angularAcceleration.multiplyScalar(deltaTime));
       
@@ -80,7 +78,7 @@ export class PhysicsSystem extends System {
       
       // Intégration rotation (quaternion)
       // q_new = q_old + 0.5 × (ω × q_old) × dt
-      if (physics.angularVelocity.lengthSq() > MIN_ANGULAR_VELOCITY_SQ) {
+      if (physics.angularVelocity.lengthSq() > PhysicsConstants.MIN_ANGULAR_VELOCITY_SQ) {
         const omegaQuat = new THREE.Quaternion(
           physics.angularVelocity.x,
           physics.angularVelocity.y,
@@ -88,7 +86,7 @@ export class PhysicsSystem extends System {
           0
         );
         const qDot = omegaQuat.multiply(transform.quaternion.clone());
-        const scale = SEMI_IMPLICIT_SCALE * deltaTime;
+        const scale = PhysicsConstants.SEMI_IMPLICIT_SCALE * deltaTime;
         transform.quaternion.x += qDot.x * scale;
         transform.quaternion.y += qDot.y * scale;
         transform.quaternion.z += qDot.z * scale;
@@ -107,12 +105,7 @@ export class PhysicsSystem extends System {
    * Multiplie une matrice 3x3 par un vecteur
    */
   private multiplyMatrix3Vector(matrix: THREE.Matrix3, vector: THREE.Vector3): THREE.Vector3 {
-    const e = matrix.elements;
-    return new THREE.Vector3(
-      e[0] * vector.x + e[3] * vector.y + e[6] * vector.z,
-      e[1] * vector.x + e[4] * vector.y + e[7] * vector.z,
-      e[2] * vector.x + e[5] * vector.y + e[8] * vector.z
-    );
+    return MathUtils.applyMatrix3ToVector(matrix, vector);
   }
 
   /**

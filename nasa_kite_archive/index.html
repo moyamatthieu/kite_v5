@@ -1,0 +1,586 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Beginner's Guide to Aeronautics</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="Beginner's Guide to Aeronautics, Beginner's Guide,
+aeronautics, airplanes, aerodynamics, Beginner's Guide to aerodynamics, foilsim,
+beginner's guide to propulsion, propulsion, enginesim, re-living the wright way,
+wright brothers, kites, beginnner's guide to kites, model rockets, beginner's guide to
+model rockets, rocketmodeler, kitemodeler, simulations, beginner's guide to compressible flow, 
+compressible flow, compressible aerodynamics, shock waves, hypersonics, 
+beginner's guide to hypersonics, baseball, soccer, NASA, NASA soccer, NASA baseball,
+educator resources, teacher activities, student activities, hitmodeler, curve ball, curveball
+">
+
+<link href="portal.css" rel="stylesheet" type="text/css">
+</head>
+
+<body bgcolor="#000000">
+<table width="730" border="0" align="center" cellpadding="10" cellspacing="0" bgcolor="#FFFFFF">
+  <tr>
+    <td>
+
+<!-- Header Begins-->
+
+	<table width="100%" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr> 
+          <td width="365" height="68" bgcolor="#CCCCCC"><a href="http://www.nasa.gov"><img src="Images/logo_nasa.gif" alt="NASA Logo - Web Link to NASA.gov" width="288" height="51" border="0"></a></td>
+          <td width="20" height="68" bgcolor="#CCCCCC"><img src="Images/line1px.jpg" alt="Vertical line" width="1" height="51"></td> 
+          <td width="170" height="68" align="left" valign="middle" bgcolor="#CCCCCC"><p>
+		  <font color="#333333" size="-2" face="Verdana, Arial, Helvetica, sans-serif">
+		  <a class="bodygray" href="http://www.nasa.gov/centers/glenn/about/contact_us.html" target="_blank">+ 
+              Contact Glenn</a></font></p></td>
+          <td width="175" height="68" bgcolor="#006699"><table cellpadding="0" cellspacing="0" border="0"><form name="search" id="search" method="GET" action="http://search.nasa.gov/nasasearch/search/search.jsp"><tr><td rowspan="2" width="20"></td><td colspan="3"><label for="searchfield"><img src="Images/title_find_it_sm.gif" width="92" height="16" alt="FIND IT @ NASA" title="FIND IT @ NASA" border="0"></label></td></tr><tr><td valign="top"><input type="text" size="9" class="search" title="searchfield" id="searchfield" name="nasaInclude" value=""></td><td width="8"><img border="0" alt="" height="1" width="1" src="Images/spacer.gif"></td><td valign="top"><a href="javascript:document.search.submit();"><img name="Go" src="Images/button_go.gif" width="38" height="20" alt="Go" title="Go" border="0"></a></td></tr></form></table>
+			
+			</td>
+        </tr>
+        <tr> 
+          <td colspan="4"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr align="center"> 
+                
+     <td><a href="http://www.nasa.gov/about/highlights/index.html">
+           <img src="Images/nav_top_0_0.gif"
+           alt="ABOUT NASA" height="25" width="123" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/news/highlights/index.html">
+           <img src="Images/nav_top_1_0.gif"
+            alt="NEWS AND EVENTS" height="25" width="140" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/multimedia/highlights/index.html">
+           <img src="Images/nav_top_2_0.gif"
+           alt="MULTIMEDIA" height="25" width="119" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/missions/highlights/index.html">
+           <img src="Images/nav_top_3_0.gif"
+           alt="MISSIONS" height="25" width="106" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://mynasa.nasa.gov/portal/site/mynasa/index.jsp?bandwidth=high">
+           <img src="Images/nav_top_4_0.gif"
+           alt="MyNASA" height="25" width="101" border=0 align=bottom></a>
+     </td>
+     <td><a href="http://www.nasa.gov/about/career/index.html">
+           <img src="Images/nav_top_5_0.gif"
+           alt="WORK FOR NASA" height="25" width="141" border=0 align=bottom></a>
+     </td>
+        </tr>
+            </table></td>
+        </tr>
+        <tr> 
+          <td colspan="4"> 
+<!-- Header Ends -->			
+
+			<table width="98%" border="0" align="center" cellpadding="0" cellspacing="0">
+              <tr> 
+                <td>
+<font size="2" face="Arial, Helvetica, sans-serif">
+
+<CENTER>
+  <TABLE width="560" BORDER=0 BGCOLOR="#FFFFFF"
+ summary = "A table is used to produce a banner for the page.
+ The banner includes a Meatball logo at the left, the name of the page in the center, and Glenn Research Center at the
+right.">
+    <TR>
+      <TD WIDTH=116> <CENTER>
+          <IMG SRC="Images/NASAlogo.gif"
+          ALT = "NASA Meatball Image"
+          WIDTH=75 HEIGHT=65 X-CLARIS-USEIMAGEWIDTH X-CLARIS-USEIMAGEHEIGHT ALIGN=bottom>
+        </CENTER></TD>
+      <TD> <H2>
+          <CENTER>
+            <FONT FACE="Arial"> <B><I>NASA Glenn Research Center<br>
+            </I></B></FONT><font size="-1" face="Arial, Helvetica, sans-serif"><i><strong>The
+            Beginner's Guide to Aeronautics</strong></i></font><FONT FACE="Arial"><B><I>
+            </I></B></FONT>
+          </CENTER>
+        </H2></TD>
+    </TR>
+  </TABLE>
+
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr align="center" bgcolor="#009999">
+      <td height="75" valign="middle"><font face="Arial, Helvetica, sans-serif"><i><font color="#FFFFFF" size="+1"><strong>Welcome
+        to The Beginner's Guide to Aeronautics</strong></font></i></font></td>
+    </tr>
+    <tr>
+      <td height="15"></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+        face="Arial, Helvetica, sans-serif"><i><font size="3">
+        <img src="Animation/airpar/Images/aroll.gif" alt="Image of Jet Airplane" 
+        width=175 height=141>
+        </font></i></font></b></td>
+      <td align="left" valign="top"><p><a href="bga.html"><font size="2" face="Arial, 
+          Helvetica, sans-serif"><b>Beginner's
+          Guide to Aerodynamics </b></font></a><br>
+          <font face="Arial, Helvetica, sans-serif" color="#003399" size="2">How
+          do airplanes work? Why does a wing change shape on takeoff and landing?
+          This site was built for middle school to college students.
+          </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="short.html">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/foilsimstudent/">FoilSim III Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/atmos/">AtmosModeler Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/sound/">SoundWave Interactive Simulator</a><br> 
+          + <a href="../aeroact.htm">Younger Student (K-8) Activities</a><br> 
+          + <a href="../BGA/BGAindex.html">Older Student (6-12) Activities</a><br> 
+          + <a href="../problems/foilindex.html">Student Activities using FoilSim</a><br> 
+      </font></p></td>
+
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+       face="Arial, Helvetica, sans-serif">
+        <img src="../UEET/StudentSite/images/buttons/Kidspg2up.gif" 
+         width="98" height="79" alt="Kids Page Graphic"></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="../UEET/StudentSite/index.html">
+            <strong>Kid's Page</strong>
+            </a></font><font face="Arial, Helvetica, sans-serif" 
+           color="#003399" size="2"><br>
+          The Kid's Page explains how airplanes and jet engines work. This site
+          was built for younger students.
+          </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="../UEET/StudentSite/index.html">Index</a><br>
+     + <a href="../UEET/StudentSite/airplanes.html">Airplanes</a><br> 
+     + <a href="../UEET/StudentSite/engines.html">Engines</a><br> 
+     + <a href="../UEET/StudentSite/lessonplans.html">Lesson Plans</a><br>   
+      </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+       face="Arial, Helvetica, sans-serif">
+        <img src="../ImagesHomepage/rot03.gif" 
+         width="175" height="116" alt="Image of Wright Brothers aircraft"></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/re-living-the-wright-way/">
+            <strong>Re-Living the Wright Way</strong>
+            </a></font><font face="Arial, Helvetica, sans-serif" 
+           color="#003399" size="2"><br>
+          The Wright Way will show you the basic math and physics
+          that led to the invention of the airplane by the Wright Brothers. This site was built for
+          middle to high school students.
+       </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/re-living-the-wright-way/">Index</a><br>
+     + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/tunnel/">Wright 1901 Wind Tunnel Interactive Simulator</a><br> 
+     + <a href="https://www.youtube.com/playlist?list=PLVPcuBdh7z6csAUJ7WAqh5O2CeJYbA9qJ">Movies featuring "Orville and Wilbur Wright"</a><br>   
+      </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2"
+        face="Arial, Helvetica, sans-serif"><img src="Animation/turbtyp/Images/flowtj.gif" 
+         alt="Image of Jet Engine" width=175 height=102><i></i></font></b></td>
+      <td align="left" valign="top"><p><b><font face="Arial, Helvetica, sans-serif" size="2">
+          <a href="bgp.html">Beginner's
+          Guide to Propulsion</a></font></b><font face="Arial, Helvetica, sans-serif" 
+          color="#003399" size="2">
+          <br>
+          How do jet engines work? Why are there different kinds of jet engines?
+          This site was built for high school and college students.
+          </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shortp.html">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/enginesim/">EngineSim Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/enginesimr/">RangeGame Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/gaslab/">GasLab Interactive Animations</a><br> 
+          + <a href="../BGP/BGPindex.html">Student(6-12) Propulsion Activities</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+          face="Arial, Helvetica, sans-serif"><img src="../baseball/Images/baseball.gif" 
+          width="108" height="72" alt="Image of Spinning Baseball"></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/aerodynamics-of-baseball/"><strong>Aerodynamics 
+          of Baseball</strong></a></font>
+        <font face="Arial, Helvetica, sans-serif" color="#003399" size="2"><br>
+          The Aerodynamics of Baseball will show you the basic math and physics
+          that govern the flight of a hit ball and a curve ball. This site was built for middle
+          school and high school students.
+       </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/aerodynamics-of-baseball/">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/ballkiosk/">CurveBall Student Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/foilsimb/">CurveBall Expert Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/hit/">HitModeler Interactive Simulator</a><br> 
+          + <a href="../problems/foilindex.html">Baseball Activities</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+          face="Arial, Helvetica, sans-serif"><img src="javplts/soccer/soccerball.gif" 
+          width="68" height="67" alt="Image of Spinning Soccer Ball"></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/soccer/"><strong>Aerodynamics 
+          of Soccer</strong></a></font>
+        <font face="Arial, Helvetica, sans-serif" color="#003399" size="2"><br>
+          The Aerodynamics of Soccer will show you the basic math and physics
+          that govern the flight of a soccer ball. This site was built for middle school
+          to high school students.
+        </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/soccer/">SoccerNASA Interactive Simulator</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+        face="Arial, Helvetica, sans-serif"><i><img src="../rocket/Animation/rocket/rocket.gif" 
+        width="86" height="129" alt="Image of Model Rocket"></i></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="bgmr.html"><strong>Beginner's
+          Guide to Model Rockets</strong></a></font><font face="Arial, Helvetica, sans-serif" 
+           color="#003399" size="2"><br>
+          The Beginner's Guide to Model Rockets will show you the basic math and
+          physics that govern the design and flight of all types of rockets. 
+          This site was built for high school and college students.
+        </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shortr.html">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/rocketmodeler/">RocketModeler Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/rnoz/">RocketNozzle Interactive Simulator</a><br> 
+          + <a href="../rocket/TRCRocket/Intro.html">Rocketry Guide and Activities</a><br> 
+        </font> </p>
+        </td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+        face="Arial, Helvetica, sans-serif"><i><img src="Images/botrock.jpg" 
+        width="70" height="112" alt="Image of Bottle Rocket"></i></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="../rocket/BottleRocket/index.htm"><strong>
+          Water Rockets</strong></a></font><font face="Arial, Helvetica, sans-serif" 
+           color="#003399" size="2"><br>
+          The Water Rockets site will show you the basics for designing and flying
+          water or bottle rockets. This site was built for younger students and their teachers.</font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="../rocket/BottleRocket/about.htm">All About Bottle Rockets</a><br>
+          + <a href="../rocket/BottleRocket/educator.htm">Bottle Rocket Activities</a><br> 
+          + <a href="../rocket/rktgrd5exp.html">Fifth Grade Activity</a><br> 
+        </font> </p>
+        </td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+       face="Arial, Helvetica, sans-serif"><img src="../InteractProgs/images/kite1.gif" 
+         width="135" height="105" alt="Image of Kite"></font></b></td>
+      <td align="left" valign="top"><p><font size="2" face="Arial, Helvetica, sans-serif">
+          <a href="bgk.html"><strong>Beginner's
+          Guide to Kites</strong></a></font><font face="Arial, Helvetica, sans-serif" 
+           color="#003399" size="2"><br>
+          The Beginner's Guide to Kites will show you the basic math and physics
+          that govern the design and flight of kites. This site was built for middle
+          school to college students.
+        </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shortk.html">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/kitemodeler/">KiteModeler Interactive Simulator</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+         face="Arial, Helvetica, sans-serif"><img src="Images/tun.jpg" 
+          alt="Image of Wind Tunnel" width=135 height=92><i></i></font></b></td>
+      <td align="left" valign="top"><p><b><font face="Arial, Helvetica, sans-serif" size="2">
+           <a href="bgt.html">Beginner's
+          Guide to Wind Tunnels</a></font></b><font face="Arial, Helvetica, sans-serif" 
+          color="#003399" size="2">
+          <br>
+          What is a wind tunnel? How do engineers use wind tunnels? This site was built
+          for middle school to college students.
+          </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shortt.html">Index</a><br>
+          + <a href="../WindTunnel/build.html">Build Your Own Tunnel</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/tuno/">TunnelSim-Open Interactive Simulator</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/sys/">TunnelSys Interactive Simulator</a><br>
+          + <a href="../BGA/Dan/wind_tunnel_act.htm">Wind Tunnel Activity</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2" 
+         face="Arial, Helvetica, sans-serif"><img src="Images/fightsml.gif" 
+         alt="Image of Supersonic aircraft" width=136 height=82><i></i></font></b></td>
+      <td align="left" valign="top"><p><font face="Arial, Helvetica, sans-serif" size="2">
+           <a href="bgc.html"><strong>Beginner's
+          Guide to Compressible Aerodynamics</strong></a></font><br>
+          <font face="Arial, Helvetica, sans-serif" color="#003399" size="2">What
+          is a shock wave? What happens in supersonic flight?
+          This site was built for high school and college students.
+        </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shortc.html">Index</a><br>
+          + <a href="mach.html">Mach and Speed of Sound Calculator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/isentrop/">Isentropic Flow Calculator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/shock/">Oblique Shock Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/mshock/">Multiple Shock Interactive Simulator</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td width="175" height="50" align="center" valign="top"><b><font size="2"
+          face="Arial, Helvetica, sans-serif"><img src="Images/hypersml.gif" 
+          alt="Image of Hypersonic aircraft" width=165 height=97><i></i></font></b></td>
+      <td align="left" valign="top"><p><font face="Arial, Helvetica, sans-serif" size="2">
+          <a href="bgh.html"><strong>NASA's
+          Guide to Hypersonics</strong></a></font><br>
+          <font face="Arial, Helvetica, sans-serif" color="#003399" size="2">What
+          are the unique problems of hypersonic flow? 
+          This site was built for college students.
+        </font></p>
+        <p><font color="#003399" size="2" face="Arial, Helvetica, sans-serif">+
+          <a href="shorth.html">Index</a><br>
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/mshock/">ShockModeler Interactive Simulator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/shock/">Hypersonic Flow Calculator</a><br> 
+          + <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/normal/">Hypersonic Shock Simulator</a><br> 
+        </font> </p></td>
+    </tr>
+    <tr>
+      <td height="15" colspan="2"><hr></td>
+    </tr>
+  </table>
+
+  <table width="560" border="0" cellspacing="0" cellpadding="4">
+    <tr>
+      <td height="50" valign="top"><b></b> <p><font size="2" face="Arial, Helvetica, sans-serif"><b><font size="3">I</font></b>n
+          the 21st century, airplanes are a normal part of everyday life. We see
+          them fly over, or read about them, or see them on television. Most of
+          us have traveled on an airplane, or we know someone who has. Do you
+          ever wonder how airplanes fly? What causes the lift that gets the airplane
+          off the runway? How does a pilot control the movement of the airplane?
+          How did the Wright Brothers invent the airplane?
+          Why are the engines on an airliner different from the engines on a fighter
+          plane? How does aerodynamics affect the flight of a baseball, soccer ball, model rocket or
+          kite? The information at this site is provided by the NASA Glenn
+          <A HREF="http://education.grc.nasa.gov/">Educational Programs Office (EPO)</A>
+          to give you a better understanding
+          of how aircraft and aerodynamics work.
+        </font></p>
+        <p><font size="2" face="Arial, Helvetica, sans-serif">
+          The web site is divided into Beginner's Guides about a single topic.
+          There is an <b>index</b> for each guide that lists <b>pages</b> within the
+          guide. Each page describes a single subject related to the topic and every
+          page has the same format. At the top of the page is a slide or graphic
+          that illustrates the subject. Below the slide is a detailed description of
+          the physics and math related to the subject of the slide. There are many
+          hyperlinks and references to other pages at the site where you can find
+          additional information. At the bottom of each page are some navigation
+          links with colored buttons to take you back to the appropriate index.
+          On many pages we have <b>interactive simulator</b>
+          computer programs, calculators, computer animations, and movies
+          that demonstrate the physics and math of the topic. You can download your
+          own copy of any of these programs or animations by following the directions
+          on the web page that contains the program.
+        </font></p>
+        <p align="left"><font size="2" face="Arial, Helvetica, sans-serif">
+          The Beginner's Guide to Aeronautics has been on the web for over a dozen years.
+          During that time, NASA projects have come and gone and the intended audience
+          has variously changed from high school students to college students and back
+          to middle school students. So there is
+          a wide breadth of information here at the site. The mathematics alone spans the range
+          from calculating the area of a rectangular wing to using calculus to derive 
+          the ideal rocket equation. We are currently grouping and tagging the
+          web pages by grade level so that teachers can more easily find grade-appropriate
+          activities. This may result in multiple versions of the same page.
+        </font></p>
+        <p align="left"><font size="2" face="Arial, Helvetica, sans-serif">
+          Much of the material in the Beginnner's Guides to Aerodynamics and Propulsion
+          was originially developed for NASA's  Learning Technologies Project (LTP). 
+          The Beginner's Guide to Model Rocketry was developed 
+          for the Exploration Systems Misssion Directorate (ESMD). 
+          Re-Living Wright Way was developed as part of NASA's Centennial of Flight Celebration.
+          The Kid's Page was developed under the Ultra Efficient Engine Technology (UEET) Project
+          at NASA Glenn.
+          The Beginner's Guides to Hypersonic and Wind Tunnels were
+          built for the Fundamental Aero program (FAP) 
+          of the Aeronautics Reasearch Mission Directorate (ARMD).
+          Aerodynamics of Soccer was built for NASA HQ during the 2010 
+          Summer of Innovation Project.
+            </font></p>
+        <p><font size="2" face="Arial, Helvetica, sans-serif">
+          For many of the
+          web pages,
+          <A HREF="../aeroact.htm">activities</A> 
+          are available for teachers to use in class. These
+          activities were developed by teachers during summer workshops including:<br>
+          </font></p>
+        <div align="left">
+          <ol>
+            <li><font size="2" face="Arial, Helvetica, sans-serif">Elementary
+              and middle school teachers at two workshops sponsored by
+              LTP in 1996 and 1997. </font></li>
+            <li><font size="2" face="Arial, Helvetica, sans-serif">Middle and
+              secondary school teachers at four workshops cosponsored by
+              the LTP and the Ohio Space Grant Consortium in 1998 and 1999.</font></li>
+            <li><font size="2" face="Arial, Helvetica, sans-serif">Pre-service
+              middle and secondary school teachers from the University of Akron,
+              Akron, Ohio, in 2000.</font></li>
+          </ol>
+        </div>
+        <p align="left"><font size="2" face="Arial, Helvetica, sans-serif">
+          At each Beginner's Guide index, there is a link to an
+          index of the teacher-generated activities related to the topic.
+          You can also access the activities by clicking on buttons at the bottom of a web
+          page. As an aid to teachers, we have organized the activities by grade
+          level (K-6, 4-6, 6-8, 9-12, 11-12) using color-coded buttons.         
+        </font></p>
+        <p><font size="2" face="Arial, Helvetica, sans-serif"> 
+          The web site was prepared
+          to provide <b>background information</b> on basic aerodynamics and propulsion
+          for math and science teachers, students, and life-long learners. We
+          have intentionally organized the Beginner's Guides to mirror the unstructured nature
+          of the world wide web. There are many pages
+          here connected to one another through hyperlinks. You can then navigate
+          through the links based on your own interest and inquiry. However, if
+          you prefer a more structured approach, you can also take one of our
+          <A HREF="guided.htm">Guided Tours</A> through the site. Each tour provides
+          a sequence of pages dealing with some aspect of aerodynamics or propulsion. 
+          We have also produced many <A HREF="topics.htm">Power Point Presentations</A> 
+          on the various topics using the slides from the Beginner's Guides. 
+          You are encouraged to download and modify these presentations for your own use. 
+          You can download a copy of any slide on any page by using a right click and "Save As..". 
+          All of this information was developed in the public domain.
+       </font></p>
+        <p align="left"><font size="2" face="Arial, Helvetica, sans-serif">
+          We would like to know if you are using the Beginner's Guides or any of the 
+          interactive computer programs.  We continue to upgrade, improve, and extend
+          the programs based on user comments. Please send your comments to Tom Benson using
+          the link at the bottom of any page.
+        </font></p>
+            <p><font size="2" face="Arial, Helvetica, sans-serif"> NOTICE ---
+              The site has been developed to support Section
+              508 of the Rehabilitation Act. Many of the pages contain mathematical
+              equations which have been produced graphically and which are too
+              long or complex to provide in an "ALT" tag. For these pages, we
+              have retained the non-compliant graphic at the top of the page
+              and have provided a compliant text version of the equations in the
+              body of the page. In many cases, because of the use of Greek fonts in the
+              graphics, the purely English text version of the equations is slightly         
+              different than the graphic version. The differences are noted in the text.
+            </font></p>
+
+        <p align="left"><b><font size="2" face="Arial, Helvetica, sans-serif"><a href="https://www.nasa.gov/about/highlights/HP_Privacy.html">PRIVACY
+        NOTICE</a> </font></b> <HR>
+        <p><font size="2" face="Arial, Helvetica, sans-serif"><b>More Fun stuff...
+          </b></font></p>
+        <DL>
+          <DT><font size="2" face="Arial, Helvetica, sans-serif">
+            <A HREF="../aerores.htm">Aerospace Resources</A></font></DT>
+
+        </DL></td>
+    </tr>
+    <tr>
+      <td height="15"><hr></td>
+    </tr>
+
+  </table>
+  <p><BR>
+  </p>
+
+</CENTER>
+					
+</font>
+         	</td>
+              </tr>
+            </table>
+<!-- Footer Begins -->		  
+
+            <p>&nbsp;</p>
+		  </td>
+        </tr>
+        <tr bgcolor="#CCCCCC"> 
+          <td colspan="4"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+
+                <td width="155" valign="top">&nbsp;&nbsp;&nbsp;&nbsp;
+                  <A HREF="http://www.firstgov.gov/"><img src="Images/logo_first_gov.gif" alt="First Gov Image" width="125" height="42" border="0"><a></td>
+                <td width="251"><p><font size="-1" face="Verdana, Arial, Helvetica, sans-serif"><br>
+                    <font size="-2">
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/oig/hq/hotline.html" target="_blank">+ Inspector General Hotline</a><br>
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/codee/nofear.html" target="_blank">+ Equal Employment Opportunity Data Posted Pursuant to the No Fear Act</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/budget/index.html" target="_blank">+ Budgets, Strategic Plans and Accountability Reports</a><br>
+                <A class="bodygray" HREF="http://www.hq.nasa.gov/office/pao/FOIA/agency/" target="_blank">+ Freedom of Information Act</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Management.html" target="_blank">+ The President's Management Agenda</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Privacy.html" target="_blank">+ NASA Privacy Statement, Disclaimer,</a><br>
+                <A class="bodygray" HREF="http://www.nasa.gov/about/highlights/HP_Privacy.html" target="_blank"> and Accessibility Certification</a></font></font></p>
+                  <p>&nbsp;</p></td>
+
+                <td align="right" valign="top"><img src="Images/logo_nasa_self.gif" alt="NASA logo"  width="49" height="48">&nbsp;&nbsp;&nbsp;</td>
+                <td width="200" valign="top"><font size="-2" face="Verdana, Arial, Helvetica, sans-serif"><br>
+                  <font color="#333333">Editor: <a class="bodygray" href="mailto:nancy.r.hall@nasa.gov">Nancy Hall</a><br> 
+                  NASA Official: <a class="bodygray" href="mailto:nancy.r.hall@nasa.gov">Nancy Hall</a><br> 
+                  Last Updated:   May 11 2023</font><br>
+                  <a class="bodygray" href="http://www.nasa.gov/centers/glenn/about/contact_us.html" target="_blank">+ 
+                  Contact Glenn</a></font></td>
+              </tr>
+            </table></td>
+        </tr>
+      </table></td>
+  </tr>
+</table>
+
+<!-- Footer Ends -->
+<!-- We participate in the US government's analytics program. See the data at analytics.usa.gov. -->
+<script async type="text/javascript" src="https://dap.digitalgov.gov/Universal-Federated-Analytics-Min.js?agency=NASA&subagency=GRC" id="_fed_an_ua_tag"></script>
+
+
+</body>
+</html>

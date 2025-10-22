@@ -158,6 +158,7 @@ export class KiteFactory {
       coefficients: {
         CL: CONFIG.aero.CL0,
         CD: CONFIG.aero.CD0,
+        CD0: CONFIG.aero.CD0,
         CM: CONFIG.aero.CM,
         CLAlpha: CONFIG.aero.CLAlpha,
         alpha0: CONFIG.aero.alpha0,

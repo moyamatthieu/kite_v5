@@ -8,6 +8,7 @@ import * as THREE from 'three';
 
 import { Entity } from '../core/Entity';
 import { TransformComponent, GeometryComponent, VisualComponent, PhysicsComponent } from '../components';
+import { EnvironmentConfig } from '../config/Config';
 
 export class ControlBarFactory {
   /**
@@ -44,8 +45,8 @@ export class ControlBarFactory {
     entity.addComponent(new PhysicsComponent({
       mass: 0.5,
       isKinematic: true, // ← FIXE pour tester (pilote tient fermement)
-      linearDamping: 0.98, // Amortissement fort (pilote contrôle)
-      angularDamping: 0.95
+      linearDamping: EnvironmentConfig.LINEAR_DAMPING,
+      angularDamping: EnvironmentConfig.ANGULAR_DAMPING
     }));
 
     // === VISUAL ===
