@@ -70,10 +70,15 @@ export class UISystem extends System {
 
   // eslint-disable-next-line max-lines-per-function
   private initUI(): void {
+    const sliders = this.getSliderConfigs();
+    // Initialiser tous les sliders
+    sliders.forEach(config => this.setupSlider(config));
+  }
+
+  private getSliderConfigs(): SliderConfig[] {
     const meta = UI_METADATA;
 
-    // Configuration de tous les sliders - Utilise UI_METADATA pour min/max/step
-    const sliders: SliderConfig[] = [
+    return [
       // === Vent ===
       {
         id: 'wind-speed-slider',
@@ -190,9 +195,6 @@ export class UISystem extends System {
         property: 'forceSmoothing'
       }
     ];
-
-    // Initialiser tous les sliders
-    sliders.forEach(config => this.setupSlider(config));
   }
 
   private setupSlider(config: SliderConfig): void {

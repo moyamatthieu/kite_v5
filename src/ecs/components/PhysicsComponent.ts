@@ -94,6 +94,6 @@ export class PhysicsComponent extends Component {
     this.angularDamping = MathUtils.initializeProperty(options, 'angularDamping', EnvironmentConfig.ANGULAR_DAMPING);
 
     // Objet cinématique (fixe) par défaut à false
-        this.isKinematic = MathUtils.initializeProperty(options, 'isKinematic', false);
+    this.isKinematic = MathUtils.initializeProperty(options, 'isKinematic', false);
   }
 }

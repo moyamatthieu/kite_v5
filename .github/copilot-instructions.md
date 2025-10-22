@@ -127,42 +127,150 @@ j'aimerais que tu lise tout le projet en details pour bien comprendre le fonctio
     *   Lors de problèmes de performance ou de rendu
 -   **Objectif** : Garantir que chaque décision technique respecte les principes ECS et maintient la cohérence du simulateur.
 
+### ⛔ RÈGLE STRICTE : NE PAS DUPLIQUER, AMÉLIORER L'EXISTANT
+
+**Toujours vérifier l'existant AVANT d'ajouter du nouveau code.** C'est une règle critique.
+
+**Principe fondamental : AMÉLIORER plutôt que DUPLIQUER**
+
+Quand vous identifiez un besoin, la priorité absolue est d'améliorer le code existant plutôt que de créer une nouvelle implémentation. Cela signifie :
+- Refactoriser une fonction existante pour la rendre plus générique
+- Ajouter des paramètres optionnels à une fonction existante
+- Extraire et mutualiser le code commun dans des utilitaires
+- Corriger/optimiser l'implémentation existante si elle est imparfaite
+- Étendre un système existant avec de nouvelles capacités
+
+**Pourquoi :**
+- La duplication de code crée de la dette technique et des bugs
+- Les fonctionnalités peuvent déjà exister sous un autre nom ou dans un autre système
+- La maintenance devient complexe quand la même logique existe à plusieurs endroits
+- Les modifications futures doivent être répliquées partout
+- Cela viole le principe DRY (Don't Repeat Yourself)
+- L'amélioration progressive maintient la cohérence architecturale
+- Un code centralisé est plus facile à tester, déboguer et optimiser
+
+**Processus obligatoire avant d'ajouter une fonctionnalité :**
+1. **Rechercher dans la codebase** : Utilisez Grep/Glob pour chercher des implémentations similaires
+2. **Analyser les systèmes existants** : Vérifiez si la logique existe déjà dans un autre système
+3. **Examiner les composants** : La donnée nécessaire existe peut-être déjà dans un composant
+4. **Consulter l'historique git** : Une fonctionnalité similaire a peut-être été supprimée pour une bonne raison
+5. **Réutiliser ou étendre** : Préférez toujours étendre/améliorer l'existant plutôt que dupliquer
+
+**Exemples de vérifications à faire :**
+- ❌ Ajouter un calcul de distance dans `AeroSystem.ts` sans vérifier `MathUtils.ts`
+- ❌ Créer une nouvelle fonction de normalisation de vecteur alors qu'elle existe déjà
+- ❌ Implémenter une interpolation sans chercher dans les utilitaires existants
+- ❌ Ajouter un système de logging alors qu'il en existe déjà un
+- ✅ Chercher "normalize" dans la codebase avant d'implémenter la normalisation
+- ✅ Vérifier `MathUtils.ts` avant d'ajouter des calculs mathématiques
+- ✅ Analyser les systèmes existants pour comprendre leur responsabilité
+- ✅ Étendre une fonction existante avec un paramètre optionnel plutôt que dupliquer
+
+**Actions à privilégier (par ordre de priorité) :**
+1. **Réutiliser tel quel** : Utiliser les fonctions existantes dans `src/ecs/utils/` sans modification
+2. **Améliorer et généraliser** : Refactoriser une fonction existante pour qu'elle couvre plus de cas d'usage
+3. **Étendre** : Ajouter des paramètres optionnels à une fonction existante plutôt que dupliquer
+4. **Factoriser** : Extraire le code commun détecté dans plusieurs endroits vers un utilitaire partagé
+5. **Corriger** : Si l'implémentation existante a des bugs/limites, la corriger plutôt que la contourner
+6. **Créer** : Seulement en dernier recours, si aucune amélioration de l'existant n'est possible
+
+**Questions à se poser systématiquement :**
+- ❓ "Cette fonctionnalité existe-t-elle déjà ailleurs ?"
+- ❓ "Puis-je améliorer/généraliser le code existant au lieu de dupliquer ?"
+- ❓ "Y a-t-il du code similaire que je pourrais factoriser ?"
+- ❓ "Pourquoi ne puis-je pas étendre l'existant avec un paramètre optionnel ?"
+- ❓ "L'implémentation existante a-t-elle des bugs que je devrais corriger plutôt que contourner ?"
+
 ## 🧲 Simulation des cordes (ConstraintSystem.ts)
 
-Le système de contrainte implémente deux modes pour simuler les lignes de cerf-volant :
+Le système de contrainte suit l'architecture validée par **Makani (Google X)**.
 
-### Mode PBD (Position-Based Dynamics) - Amélioré
-Le mode PBD est une approche robuste basée sur les contraintes de distance. Implémentation actuelle (feat/improve-pbd-stability) :
+### Modèle Physique (Makani-Inspired)
+Le système implémente des lignes élastiques avec ressort-amortisseur, basé sur le code de Makani (`external/makani-master/sim/models/tether.cc`).
+
+**Architecture validée (Makani)** :
+1. **Kite = Corps Rigide Unique**
+   - Objet dynamique avec 6 DDL (3 position + 3 rotation)
+   - Masse, tenseur d'inertie, centre de masse
+   - Toutes les forces accumulées → intégrées ensemble
+
+2. **Brides = Contraintes Géométriques**
+   - Points d'attache CTRL calculés par trilatération (BridleConstraintSystem)
+   - Pas d'entités dynamiques séparées
+   - Font partie du corps rigide
+
+3. **Lignes = Ressort-Amortisseur**
+   - **SLACK** (distance < restLength) : Force = 0
+   - **TAUT** (distance ≥ restLength) : Force = k×élongation + c×v_radial
+
+**États des lignes** :
+1. **Ligne SLACK** (distance < restLength) :
+   - Aucune contrainte active, le kite est complètement libre
+   - La traînée aérodynamique pousse le kite en Z- (vers l'arrière)
+   - Le kite s'éloigne de la barre jusqu'à tendre les lignes
+   - Aucune force transmise par les lignes
+
+2. **Ligne TENDUE** (distance ≥ restLength) :
+   - Force ressort : F_spring = LINE_STIFFNESS × elongation (Loi de Hooke)
+   - Force amortissement : F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
+   - Force totale appliquée au point CTRL du corps rigide
+   - Génère un torque τ = r × F pour l'orientation
 
 **Paramètres configurables :**
-- `PBD_STIFFNESS = 0.8` : Fraction de correction appliquée par itération (0.0-1.0)
-  - 1.0 = correction complète (très rigide)
-  - 0.5 = correction progressive (élastique)
-- `PBD_DAMPING = 0.2` : Coefficient d'amortissement (0.1-0.3)
-  - Dissipe l'énergie basée sur la vitesse relative
-  - Réduit les oscillations non-physiques
-- `PBD_ITERATIONS = 3` : Nombre d'itérations par frame
-  - Chaque itération améliore la convergence
-  - PhysX recommande 120-300 Hz (2-4 itérations à 60 fps)
+- `LINE_STIFFNESS = 8000 N/m` : Rigidité du câble (tensile stiffness)
+  - Basé sur Makani : EA / restLength où EA = rigidité axiale (N)
+  - 1cm d'élongation → 80N de force (≈8kg de tension)
+  - Valeurs typiques : 5000-10000 N/m pour réalisme
+  - Trop élevé (>50000) = instabilité numérique
+  
+- `PBD_DAMPING = 0.04` : Coefficient d'amortissement longitudinal (sans dimension)
+  - Basé sur Makani : damping_ratio × sqrt(2 × EA × density)
+  - Formule : F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
+  - À v_radial = 1 m/s : force d'amortissement = 320 N
+  - Valeurs typiques : 0.02-0.05 pour câbles réels
+  
+- `PBD_ITERATIONS = 5` : Nombre d'itérations par frame
+  - Uniquement si mode itératif activé
+  - 3-5 itérations suffisent pour convergence
+  
 - `BAUMGARTE_COEF = 0.1` : Stabilization coefficient
   - Compense les erreurs numériques accumulées
-  - Prévient la divergence
+  - @deprecated dans l'implémentation force-based actuelle
 
-**Algorithme (par itération) :**
-1. Calculer l'élongation: `delta = distance - restLength`
-2. Si slack (pas en tension): retourner sans appliquer de forces
-3. Calculer forces:
-   - Force ressort: `F_spring = k × elongation`
-   - Force amortissement: `F_damp = -c × v_radial`
-   - Baumgarte: `F_baum = β × elongation`
-4. Appliquer la force totale `F_total = max(0, F_spring + F_damp + F_baum)`
-5. Générer le torque: `τ = r × F` (pour l'orientation du kite)
-6. Projection de position si encore en dépassement
+**Algorithme (Makani-inspired force-based) :**
+1. **Détection** : 
+   - Calculer distance = ||CTRL_pos - handle_pos||
+   - Si distance < restLength → SLACK : return (F = 0)
+   - Sinon → TAUT : continuer
 
-**Avantages du PBD :**
-- Stable même avec grands timesteeps
-- Support natif des slack lines (cordes molles)
-- Contrôle fin de la rigidité via paramètres
-- Génération correcte de torques pour la rotation
+2. **Force ressort** (Loi de Hooke) :
+   - excess = distance - restLength
+   - strain = excess / restLength
+   - F_spring = LINE_STIFFNESS × excess
+
+3. **Force amortissement** (longitudinal) :
+   - v_radial = -velocity · direction (composante radiale)
+   - F_damp = PBD_DAMPING × (-v_radial) × LINE_STIFFNESS
+
+4. **Application force** :
+   - F_total = max(0, F_spring + F_damp)
+   - kitePhysics.forces.add(F_total × direction)
+
+5. **Génération torque** :
+   - r = CTRL_pos - kite_center (bras de levier)
+   - τ = r × F_total
+   - kitePhysics.torques.add(τ)
+
+6. **Correction vitesse** (optionnel, stabilité) :
+   - Si v_radial < -0.5 m/s : réduire composante excessive
+
+**Avantages de l'approche force-based :**
+- Physique validée par Makani (Google X)
+- Architecture simple : corps rigide + forces externes
+- Forces explicites → faciles à logger/déboguer
+- Stable avec damping approprié
+- Support natif des slack lines
+- Génération correcte de torques
+- Compatible avec PhysicsSystem (accumulation de forces)
 
 En suivant ces instructions, vous serez en mesure de contribuer efficacement au projet tout en respectant son architecture fondamentale.

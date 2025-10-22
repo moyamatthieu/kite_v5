@@ -1,21 +1,19 @@
 /**
- * KiteSurfaceDefinition.ts - Définition unique et centralisée des surfaces du kite
- * 
- * ✨ ARCHITECTURE: Source unique de vérité pour les surfaces du kite delta
- * 
- * Cette classe centralise la définition des 4 surfaces du kite pour éviter
- * la duplication de données et les incohérences d'ordre de vertices.
- * 
- * L'ordre des vertices est CRITIQUE:
- * - Détermine la direction de la normale (règle de la main droite)
- * - Utilisé par GeometryComponent (rendu) ET AerodynamicsComponent (calculs aéro)
- * - DOIT être identique partout où les surfaces sont utilisées
- * 
- * Système de coordonnées:
- * - X: gauche/droite
- * - Y: haut/bas (vertical)
- * - Z: avant/arrière (positif = avant, négatif = arrière)
- * - Normales: doivent pointer en Z- (vers l'arrière du kite)
+ * KiteSurfaceDefinition.ts - Définition centralisée des surfaces du kite delta
+ *
+ * Source unique de vérité pour les 4 surfaces triangulaires du cerf-volant.
+ * Centralise la définition pour éviter les duplications et incohérences.
+ *
+ * ORDRE DES VERTICES CRITIQUE:
+ * - Détermine l'orientation des normales (règle de la main droite)
+ * - Utilisé par GeometryComponent (rendu 3D) et AeroSystemNASA (calculs aéro)
+ * - Doit être identique dans tous les systèmes
+ *
+ * COORDONNÉES:
+ * - X: gauche (+) / droite (-)
+ * - Y: haut (+) / bas (-)
+ * - Z: avant (+) / arrière (-)
+ * - Normales: pointent vers l'EXTÉRIEUR (côté convexe, Z+) pour portance vers le haut
  */
 
 export interface KiteSurfaceDefinition {
@@ -45,26 +43,26 @@ export class KiteSurfaceDefinitions {
     {
       id: 'leftUpper',
       name: 'Left Upper Surface',
-      points: ['NEZ', 'WHISKER_GAUCHE', 'BORD_GAUCHE'],
-      description: 'Face supérieure du côté gauche - Forme un triangle avec le nez, whisker gauche et bord d\'attaque gauche'
+      points: ['WHISKER_GAUCHE', 'BORD_GAUCHE', 'NEZ'], // ✅ Ordre corrigé pour normale vers +Y (haut)
+      description: 'Face supérieure du côté gauche - Normale pointe vers l\'extérieur et vers le haut'
     },
     {
       id: 'leftLower',
       name: 'Left Lower Surface',
-      points: ['NEZ', 'SPINE_BAS', 'WHISKER_GAUCHE'],
-      description: 'Face inférieure du côté gauche - Forme un triangle avec le nez, épine basse et whisker gauche'
+      points: ['SPINE_BAS', 'WHISKER_GAUCHE', 'NEZ'], // ✅ Ordre corrigé pour normale vers +Y (haut)
+      description: 'Face inférieure du côté gauche - Normale pointe vers l\'extérieur et vers le haut'
     },
     {
       id: 'rightUpper',
       name: 'Right Upper Surface',
-      points: ['NEZ', 'BORD_DROIT', 'WHISKER_DROIT'],
-      description: 'Face supérieure du côté droit - Forme un triangle avec le nez, bord d\'attaque droit et whisker droit'
+      points: ['BORD_DROIT', 'WHISKER_DROIT', 'NEZ'], // ✅ Ordre corrigé pour normale vers +Y (haut)
+      description: 'Face supérieure du côté droit - Normale pointe vers l\'extérieur et vers le haut'
     },
     {
       id: 'rightLower',
       name: 'Right Lower Surface',
-      points: ['NEZ', 'WHISKER_DROIT', 'SPINE_BAS'],
-      description: 'Face inférieure du côté droit - Forme un triangle avec le nez, whisker droit et épine basse'
+      points: ['WHISKER_DROIT', 'SPINE_BAS', 'NEZ'], // ✅ Ordre corrigé pour normale vers +Y (haut)
+      description: 'Face inférieure du côté droit - Normale pointe vers l\'extérieur et vers le haut'
     }
   ];
 

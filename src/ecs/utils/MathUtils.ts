@@ -205,14 +205,25 @@ export class MathUtils {
     if (vertices.length === 0) {
       return new THREE.Vector3();
     }
-    
+
     const centroid = new THREE.Vector3();
     for (const vertex of vertices) {
       centroid.add(vertex);
     }
     centroid.divideScalar(vertices.length);
-    
+
     return centroid;
+  }
+
+  /**
+   * Calcule le centroïde d'un triangle (moyenne des trois sommets)
+   * @param v1 Premier sommet
+   * @param v2 Deuxième sommet
+   * @param v3 Troisième sommet
+   * @returns Centroïde du triangle
+   */
+  static computeTriangleCentroid(v1: THREE.Vector3, v2: THREE.Vector3, v3: THREE.Vector3): THREE.Vector3 {
+    return this.computeCentroid([v1, v2, v3]);
   }
 
   // ========================================================================

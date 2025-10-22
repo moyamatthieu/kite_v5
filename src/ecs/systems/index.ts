@@ -6,10 +6,11 @@ export { InputSyncSystem } from './InputSyncSystem';
 export { InputSystem } from './InputSystem';
 export { WindSystem } from './WindSystem';
 export type { WindState } from './WindSystem';
-export { AeroSystem } from './AeroSystem';
+
 export { BridleConstraintSystem } from './BridleConstraintSystem';
 export { BridleRenderSystem } from './BridleRenderSystem';
-export { ConstraintSystem } from './ConstraintSystem';
+export { TetherSystem } from './TetherSystem'; // Nouveau système simplifié
+// export { ConstraintSystem } from './ConstraintSystem'; // Ancien système (backup)
 // PBDConstraintSystem déplacé vers experimental/ (système expérimental non utilisé)
 export { PhysicsSystem } from './PhysicsSystem';
 export { GeometryRenderSystem } from './GeometryRenderSystem';

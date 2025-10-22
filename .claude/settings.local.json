@@ -42,7 +42,8 @@
       "Bash(bash download_nasa_content.sh)",
       "Bash(bash download_nasa_images.sh)",
       "Bash(npx cloc src --by-file --json)",
-      "Bash(timeout 30 npm run build)"
+      "Bash(timeout 30 npm run build)",
+      "Bash(copy \"c:\\code\\Kite_V5\\kite_v5\\src\\ecs\\systems\\ConstraintSystem.ts\" \"c:\\code\\Kite_V5\\kite_v5\\src\\ecs\\systems\\ConstraintSystem.ts.backup\")"
     ],
     "deny": [],
     "ask": []

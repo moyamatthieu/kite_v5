@@ -11,14 +11,12 @@ import * as THREE from 'three';
 
 import { EntityManager } from './core/EntityManager';
 import { SystemManager } from './core/SystemManager';
-import { InputComponent } from './components/InputComponent';
 import { KiteFactory, LineFactory, ControlBarFactory, PilotFactory, UIFactory, BridleFactory } from './entities';
 import { DebugFactory } from './entities/DebugFactory';
 import {
   InputSyncSystem,
   InputSystem,
   WindSystem,
-  AeroSystem,
   BridleConstraintSystem,
   BridleRenderSystem,
   PhysicsSystem,
@@ -31,9 +29,9 @@ import {
   UISystem,
   DebugSystem,
   SimulationLogger,
+  TetherSystem,
 } from './systems';
 import { AeroSystemNASA } from './systems/AeroSystemNASA';
-import { ConstraintSystem } from './systems/ConstraintSystem';
 import { CONFIG, SimulationConstants } from './config/Config';
 import { Logger } from './utils/Logging';
 import type { SimulationContext } from './core/System';
@@ -47,14 +45,11 @@ export class SimulationApp {
   private paused = !CONFIG.simulation.autoStart; // Lecture depuis la config (autoStart: true => paused: false)
   private logger = Logger.getInstance();
   
-  // Systèmes aérodynamiques (bascule NASA/Perso)
-  private aeroSystemPerso!: AeroSystem;
+  // Système aérodynamique NASA (seul mode disponible)
   private aeroSystemNASA!: AeroSystemNASA;
-  private currentAeroMode: 'perso' | 'nasa' = CONFIG.modes.aero;
-  
-  // Système de contraintes (dual-mode: PBD et Spring-Force)
-  private constraintSystem!: ConstraintSystem;
-  private currentConstraintMode: 'pbd' | 'spring-force' = CONFIG.modes.constraint;
+
+  // Système de lignes simplifié (inextensible)
+  private tetherSystem!: TetherSystem;
   
   private animationFrameId: number | null = null;
   
@@ -91,7 +86,13 @@ export class SimulationApp {
       controlBarPos.y + CONFIG.initialization.kiteAltitude, // Plus haut
       controlBarPos.z - CONFIG.initialization.kiteDistance  // Plus devant (Z négatif)
     );
-    
+
+    // ✅ VALIDATION GÉOMÉTRIQUE
+    // Distance 3D entre barre et kite doit être < longueur de ligne pour démarrage en slack
+    // Distance 3D = √((0-0)² + (8)² + (11)²) = √(64 + 121) = 13.6m
+    // Longueur ligne = 15m
+    // 13.6m < 15m ✅ Les lignes démarrent SLACK comme prévu
+
     // Positions initiales calculées (désactivé en production)
     // console.log('=== POSITIONS INITIALES ===');
     // console.log('Pilote:', new THREE.Vector3(0, 0, 0));
@@ -144,9 +145,9 @@ export class SimulationApp {
     // Créer DebugSystem
     const debugSystem = new DebugSystem();
 
-    // Initialiser les systèmes aérodynamiques et de contraintes
+    // Initialiser les systèmes aérodynamiques et de lignes
     this.initializeAeroSystems();
-    this.initializeConstraintSystems();
+    this.initializeTetherSystem();
 
     // Configurer le pipeline de systèmes
     this.setupSystemPipeline(scene, this.canvas, camera, debugSystem, renderSystem);
@@ -159,26 +160,22 @@ export class SimulationApp {
    * Initialise les systèmes aérodynamiques selon la configuration
    */
   private initializeAeroSystems(): void {
-    this.aeroSystemPerso = new AeroSystem();
     this.aeroSystemNASA = new AeroSystemNASA();
-
-    // Activer le système selon la config
-    const isNasaMode = CONFIG.modes.aero === 'nasa';
-    this.aeroSystemPerso.setEnabled(!isNasaMode);
-    this.aeroSystemNASA.setEnabled(isNasaMode);
+    this.aeroSystemNASA.setEnabled(true); // NASA est le seul mode disponible
   }
 
   /**
-   * Initialise le système de contraintes selon la configuration
+   * Initialise le système de lignes (tethers)
    */
-  private initializeConstraintSystems(): void {
-    this.constraintSystem = new ConstraintSystem();
-    this.constraintSystem.setEnabled(true);
+  private initializeTetherSystem(): void {
+    this.tetherSystem = new TetherSystem();
+    this.tetherSystem.setEnabled(true);
 
-    // Note: ConstraintSystem gère en interne les deux modes:
-    // - 'pbd': Position-Based Dynamics avec amortissement et Baumgarte
-    // - 'spring-force': Ressorts classiques avec amortissement
-    // Le mode est sélectionné via InputComponent.constraintMode
+    // TetherSystem : lignes inextensibles simplifiées
+    // - Contrainte unilatérale (distance ≤ maxLength)
+    // - SLACK : aucune force
+    // - TAUT : force de tension (pas de compression)
+    // - Transfert bidirectionnel de traction
   }
 
   /**
@@ -199,12 +196,11 @@ export class SimulationApp {
     this.systemManager.add(new InputSystem()); // Priority 10
     this.systemManager.add(new WindSystem()); // Priority 20
     
-    // Systèmes aérodynamiques (un seul actif à la fois)
-    this.systemManager.add(this.aeroSystemPerso); // Priority 30
+    // Système aérodynamique NASA (seul mode disponible)
     this.systemManager.add(this.aeroSystemNASA); // Priority 30
 
-    // Système de contraintes (dual-mode interne)
-    this.systemManager.add(this.constraintSystem); // Priority 40
+    // Système de lignes (tethers inextensibles)
+    this.systemManager.add(this.tetherSystem); // Priority 40
     
     this.systemManager.add(new SimulationLogger()); // Priority 45
     this.systemManager.add(new PhysicsSystem()); // Priority 50
@@ -249,51 +245,8 @@ export class SimulationApp {
     this.update();
   }
 
-  /**
-   * Bascule entre les systèmes aérodynamiques selon le mode aeroMode
-   * 'perso' = Système Perso (Rayleigh), 'nasa' = Système NASA (officiel)
-   */
-  private switchAeroSystem(aeroMode: 'perso' | 'nasa'): void {
-    if (aeroMode === this.currentAeroMode) {
-      return; // Pas de changement
-    }
 
-    // Désactiver/Activer les systèmes selon le mode
-    if (aeroMode === 'perso') {
-      // Mode Perso (Rayleigh)
-      this.systemManager.setSystemEnabled('AeroSystem', true);
-      this.systemManager.setSystemEnabled('AeroSystemNASA', false);
-      this.logger.info('🔄 Basculé vers AeroSystem (Perso/Rayleigh)', 'SimulationApp');
-    } else {
-      // Mode NASA (Officiel)
-      this.systemManager.setSystemEnabled('AeroSystem', false);
-      this.systemManager.setSystemEnabled('AeroSystemNASA', true);
-      this.logger.info('🔄 Basculé vers AeroSystemNASA (Officiel)', 'SimulationApp');
-    }
 
-    this.currentAeroMode = aeroMode;
-  }
-
-  /**
-   * Bascule entre les systèmes de contraintes selon le mode constraintMode
-   * Note: Pour l'instant, on utilise toujours ConstraintSystem (hybride)
-   * qui gère en interne 'pbd' et 'spring-force'
-   */
-  private switchConstraintSystem(constraintMode: 'pbd' | 'spring-force'): void {
-    if (constraintMode === this.currentConstraintMode) {
-      return; // Pas de changement
-    }
-
-    // ConstraintSystem lit automatiquement InputComponent.constraintMode
-    // et bascule entre updatePBD() et updateSpringForce() en interne
-    this.logger.info(
-      `🔗 Mode contrainte changé: ${this.currentConstraintMode} → ${constraintMode}`,
-      'SimulationApp'
-    );
-
-    this.currentConstraintMode = constraintMode;
-  }
-  
   /**
    * Boucle de mise à jour principale
    */
@@ -307,17 +260,7 @@ export class SimulationApp {
     
     // Vérifier les commandes UI (pause/reset)
     this.checkUICommands();
-    
-    // Vérifier le changement de modes (aérodynamique et contraintes)
-    const inputEntities = this.entityManager.query(['Input']);
-    if (inputEntities.length > 0) {
-      const inputComp = inputEntities[0].getComponent<InputComponent>('Input');
-      if (inputComp) {
-        this.switchAeroSystem(inputComp.aeroMode);
-        this.switchConstraintSystem(inputComp.constraintMode);
-      }
-    }
-    
+
     const context: SimulationContext = {
       deltaTime: this.paused ? 0 : deltaTime, // Pas de deltaTime en pause
       totalTime: currentTime / SimulationConstants.MS_TO_SECONDS,
@@ -327,7 +270,7 @@ export class SimulationApp {
     if (this.paused) {
       // En pause : exécuter les systèmes physiques ET de rendu
       // Cela permet d'afficher les forces même en pause (gravité, etc)
-      const systemsToRun = ['AeroSystem', 'GeometryRenderSystem', 'LineRenderSystem', 'BridleRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
+      const systemsToRun = ['AeroSystemNASA', 'GeometryRenderSystem', 'LineRenderSystem', 'BridleRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
       systemsToRun.forEach(name => {
         const system = this.systemManager.getSystem(name);
         if (system && system.isEnabled()) {
@@ -463,6 +406,30 @@ export class SimulationApp {
     }
   }
   
+  /**
+   * Active/désactive le debug aérodynamique détaillé
+   * Permet de voir tous les calculs intermédiaires (positions, orientations, forces)
+   * 
+   * @param enabled Activer le debug
+   * @param surfaceIndex Index de la surface à déboguer (0-3) ou -1 pour toutes
+   * 
+   * Utilisation depuis la console du navigateur:
+   * ```
+   * window.app.setAeroDebug(true, 0)  // Debug surface 0 uniquement
+   * window.app.setAeroDebug(true)     // Debug TOUTES les surfaces
+   * window.app.setAeroDebug(false)    // Désactiver
+   * ```
+   */
+  setAeroDebug(enabled: boolean, surfaceIndex: number = -1): void {
+    if (this.aeroSystemNASA) {
+      this.aeroSystemNASA.setDebugFaces(enabled, surfaceIndex);
+      console.log(`🔍 [SimulationApp] Debug aéro ${enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}${surfaceIndex >= 0 ? ` pour surface ${surfaceIndex}` : ''}`);
+    } else {
+      console.warn('⚠️ [SimulationApp] AeroSystemNASA non disponible');
+    }
+  }
+
+
   /**
    * Nettoie les ressources
    */

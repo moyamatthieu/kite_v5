@@ -67,19 +67,19 @@ export class InputSyncSystem extends System {
     // ========================================================================
     if (input.bridleNez !== this.lastBridleNez) {
       logger.debug(`🌉 Bridle Nez changed: ${this.lastBridleNez} → ${input.bridleNez} m`, 'InputSyncSystem');
-      this.updateBridleNez(entityManager, input.bridleNez);
+      this.updateBridleLength(entityManager, 'nez', input.bridleNez);
       this.lastBridleNez = input.bridleNez;
     }
 
     if (input.bridleInter !== this.lastBridleInter) {
       logger.debug(`🌉 Bridle Inter changed: ${this.lastBridleInter} → ${input.bridleInter} m`, 'InputSyncSystem');
-      this.updateBridleInter(entityManager, input.bridleInter);
+      this.updateBridleLength(entityManager, 'inter', input.bridleInter);
       this.lastBridleInter = input.bridleInter;
     }
 
     if (input.bridleCentre !== this.lastBridleCentre) {
       logger.debug(`🌉 Bridle Centre changed: ${this.lastBridleCentre} → ${input.bridleCentre} m`, 'InputSyncSystem');
-      this.updateBridleCentre(entityManager, input.bridleCentre);
+      this.updateBridleLength(entityManager, 'centre', input.bridleCentre);
       this.lastBridleCentre = input.bridleCentre;
     }
 
@@ -114,26 +114,7 @@ export class InputSyncSystem extends System {
     });
   }
 
-  /**
-   * Met à jour la longueur de la bride nez du kite
-   */
-  private updateBridleNez(entityManager: EntityManager, newLength: number): void {
-    this.updateBridleLength(entityManager, 'nez', newLength);
-  }
 
-  /**
-   * Met à jour la longueur de la bride inter du kite
-   */
-  private updateBridleInter(entityManager: EntityManager, newLength: number): void {
-    this.updateBridleLength(entityManager, 'inter', newLength);
-  }
-
-  /**
-   * Met à jour la longueur de la bride centre du kite
-   */
-  private updateBridleCentre(entityManager: EntityManager, newLength: number): void {
-    this.updateBridleLength(entityManager, 'centre', newLength);
-  }
 
   /**
    * Met à jour une longueur de bride (nez, inter ou centre)

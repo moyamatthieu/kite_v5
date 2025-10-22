@@ -1,5 +1,5 @@
 import { Logger, LogLevel } from './ecs/utils/Logging';
-import { SimulationApp } from './ecs/SimulationApp';
+import { SimpleSimulationApp } from './ecs/SimpleSimulationApp';
 
 // Initialisation de la simulation
 async function startSimulation() {
@@ -17,11 +17,11 @@ async function startSimulation() {
       document.body.appendChild(canvas);
     }
     
-    const app = new SimulationApp(canvas);
-    logger.info('✅ SimulationApp created', 'Main');
+    const app = new SimpleSimulationApp(canvas);
+    logger.info('✅ SimpleSimulationApp created', 'Main');
 
     await app.initialize();
-    logger.info('✅ SimulationApp initialized', 'Main');
+    logger.info('✅ SimpleSimulationApp initialized', 'Main');
 
     // Démarrer la simulation
     app.start();

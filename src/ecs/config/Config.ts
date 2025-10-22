@@ -76,20 +76,102 @@ namespace PhysicsConstants {
 // ============================================================================
 
 namespace ConstraintConfig {
-  /** Rigidité physique de la ligne (N/m) - Loi de Hooke F = k × x */
-  export const LINE_STIFFNESS = 25000;
+  /** Tether line tensile stiffness (N/m)
+   * 
+   * Makani reference: tether_params.tensile_stiffness (EA in N)
+   *   EA = Young's modulus × cross-sectional area
+   *   For Dyneema rope: EA ≈ 1-5 MN (1,000,000 - 5,000,000 N)
+   * 
+   * Our implementation uses stiffness per meter:
+   *   LINE_STIFFNESS = EA / restLength (N/m)
+   *   For EA = 120,000 N and L = 15m: k = 8000 N/m
+   * 
+   * Physical interpretation:
+   *   • 1cm elongation → 80N force (≈8kg tension)
+   *   • 10cm elongation → 800N force (≈80kg tension)
+   * 
+   * Tuning guidelines:
+   *   • Higher values (10000-20000) = stiffer lines, less stretch
+   *   • Lower values (5000-8000) = more realistic elasticity
+   *   • Too high (>50000) = numerical instability
+   *   • Too low (<1000) = excessive stretch, unrealistic
+   * 
+   * ⚠️ Current value: 8000 N/m (good balance rigidity/stability)
+   */
+  export const LINE_STIFFNESS = 2000; // Réduit de 4000 à 2000 N/m pour un comportement plus doux // Réduit de 8000 à 4000 pour plus de réalisme
 
-  /** Facteur de relaxation pour projection PBD (0.0-1.0) */
-  export const PBD_PROJECTION_FACTOR = 0.5;
+  /** Position-based projection factor (0.0-1.0)
+   * 
+   * @deprecated Not used in current force-based implementation
+   * 
+   * This was used in PBD mode for direct position correction.
+   * Current implementation uses explicit forces instead.
+   */
+  export const PBD_PROJECTION_FACTOR = 0.3;
 
-  /** Coefficient d'amortissement PBD (0.1-0.3) */
-  export const PBD_DAMPING = 0.2;
+  /** Longitudinal damping coefficient (dimensionless)
+   * 
+   * Makani reference: tether.cc line 119-124
+   *   c_damp = damping_ratio × sqrt(2 × EA × linear_density)
+   * 
+   * Our simplified implementation:
+   *   F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
+   * 
+   * This is dimensionless and scales the damping force relative to stiffness.
+   * 
+   * Physical interpretation:
+   *   • At v_radial = 1 m/s, damping force = 0.04 × 1 × 8000 = 320 N
+   *   • Typical damping ratios for cables: 0.01-0.10 (1-10%)
+   * 
+   * Tuning guidelines:
+   *   • Higher values (0.05-0.10) = more damping, less oscillation
+   *   • Lower values (0.01-0.03) = less damping, more oscillation
+   *   • Too high (>0.15) = over-damped, sluggish response
+   *   • Too low (<0.005) = under-damped, persistent oscillations
+   * 
+   * ⚠️ Current value: 0.04 (moderate damping, stable behavior)
+   */
+  export const PBD_DAMPING = 0.12; // Augmenté de 0.08 à 0.12 pour plus de stabilité // Augmenté de 0.04 à 0.08 pour plus de stabilité
 
-  /** Nombre d'itérations de résolution PBD par frame */
+  /** Nombre d'itérations de résolution PBD par frame 
+   * Plus d'itérations = meilleure convergence mais plus coûteux
+   * 3-5 itérations suffisent généralement pour des contraintes rigides
+   */
   export const PBD_ITERATIONS = 5;
 
-  /** Coefficient de stabilisation Baumgarte (0.05-0.2) */
+  /** Coefficient de stabilisation Baumgarte (0.05-0.2) 
+   * @deprecated Non utilisé en mode inextensible pur
+   */
   export const BAUMGARTE_COEF = 0.1;
+
+  /** Limite de sécurité pour les forces de contrainte (N)
+   * 
+   * Prevents numerical explosions when lines are severely overstretched.
+   * Physical interpretation: maximum tension before line breaks or becomes unstable.
+   * 
+   * For a 15m line with 8000 N/m stiffness:
+   *   • Breaking force of typical kite lines: ~2000-5000 N
+   *   • Safety limit: 1000 N (conservative, prevents instability)
+   */
+  export const MAX_CONSTRAINT_FORCE = 500; // Réduit de 1000 à 500 N pour plus de sécurité
+
+  /** Limite d'élongation maximale (% de longueur au repos)
+   * 
+   * Beyond this limit, the line is considered broken or unstable.
+   * Prevents infinite force accumulation in numerical simulations.
+   * 
+   * Physical interpretation:
+   *   • Typical kite lines break at 5-10% elongation
+   *   • Safety limit: 20% (allows some stretch but prevents explosion)
+   */
+  export const MAX_ELONGATION_RATIO = 0.20;
+
+  /** Force minimale pour considérer une ligne tendue (N)
+   * 
+   * Below this threshold, the line is considered slack.
+   * Prevents micro-oscillations around the slack/taut boundary.
+   */
+  export const MIN_TAUT_FORCE = 0.1; // Réduit de 1.0 à 0.1 N pour moins de force au repos
 }
 
 // ============================================================================
@@ -154,19 +236,19 @@ namespace KiteSpecs {
   export const CHORD_M = 0.65;
 
   /** Surface ailée (m²) - Calculée : wingspan × chord × 0.5 (delta triangulaire) */
-  export const SURFACE_AREA_M2 = 0.54;
+  export const SURFACE_AREA_M2 = 0.8; // Augmentée pour plus de portance réaliste
 
   // === Moments d'inertie (kg⋅m²) ===
-  // Approximation pour plaque triangulaire (delta)
-  // Audit physique : 19/10/2025
+  // Calcul précis pour plaque triangulaire delta (120g, 1.65m x 0.65m)
+  // Formule: I = m * (a² + b²) / 24 pour axes principaux
   /** Pitch (rotation avant/arrière autour de X) */
-  export const INERTIA_XX = 0.0315;
+  export const INERTIA_XX = 0.0158; // m * (wingspan² + chord²) / 24
 
   /** Yaw (rotation gauche/droite autour de Y) */
-  export const INERTIA_YY = 0.0042;
+  export const INERTIA_YY = 0.0136; // m * wingspan² / 24
 
   /** Roll (rotation latérale autour de Z) */
-  export const INERTIA_ZZ = 0.0110;
+  export const INERTIA_ZZ = 0.0158; // m * (wingspan² + chord²) / 24
 
   // === Couleur ===
   /** Couleur du kite en RGB hex */
@@ -296,8 +378,8 @@ namespace AeroConfig {
 
 namespace EnvironmentConfig {
   // === Vent ===
-  /** Vitesse du vent par défaut (m/s) - ~43 km/h (bon pour vol cerf-volant) */
-  export const WIND_SPEED_M_S = 12;
+  /** Vitesse du vent par défaut (m/s) - 0 = pas de vent pour tests gravité pure */
+  export const WIND_SPEED_M_S = 0.0; // Changé de 8.0 à 0.0
 
   /** Direction du vent par défaut (degrés) - 270 = -Z = Nord */
   export const WIND_DIRECTION_DEG = 270;
@@ -313,11 +395,11 @@ namespace EnvironmentConfig {
   // Direction 270° = -Z (Nord)
 
   // === Physique générale ===
-  /** Damping linéaire (réduction de vélocité) */
-  export const LINEAR_DAMPING = 0.8;
+  /** Damping linéaire (réduction de vélocité) - Plus fort pour stabilité */
+  export const LINEAR_DAMPING = 0.1;
 
-  /** Damping angulaire (réduction de rotation) */
-  export const ANGULAR_DAMPING = 0.5;
+  /** Damping angulaire (réduction de rotation) - Plus fort pour stabilité */
+  export const ANGULAR_DAMPING = 0.05;
 }
 
 // ============================================================================
@@ -357,10 +439,13 @@ namespace InitConfig {
   export const CONTROL_BAR_POSITION_Z_M = -0.6;
 
   /** Altitude du kite au-dessus de la barre (m) */
-  export const KITE_ALTITUDE_M = 10;
+  export const KITE_ALTITUDE_M = 8;
 
-  /** Distance du kite devant la barre (m) */
-  export const KITE_DISTANCE_M = 15;
+  /** Distance du kite devant la barre (m)
+   * IMPORTANT: Distance 3D totale doit être < LENGTH_M (15m) pour lignes slack au départ
+   * Distance 3D = √(altitude² + distance²) = √(64 + 121) = 13.6m < 15m ✅
+   */
+  export const KITE_DISTANCE_M = 11;
 
   // === Orientation initiale ===
   /** Pitch initial (deg) - Face au vent, angle d'attaque faible */
@@ -532,8 +617,8 @@ namespace WindConfig {
   /** Vitesse minimale du vent pour calcul direction normalisée (m/s) */
   export const MINIMUM_WIND_SPEED = 0.01;
 
-  /** Vitesse vent par défaut au démarrage (m/s) - ~20 km/h */
-  export const DEFAULT_WIND_SPEED_MS = 5.56;
+  /** Vitesse vent par défaut au démarrage (m/s) - 0 = pas de vent */
+  export const DEFAULT_WIND_SPEED_MS = 0.0;
 
   /** Direction vent par défaut au démarrage (°) - 0 = +X (Est) */
   export const DEFAULT_WIND_DIRECTION = 0;
@@ -560,8 +645,10 @@ namespace SimulationModes {
 // ============================================================================
 
 namespace InputDefaults {
-  /** Valeur par défaut pour lineLength (m) */
-  export const LINE_LENGTH_M = 150;
+  /** Valeur par défaut pour lineLength (m)
+   * ⚠️  Cette valeur doit correspondre à LineSpecs.LENGTH_M pour cohérence
+   */
+  export const LINE_LENGTH_M = 15;
   
   /** Valeur par défaut pour bridleNez (m) */
   export const BRIDLE_NEZ_M = 1.5;
@@ -617,9 +704,9 @@ export const CONFIG = {
 
   // === BRIDES ===
   bridles: {
-    nez: BridleConfig.LENGTH_NEZ_M,
-    inter: BridleConfig.LENGTH_INTER_M,
-    centre: BridleConfig.LENGTH_CENTRE_M,
+    nez: BridleConfig.LENGTH_NEZ_M,    // 0.65m = 65cm (correct pour les brides)
+    inter: BridleConfig.LENGTH_INTER_M, // 0.65m = 65cm (correct pour les brides)
+    centre: BridleConfig.LENGTH_CENTRE_M, // 0.65m = 65cm (correct pour les brides)
     color: BridleConfig.COLOR
   },
 

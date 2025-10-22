@@ -225,48 +225,35 @@ export class DebugSystem extends System {
 
     if (!kiteGeometry || !barGeometry) return;
 
+    // Fonction utilitaire pour afficher la tension d'une ligne
+    const displayLineTension = (line: Entity, ctrlPointName: string, handleName: string, arrowId: string): void => {
+      const lineComp = line.getComponent('line') as LineComponent | null;
+      if (!lineComp || !lineComp.state.isTaut || lineComp.currentTension <= DebugConfig.FORCE_THRESHOLD) return;
+
+      const kitePoint = kiteGeometry.getPointWorld(ctrlPointName, kiteEntity);
+      const barPoint = barGeometry.getPointWorld(handleName, controlBar);
+      if (!kitePoint || !barPoint) return;
+
+      // Calcul factorisé de la direction normalisée
+      const direction = barPoint.clone().sub(kitePoint).normalize();
+      const tensionVector = direction.multiplyScalar(lineComp.currentTension);
+
+      debugComp.addForceArrow(
+        kitePoint.clone(),
+        tensionVector.clone().multiplyScalar(scale),
+        0xff00ff, // Magenta
+        arrowId
+      );
+    };
+
     // Tension ligne gauche
     if (leftLine) {
-      const lineComp = leftLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
-        const kitePoint = kiteGeometry.getPointWorld('CTRL_GAUCHE', kiteEntity);
-        const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
-
-        if (kitePoint && barPoint) {
-          const direction = barPoint.clone().sub(kitePoint).normalize();
-          const tensionVector = direction.multiplyScalar(lineComp.currentTension);
-
-          // Afficher la tension (magenta)
-          debugComp.addForceArrow(
-            kitePoint.clone(),
-            tensionVector.clone().multiplyScalar(scale),
-            0xff00ff, // Magenta
-            'tension-left'
-          );
-        }
-      }
+      displayLineTension(leftLine, 'CTRL_GAUCHE', 'leftHandle', 'tension-left');
     }
 
     // Tension ligne droite
     if (rightLine) {
-      const lineComp = rightLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
-        const kitePoint = kiteGeometry.getPointWorld('CTRL_DROIT', kiteEntity);
-        const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
-
-        if (kitePoint && barPoint) {
-          const direction = barPoint.clone().sub(kitePoint).normalize();
-          const tensionVector = direction.multiplyScalar(lineComp.currentTension);
-
-          // Afficher la tension (magenta)
-          debugComp.addForceArrow(
-            kitePoint.clone(),
-            tensionVector.clone().multiplyScalar(scale),
-            0xff00ff, // Magenta
-            'tension-right'
-          );
-        }
-      }
+      displayLineTension(rightLine, 'CTRL_DROIT', 'rightHandle', 'tension-right');
     }
   }
 
@@ -281,65 +268,44 @@ export class DebugSystem extends System {
     const leftLine = entityManager.getEntity('leftLine');
     const rightLine = entityManager.getEntity('rightLine');
     const controlBar = entityManager.getEntity('controlBar');
+    const kiteEntity = entityManager.getEntity('kite');
 
-    if (!controlBar) return;
+    if (!controlBar || !kiteEntity) return;
 
     const barGeometry = controlBar.getComponent('geometry') as GeometryComponent | null;
-    if (!barGeometry) return;
+    const barTransform = controlBar.getComponent('transform') as TransformComponent | null;
+    const kiteTransform = kiteEntity.getComponent('transform') as TransformComponent | null;
+
+    if (!barGeometry || !barTransform || !kiteTransform) return;
+
+    // Fonction utilitaire pour afficher la force de grip d'une ligne
+    const displayGripForce = (line: Entity, handleName: string, arrowId: string): void => {
+      const lineComp = line.getComponent('line') as LineComponent | null;
+      if (!lineComp || !lineComp.state.isTaut || lineComp.currentTension <= DebugConfig.FORCE_THRESHOLD) return;
+
+      const barPoint = barGeometry.getPointWorld(handleName, controlBar);
+      if (!barPoint) return;
+
+      // Calcul factorisé de la direction normalisée (du kite vers la barre)
+      const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
+      const gripForce = direction.multiplyScalar(lineComp.currentTension);
+
+      debugComp.addForceArrow(
+        barPoint.clone(),
+        gripForce.clone().multiplyScalar(scale),
+        0x00ffff, // Cyan
+        arrowId
+      );
+    };
 
     // Force sur le poignet gauche
     if (leftLine) {
-      const lineComp = leftLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
-        const barPoint = barGeometry.getPointWorld('leftHandle', controlBar);
-        
-        if (barPoint) {
-          // La tension tire le poignet vers le haut-avant (direction du kite)
-          const barTransform = controlBar.getComponent('transform') as TransformComponent | null;
-          const kiteEntity = entityManager.getEntity('kite');
-          const kiteTransform = kiteEntity?.getComponent('transform') as TransformComponent | null;
-          
-          if (kiteTransform && barTransform) {
-            const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
-            const gripForce = direction.multiplyScalar(lineComp.currentTension);
-
-            // Afficher la force au poignet (cyan = couleur des forces de grip)
-            debugComp.addForceArrow(
-              barPoint.clone(),
-              gripForce.clone().multiplyScalar(scale),
-              0x00ffff, // Cyan
-              'grip-force-left'
-            );
-          }
-        }
-      }
+      displayGripForce(leftLine, 'leftHandle', 'grip-force-left');
     }
 
     // Force sur le poignet droit
     if (rightLine) {
-      const lineComp = rightLine.getComponent('line') as LineComponent | null;
-      if (lineComp && lineComp.state.isTaut && lineComp.currentTension > DebugConfig.FORCE_THRESHOLD) {
-        const barPoint = barGeometry.getPointWorld('rightHandle', controlBar);
-        
-        if (barPoint) {
-          const barTransform = controlBar.getComponent('transform') as TransformComponent | null;
-          const kiteEntity = entityManager.getEntity('kite');
-          const kiteTransform = kiteEntity?.getComponent('transform') as TransformComponent | null;
-          
-          if (kiteTransform && barTransform) {
-            const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
-            const gripForce = direction.multiplyScalar(lineComp.currentTension);
-
-            // Afficher la force au poignet (cyan)
-            debugComp.addForceArrow(
-              barPoint.clone(),
-              gripForce.clone().multiplyScalar(scale),
-              0x00ffff, // Cyan
-              'grip-force-right'
-            );
-          }
-        }
-      }
+      displayGripForce(rightLine, 'rightHandle', 'grip-force-right');
     }
   }
 

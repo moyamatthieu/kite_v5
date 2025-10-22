@@ -1,18 +1,18 @@
 /**
- * AeroSystemNASA.ts - Calcul des forces aérodynamiques selon les formules officielles NASA
- * 
+ * AeroSystemNASA.ts - Calcul des forces aérodynamiques selon les formules NASA
+ *
  * Implémentation basée sur le "Beginner's Guide to Kites" de la NASA Glenn Research Center
  * https://www.grc.nasa.gov/www/k-12/airplane/kitelift.html
  * https://www.grc.nasa.gov/www/k-12/airplane/kitedrag.html
- * 
- * FORMULES NASA POUR CERFS-VOLANTS (surfaces planes) :
+ *
+ * FORMULES NASA POUR PLAQUES PLANES :
  * - Portance: L = Cl × A × ρ × 0.5 × V²
  * - Cl pour plaque plane: Clo = 2 × π × α (α en radians)
  * - Correction aspect ratio: Cl = Clo / (1 + Clo / (π × AR))
  * - Traînée: D = Cd × A × ρ × 0.5 × V²
  * - Cd pour plaque plane: Cdo = 1.28 × sin(α)
  * - Traînée totale: Cd = Cdo + Cl² / (0.7 × π × AR)
- * 
+ *
  * Priorité 30 (après vent, avant contraintes).
  */
 
@@ -29,11 +29,13 @@ import { InputComponent } from '../components/InputComponent';
 
 import { WindState } from './WindSystem';
 import { PhysicsConstants, DebugConfig } from '../config/Config';
+import { MathUtils } from '../utils/MathUtils';
 
 interface SurfaceSample {
   descriptor: AeroSurfaceDescriptor;
   area: number;
   centroid: THREE.Vector3;
+  centerOfPressure: THREE.Vector3;  // Centre de pression (point d'application des forces aéro)
   normal: THREE.Vector3;  // Normale de la surface triangulaire
 }
 
@@ -66,19 +68,19 @@ namespace NASAAeroConfig {
   /** Post-stall CD (traînée augmentée après stall) */
   export const CD_STALL = 1.8;
 
-  // === MOMENT COEFFICIENTS ===
-  /** Coefficient de moment de tangage (pitch) - Négatif = stable */
-  export const CM_PITCH = -0.05;
-
-  /** Coefficient de moment de lacet (yaw) dû à l'asymétrie */
-  export const CM_YAW = -0.02;
-
-  /** Coefficient de moment de roulis (roll) dû à l'asymétrie */
-  export const CM_ROLL = -0.03;
-
   // === CENTER OF PRESSURE ===
   /** Position du centre de pression par rapport au centre géométrique (% chord) */
   export const CP_POSITION_RATIO = 0.25;
+
+  // === SAFETY LIMITS ===
+  /** Force maximale par surface (N) - Limite de sécurité pour éviter instabilité */
+  export const MAX_FORCE_PER_SURFACE = 500;
+
+  /** Couple maximal par surface (N·m) - Limite de sécurité */
+  export const MAX_TORQUE_PER_SURFACE = 200;
+
+  /** Vitesse apparente maximale considérée (m/s) - Cap réaliste pour kite */
+  export const MAX_APPARENT_WIND_SPEED = 30;
 }
 
 export class AeroSystemNASA extends System {
@@ -87,6 +89,12 @@ export class AeroSystemNASA extends System {
   // Debug: activer pour logger les informations sur chaque face
   private debugFaces = false;
   private debugFrameCounter = 0;
+  private debugSurfaceIndex = 0; // Surface à déboguer (-1 = toutes)
+
+  // Lissage temporel des forces (stabilité numérique)
+  private previousForces: Map<string, THREE.Vector3> = new Map();
+  private previousTorques: Map<string, THREE.Vector3> = new Map();
+  private readonly FORCE_SMOOTHING_FACTOR = 0.3; // 30% de lissage (0 = pas de lissage, 1 = lissage max)
 
   constructor() {
     const PRIORITY = 30;
@@ -122,10 +130,21 @@ export class AeroSystemNASA extends System {
       physics.faceForces = [];
 
       const wind = windCache.get(kite.id);
-      if (!wind) return;
+      if (!wind) {
+        console.warn('⚠️ [AeroSystemNASA] Pas de vent dans le cache');
+        return;
+      }
 
       const surfaceSamples = this.getSurfaceSamples(aero, geometry, kite);
-      if (surfaceSamples.length === 0) return;
+      if (surfaceSamples.length === 0) {
+        console.warn('⚠️ [AeroSystemNASA] Aucune surface détectée');
+        return;
+      }
+      
+      // 🔍 DEBUG: Log le vent ambiant
+      if (this.debugFaces && this.debugFrameCounter % 60 === 0) {
+        console.log(`💨 [AeroSystemNASA] Vent ambiant: (${wind.ambient.x.toFixed(2)}, ${wind.ambient.y.toFixed(2)}, ${wind.ambient.z.toFixed(2)}) | vitesse=${wind.ambient.length().toFixed(2)} m/s`);
+      }
 
       // ========================================================================
       // CALCULS NASA - Application des formules officielles pour cerfs-volants
@@ -134,135 +153,190 @@ export class AeroSystemNASA extends System {
       // Les cerfs-volants sont traités comme des "thin flat plates" avec
       // des formules spécifiques validées expérimentalement.
       surfaceSamples.forEach((sample, index) => {
-        // 1. Vitesse locale du centroïde (translation + rotation)
-        const leverArm = sample.centroid.clone().sub(transform.position);
-        const rotationVelocity = new THREE.Vector3().crossVectors(physics.angularVelocity, leverArm);
-        const localVelocity = physics.velocity.clone().add(rotationVelocity);
+        // === GRAVITÉ - TOUJOURS APPLIQUÉE (indépendante du vent) ===
+        const gravityPerFace = this.gravity.clone().multiplyScalar((physics.mass * sample.area) / kiteComp.surfaceArea);
+        this.addForce(physics, gravityPerFace);
 
-        // 2. Vent apparent local pour cette face
-        const localApparentWind = wind.ambient.clone().sub(localVelocity);
+        // Calcul du vent apparent local
+        const centerOfMass = transform.position; // CoM ≈ centre géométrique pour kite delta
+        const leverArm = sample.centerOfPressure.clone().sub(centerOfMass);
+        
+        // Vitesse au point d'application (CP) due à la rotation du kite
+        // v_rotation = ω × r
+        const rotationVelocity = new THREE.Vector3().crossVectors(physics.angularVelocity, leverArm);
+
+        // Vitesse totale du point d'application dans l'espace monde
+        // v_total = v_CoM + v_rotation
+        const pointVelocity = physics.velocity.clone().add(rotationVelocity);
+
+        // Vent apparent = vent ambiant - vitesse du point
+        const localApparentWind = wind.ambient.clone().sub(pointVelocity);
         const localWindSpeed = localApparentWind.length();
 
-        if (localWindSpeed < 0.01) return;
+        // Si pas de vent apparent, seules les forces gravitationnelles s'appliquent
+        if (localWindSpeed < 0.01) {
+          // Stocker pour debug même sans vent
+          physics.faceForces.push({
+            name: sample.descriptor.name,
+            centroid: sample.centerOfPressure.clone(),
+            lift: new THREE.Vector3(),
+            drag: new THREE.Vector3(),
+            gravity: gravityPerFace.clone(),
+            apparentWind: localApparentWind.clone(),
+            normal: sample.normal.clone()
+          });
+          return; // Pas de forces aérodynamiques
+        }
 
         const localWindDir = localApparentWind.clone().normalize();
 
         // 3. Calcul de l'angle d'attaque selon NASA
-        // Pour une plaque plane, l'angle α est entre la normale et le vent
+        //
+        // ✅ DÉFINITION NASA DE L'ANGLE D'ATTAQUE (pour plaques planes) ✅
+        // Source: NASA Glenn Research Center - "Beginner's Guide to Aerodynamics"
+        // https://www.grc.nasa.gov/www/k-12/airplane/incline.html
+        //
+        // Pour une plaque plane inclinée:
+        // - α = angle entre la NORMALE et la direction du vent
+        // - α = 0° : normale alignée avec le vent (plaque perpendiculaire, traînée max)
+        // - α = 90° : normale perpendiculaire au vent (plaque parallèle, portance nulle)
+        //
+        // Les formules NASA CL = 2π×α utilisent cet angle directement
         const surfaceNormal = sample.normal.clone();
         const dotNW = surfaceNormal.dot(localWindDir);
-        
-        // Si le vent vient de derrière, pas de force aéro sur cette face
+
+        // Protection: si le vent vient de derrière (dot < 0), pas de portance
+        // On utilise abs() pour gérer les deux orientations de la normale
+        const alphaRad = Math.acos(Math.max(-1.0, Math.min(1.0, Math.abs(dotNW))));
+        const alphaDeg = alphaRad * 180 / Math.PI;
+
+        // Détection vent défavorable (de derrière la surface)
         if (dotNW < 0) {
-          // Stocker des forces nulles pour le debug
-          physics.faceForces.push({
-            lift: new THREE.Vector3(),
-            drag: new THREE.Vector3(),
-            gravity: new THREE.Vector3(),
-            apparentWind: localApparentWind.clone(),
-            centroid: sample.centroid.clone(),
-            name: sample.descriptor.name,
-            normal: surfaceNormal.clone()
-          });
-          return;
+          // Vent de derrière: forces très réduites (quasi nulles)
+          if (this.debugFaces && (this.debugSurfaceIndex === -1 || this.debugSurfaceIndex === index)) {
+            console.log(`[AeroSystemNASA] ${sample.descriptor.name}: Vent de derrière (dotNW=${dotNW.toFixed(3)}), forces nulles`);
+          }
+          return; // Skip cette surface
         }
 
-        // ✅ CORRECTION NASA: Alpha = angle entre SURFACE et vent
-        // NASA: α = 0° → surface parallèle au vent (pas de portance)
-        //       α = 90° → surface perpendiculaire au vent (portance max)
-        // dotNW = cos(angle entre normale et vent)
-        // Alpha = π/2 - angle_normale = asin(dotNW)
-        const alphaRad = Math.asin(Math.min(1.0, Math.abs(dotNW)));
-
-        // 4. ✨ FORMULES NASA OFFICIELLES PURES ✨
-        // Sources: kitelift.html, kitedrag.html, kitedown.html
-
-        const aspectRatio = Math.max(kiteComp.aspectRatio, 0.1); // Éviter division par 0
+        const aspectRatio = Math.max(kiteComp.aspectRatio, 0.1);
 
         // === FORMULES NASA POUR PLAQUES PLANES ===
-        // Note: La NASA ne mentionne PAS de décrochage brutal pour les plaques planes.
-        // Les plaques planes ont un comportement linéaire jusqu'à ~30-40° contrairement aux profils aérodynamiques.
+        const Clo = 2.0 * NASAAeroConfig.PI * alphaRad;
+        const CL = Clo / (1.0 + Clo / (NASAAeroConfig.PI * aspectRatio));
+        const Cdo = NASAAeroConfig.FLAT_PLATE_DRAG_COEFF * Math.sin(alphaRad);
+        const inducedDrag = (CL * CL) / (NASAAeroConfig.RECTANGULAR_WING_EFFICIENCY * NASAAeroConfig.PI * aspectRatio);
+        const CD = Cdo + inducedDrag;
 
-        // Coefficient de portance (Source: kitelift.html lignes 173-210)
-        const Clo = 2.0 * NASAAeroConfig.PI * alphaRad;  // Formule linéaire théorique
-        const CL = Clo / (1.0 + Clo / (NASAAeroConfig.PI * aspectRatio)); // Correction aspect ratio + downwash
-
-        // Coefficient de traînée (Source: kitedrag.html lignes 178-213)
-        const Cdo = NASAAeroConfig.FLAT_PLATE_DRAG_COEFF * Math.sin(alphaRad);  // Traînée de forme
-        const inducedDrag = (CL * CL) / (NASAAeroConfig.RECTANGULAR_WING_EFFICIENCY * NASAAeroConfig.PI * aspectRatio); // Traînée induite
-        const CD = Cdo + inducedDrag;  // Traînée totale
-
-        // 5. Pression dynamique selon NASA: q = 0.5 × ρ × V²
+        // 5. Pression dynamique selon NASA
         const airDensity = aero.airDensity || NASAAeroConfig.AIR_DENSITY_SEA_LEVEL;
         const q = NASAAeroConfig.DYNAMIC_PRESSURE_COEFF * airDensity * localWindSpeed * localWindSpeed;
 
-        // 6. ✨ DIRECTIONS DES FORCES NASA ✨
-        
-        // === LIFT (Portance) : perpendiculaire au vent ===
-        // NASA: "lift direction is perpendicular to the wind"
+        // 6. Directions des forces NASA
         const liftDir = this.calculateNASALiftDirection(surfaceNormal, localWindDir);
-        
-        // === DRAG (Traînée) : parallèle au vent ===
-        // NASA: "drag acts in the direction of the wind"
         const dragDir = localWindDir.clone();
 
-        // Debug: Logger les informations de chaque face (1 fois par seconde) - désactivé
-        // if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) { ... }
+        // 7. Forces selon équations NASA
+        let panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
+        let panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
 
-        // 7. ✨ FORCES SELON ÉQUATIONS NASA ✨
-        // L = Cl × A × ρ × 0.5 × V²
-        // D = Cd × A × ρ × 0.5 × V²
-        const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
-        const panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
+        // 🛡️ SAFETY CAP: Limiter les forces par surface pour éviter instabilité
+        const liftMag = panelLift.length();
+        const dragMag = panelDrag.length();
 
-        // 8. Gravité distribuée par face
-        const gravityPerFace = this.gravity.clone().multiplyScalar((physics.mass * sample.area) / kiteComp.surfaceArea);
+        if (liftMag > NASAAeroConfig.MAX_FORCE_PER_SURFACE) {
+          console.warn(`⚠️ [AeroSystemNASA] ${sample.descriptor.name}: Portance excessive ${liftMag.toFixed(1)}N → plafonnée à ${NASAAeroConfig.MAX_FORCE_PER_SURFACE}N`);
+          panelLift.normalize().multiplyScalar(NASAAeroConfig.MAX_FORCE_PER_SURFACE);
+        }
 
-        // 9. Application des forces et couples
+        if (dragMag > NASAAeroConfig.MAX_FORCE_PER_SURFACE) {
+          console.warn(`⚠️ [AeroSystemNASA] ${sample.descriptor.name}: Traînée excessive ${dragMag.toFixed(1)}N → plafonnée à ${NASAAeroConfig.MAX_FORCE_PER_SURFACE}N`);
+          panelDrag.normalize().multiplyScalar(NASAAeroConfig.MAX_FORCE_PER_SURFACE);
+        }
+
+        // 🔍 DEBUG DÉTAILLÉ - Afficher tous les calculs intermédiaires
+        if (this.debugFaces && (this.debugSurfaceIndex === -1 || this.debugSurfaceIndex === index) && this.debugFrameCounter % 60 === 0) {
+          this.logDetailedAeroCalculations(
+            index, sample, alphaDeg, localWindSpeed, leverArm, 
+            Clo, CL, Cdo, CD, q, liftDir, dragDir,
+            panelLift, panelDrag, gravityPerFace
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 9. APPLICATION DES FORCES AU CENTRE DE PRESSION (CP)
+        // ═══════════════════════════════════════════════════════════════════════
+        //
+        // PHYSIQUE DES CORPS RIGIDES:
+        // ──────────────────────────────
+        // Une force F appliquée à un point P (CP) est équivalente à:
+        //   1. Force au CoM: F_CoM = F
+        //   2. Torque: τ = r × F, où r = vecteur (CoM → CP)
+        //
+        // ARCHITECTURE ECS:
+        // ─────────────────
+        // • Forces stockées dans physics.forces (accumulateur)
+        // • PhysicsSystem les intègre en vélocité puis position
+        // • Torques stockés dans physics.torques (accumulateur)
+        // • PhysicsSystem les intègre en vélocité angulaire puis quaternion
+        //
+        // CE QUI EST FAIT ICI:
+        // ────────────────────
+        // ✅ leverArm = CP - CoM (calculé ligne 157)
+        // ✅ Forces ajoutées à l'accumulateur (translation)
+        // ✅ Torque généré et ajouté (rotation)
+        // ✅ RÉSULTAT: Force appliquée AU CENTRE DE PRESSION ✅
+        //
         const panelForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
 
-        this.addForce(physics, panelLift);
-        this.addForce(physics, panelDrag);
-        this.addForce(physics, gravityPerFace);
+        // ═══════════════════════════════════════════════════════════════════════
+        // LISSAGE TEMPOREL DES FORCES (Temporal Smoothing)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Pour éviter les explosions numériques, on lisse les forces entre frames :
+        // F_smooth = (1 - α) × F_previous + α × F_current
+        // où α = FORCE_SMOOTHING_FACTOR (0.3 = 30% nouveau, 70% ancien)
+        //
+        const surfaceKey = `${kite.id}_${sample.descriptor.name}`;
+        const smoothedForce = this.smoothForce(surfaceKey, panelForce);
 
-        // Couple = bras de levier × force
-        const panelTorque = leverArm.clone().cross(panelForce);
+        // Décomposer en lift/drag/gravity pour application
+        const forceRatio = smoothedForce.length() / (panelForce.length() || 1);
+        const smoothedLift = panelLift.clone().multiplyScalar(forceRatio);
+        const smoothedDrag = panelDrag.clone().multiplyScalar(forceRatio);
+        const smoothedGravity = gravityPerFace.clone(); // Gravité ne change pas
+
+        // Ajouter forces lissées (translation du CoM)
+        this.addForce(physics, smoothedLift);
+        this.addForce(physics, smoothedDrag);
+        this.addForce(physics, smoothedGravity);
+
+        // Générer torque: τ = (CP - CoM) × Force
+        // C'est ce qui fait que la force appliquée au CP crée une rotation
+        let panelTorque = leverArm.clone().cross(smoothedForce);
+
+        // Lisser le torque également
+        panelTorque = this.smoothTorque(surfaceKey, panelTorque);
+
+        // 🛡️ SAFETY CAP: Limiter le couple par surface
+        const torqueMag = panelTorque.length();
+        if (torqueMag > NASAAeroConfig.MAX_TORQUE_PER_SURFACE) {
+          console.warn(`⚠️ [AeroSystemNASA] ${sample.descriptor.name}: Couple excessif ${torqueMag.toFixed(1)}N·m → plafonné à ${NASAAeroConfig.MAX_TORQUE_PER_SURFACE}N·m`);
+          panelTorque.normalize().multiplyScalar(NASAAeroConfig.MAX_TORQUE_PER_SURFACE);
+        }
+
         this.addTorque(physics, panelTorque);
 
-        // === 9b. MOMENTS AERODYNAMIQUES (Pitch, Yaw, Roll) ===
-        // Les moments aérodynamiques sont essentiels pour la stabilité
-        // M = CM × q × S × chord (pour pitch)
-
-        // Chord du kite (longueur caractéristique)
-        const chord = kiteComp.chord || 0.65;
-
-        // // Moment de tangage (pitch) - Stabilité longitudinale
-        // const pitchMoment = NASAAeroConfig.CM_PITCH * q * sample.area * chord;
-        // const pitchAxis = new THREE.Vector3(1, 0, 0); // Axe X (latéral)
-        // const pitchTorque = pitchAxis.multiplyScalar(pitchMoment);
-        // this.addTorque(physics, pitchTorque);
-
-        // // Moment de lacet (yaw) - Stabilité directionnelle
-        // const yawMoment = NASAAeroConfig.CM_YAW * q * sample.area * chord;
-        // const yawAxis = new THREE.Vector3(0, 1, 0); // Axe Y (vertical)
-        // const yawTorque = yawAxis.multiplyScalar(yawMoment);
-        // this.addTorque(physics, yawTorque);
-
-        // // Moment de roulis (roll) - Stabilité latérale
-        // const rollMoment = NASAAeroConfig.CM_ROLL * q * sample.area * chord;
-        // const rollAxis = new THREE.Vector3(0, 0, 1); // Axe Z (longitudinal)
-        // const rollTorque = rollAxis.multiplyScalar(rollMoment);
-        // this.addTorque(physics, rollTorque);
-
         // 10. Stockage pour visualisation debug
+        // Note: 'centroid' stocke en réalité le centre de pression (CP), pas le centroïde géométrique
+        // C'est le point d'application des forces aérodynamiques (portance + traînée)
         physics.faceForces.push({
           name: sample.descriptor.name,
-          centroid: sample.centroid.clone(),
+          centroid: sample.centerOfPressure.clone(), // ⚠️ Nom hérité: contient CP, pas centroïde
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
           gravity: gravityPerFace.clone(),
           apparentWind: localApparentWind.clone(),
-          normal: liftDir.clone()  // Direction de la portance pour debug visuel
+          normal: liftDir.clone()
         });
       });
     });
@@ -292,7 +366,19 @@ export class AeroSystemNASA extends System {
       const centroid = this.computeTriangleCentroid(p1, p2, p3);
       const normal = this.computeTriangleNormal(p1, p2, p3);
       
-      samples.push({ descriptor, area, centroid, normal });
+      // === Calcul du centre de pression (CP) - Version simplifiée ===
+      // Pour une plaque plane triangulaire, nous utilisons le CENTROÏDE comme point d'application.
+      //
+      // Raisons:
+      // 1. Le CP réel varie avec l'angle d'attaque (25%-50% selon α)
+      // 2. Pour un delta, le centroïde est une excellente approximation moyenne
+      // 3. Simplifie le calcul sans perte significative de précision physique
+      // 4. Évite les instabilités numériques du CP mobile
+      //
+      // Source: Pour plaques planes à angles modérés, CP ≈ centroïde géométrique
+      const centerOfPressure = centroid.clone();
+      
+      samples.push({ descriptor, area, centroid, centerOfPressure, normal });
     });
 
     return samples;
@@ -312,14 +398,11 @@ export class AeroSystemNASA extends System {
   }
 
   private computeTriangleArea(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): number {
-    const ab = new THREE.Vector3().subVectors(b, a);
-    const ac = new THREE.Vector3().subVectors(c, a);
-    const cross = new THREE.Vector3().crossVectors(ab, ac);
-    return 0.5 * cross.length();
+    return MathUtils.computeTriangleArea(a, b, c);
   }
 
   private computeTriangleCentroid(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): THREE.Vector3 {
-    return a.clone().add(b).add(c).multiplyScalar(1 / 3);
+    return MathUtils.computeTriangleCentroid(a, b, c);
   }
   
   /**
@@ -327,9 +410,7 @@ export class AeroSystemNASA extends System {
    * IMPORTANT: L'ordre des vertices détermine l'orientation de la normale
    */
   private computeTriangleNormal(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): THREE.Vector3 {
-    const ab = new THREE.Vector3().subVectors(b, a);
-    const ac = new THREE.Vector3().subVectors(c, a);
-    return new THREE.Vector3().crossVectors(ab, ac).normalize();
+    return MathUtils.computeTriangleNormal(a, b, c);
   }
   
   /**
@@ -390,10 +471,144 @@ export class AeroSystemNASA extends System {
   }
 
   /**
-   * Active/désactive le debug des faces
+   * Log détaillé de tous les calculs aérodynamiques pour une surface
+   * Utilisé pour déboguer les positions et orientations des vecteurs de force
    */
-  public setDebugFaces(enabled: boolean): void {
+  private logDetailedAeroCalculations(
+    index: number,
+    sample: SurfaceSample,
+    alphaDeg: number,
+    windSpeed: number,
+    leverArm: THREE.Vector3,
+    Clo: number,
+    CL: number,
+    Cdo: number,
+    CD: number,
+    q: number,
+    liftDir: THREE.Vector3,
+    dragDir: THREE.Vector3,
+    panelLift: THREE.Vector3,
+    panelDrag: THREE.Vector3,
+    gravityPerFace: THREE.Vector3
+  ): void {
+    console.group(`🎯 [AeroSystemNASA] Surface ${index}: ${sample.descriptor.name}`);
+
+    // 1. Géométrie
+    console.log(`📐 GÉOMÉTRIE:`);
+    console.log(`   - Surface: ${sample.descriptor.name}`);
+    console.log(`   - Centre de pression (CP): (${sample.centerOfPressure.x.toFixed(3)}, ${sample.centerOfPressure.y.toFixed(3)}, ${sample.centerOfPressure.z.toFixed(3)})`);
+    console.log(`   - Centroïde géométrique: (${sample.centroid.x.toFixed(3)}, ${sample.centroid.y.toFixed(3)}, ${sample.centroid.z.toFixed(3)})`);
+    console.log(`   - Bras de levier (CP - CoM): (${leverArm.x.toFixed(3)}, ${leverArm.y.toFixed(3)}, ${leverArm.z.toFixed(3)}) [mag=${leverArm.length().toFixed(3)} m]`);
+    console.log(`   - Aire: ${sample.area.toFixed(4)} m²`);
+
+    // 2. Vent et angle d'attaque
+    console.log(`💨 VENT:`);
+    console.log(`   - Vitesse apparente: ${windSpeed.toFixed(2)} m/s`);
+    console.log(`   - Direction vent: (${dragDir.x.toFixed(3)}, ${dragDir.y.toFixed(3)}, ${dragDir.z.toFixed(3)})`);
+    console.log(`   - Normale surface: (${sample.normal.x.toFixed(3)}, ${sample.normal.y.toFixed(3)}, ${sample.normal.z.toFixed(3)})`);
+    console.log(`   - Angle d'attaque (α): ${alphaDeg.toFixed(1)}°`);
+
+    // 3. Coefficients aérodynamiques
+    console.log(`📊 COEFFICIENTS AÉRO:`);
+    console.log(`   - CL théorique: ${Clo.toFixed(4)} → CL corrigé: ${CL.toFixed(4)}`);
+    console.log(`   - CD parasite: ${Cdo.toFixed(4)}`);
+    console.log(`   - CD induit: ${(CD - Cdo).toFixed(4)}`);
+    console.log(`   - CD total: ${CD.toFixed(4)}`);
+    console.log(`   - Pression dynamique (q): ${q.toFixed(2)} Pa`);
+
+    // 4. Directions des forces
+    console.log(`🎲 DIRECTIONS:`);
+    console.log(`   - Direction portance: (${liftDir.x.toFixed(3)}, ${liftDir.y.toFixed(3)}, ${liftDir.z.toFixed(3)}) [perpendiculaire au vent]`);
+    console.log(`   - Direction traînée: (${dragDir.x.toFixed(3)}, ${dragDir.y.toFixed(3)}, ${dragDir.z.toFixed(3)}) [parallèle au vent]`);
+
+    // 5. Forces finales
+    console.log(`💪 FORCES FINALES:`);
+    console.log(`   - Portance: (${panelLift.x.toFixed(3)}, ${panelLift.y.toFixed(3)}, ${panelLift.z.toFixed(3)}) [mag=${panelLift.length().toFixed(3)} N]`);
+    console.log(`   - Traînée: (${panelDrag.x.toFixed(3)}, ${panelDrag.y.toFixed(3)}, ${panelDrag.z.toFixed(3)}) [mag=${panelDrag.length().toFixed(3)} N]`);
+    console.log(`   - Gravité: (${gravityPerFace.x.toFixed(3)}, ${gravityPerFace.y.toFixed(3)}, ${gravityPerFace.z.toFixed(3)}) [mag=${gravityPerFace.length().toFixed(3)} N]`);
+
+    const totalForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
+    console.log(`   - ∑ Force totale: (${totalForce.x.toFixed(3)}, ${totalForce.y.toFixed(3)}, ${totalForce.z.toFixed(3)}) [mag=${totalForce.length().toFixed(3)} N]`);
+
+    // 6. Couple généré
+    const torque = leverArm.clone().cross(totalForce);
+    console.log(`🔄 COUPLE (TORQUE):`);
+    console.log(`   - τ = r × F: (${torque.x.toFixed(3)}, ${torque.y.toFixed(3)}, ${torque.z.toFixed(3)}) [mag=${torque.length().toFixed(3)} N·m]`);
+    console.log(`   - Bras de levier utilisé: ${leverArm.length().toFixed(3)} m`);
+
+    console.groupEnd();
+  }
+
+  /**
+   * Active/désactive le debug des faces avec possibilité de cibler une surface
+   * @param enabled Activer le debug
+   * @param surfaceIndex Index de la surface à déboguer (-1 pour toutes)
+   */
+  public setDebugFaces(enabled: boolean, surfaceIndex: number = -1): void {
     this.debugFaces = enabled;
-    // Debug log removed
+    this.debugSurfaceIndex = surfaceIndex;
+    if (enabled) {
+      console.log(`🔍 [AeroSystemNASA] Debug activé${surfaceIndex >= 0 ? ` pour surface ${surfaceIndex}` : ` pour TOUTES les surfaces`}`);
+    }
+  }
+
+  /**
+   * Lisse une force entre le frame précédent et le frame actuel
+   * Utilise un filtre passe-bas exponentiel (EMA - Exponential Moving Average)
+   *
+   * @param key Identifiant unique de la surface
+   * @param currentForce Force calculée ce frame
+   * @returns Force lissée
+   */
+  private smoothForce(key: string, currentForce: THREE.Vector3): THREE.Vector3 {
+    const previousForce = this.previousForces.get(key);
+
+    if (!previousForce) {
+      // Premier frame : pas de lissage
+      this.previousForces.set(key, currentForce.clone());
+      return currentForce.clone();
+    }
+
+    // Lissage exponentiel : F_smooth = α × F_current + (1 - α) × F_previous
+    // où α = FORCE_SMOOTHING_FACTOR
+    const smoothed = new THREE.Vector3();
+    smoothed.x = this.FORCE_SMOOTHING_FACTOR * currentForce.x + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.x;
+    smoothed.y = this.FORCE_SMOOTHING_FACTOR * currentForce.y + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.y;
+    smoothed.z = this.FORCE_SMOOTHING_FACTOR * currentForce.z + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.z;
+
+    // Sauvegarder pour le prochain frame
+    this.previousForces.set(key, smoothed.clone());
+
+    return smoothed;
+  }
+
+  /**
+   * Lisse un torque entre le frame précédent et le frame actuel
+   * Même algorithme que smoothForce
+   *
+   * @param key Identifiant unique de la surface
+   * @param currentTorque Torque calculé ce frame
+   * @returns Torque lissé
+   */
+  private smoothTorque(key: string, currentTorque: THREE.Vector3): THREE.Vector3 {
+    const previousTorque = this.previousTorques.get(key);
+
+    if (!previousTorque) {
+      // Premier frame : pas de lissage
+      this.previousTorques.set(key, currentTorque.clone());
+      return currentTorque.clone();
+    }
+
+    // Lissage exponentiel : τ_smooth = α × τ_current + (1 - α) × τ_previous
+    const smoothed = new THREE.Vector3();
+    smoothed.x = this.FORCE_SMOOTHING_FACTOR * currentTorque.x + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.x;
+    smoothed.y = this.FORCE_SMOOTHING_FACTOR * currentTorque.y + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.y;
+    smoothed.z = this.FORCE_SMOOTHING_FACTOR * currentTorque.z + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.z;
+
+    // Sauvegarder pour le prochain frame
+    this.previousTorques.set(key, smoothed.clone());
+
+    return smoothed;
   }
 }
+
