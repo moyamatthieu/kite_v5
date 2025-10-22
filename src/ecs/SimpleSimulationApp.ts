@@ -95,11 +95,9 @@ export class SimpleSimulationApp {
     const ui = UIFactory.create();
     this.entityManager.register(ui);
 
-    // === DEBUG (optionnel) ===
-    if (CONFIG.debug.enabled) {
-      const debug = UIFactory.create(); // TODO: créer SimpleDebugFactory
-      this.entityManager.register(debug);
-    }
+    // NOTE: Pas de brides pour l'instant - causent des erreurs
+    // const bridles = BridleFactory.createAll();
+    // bridles.forEach(bridle => this.entityManager.register(bridle));
   }
 
   /**
