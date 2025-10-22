@@ -70,6 +70,28 @@ const EPSILON = 0.001;
 const PRIORITY = 40;
 
 export class ConstraintSystem extends System {
+  // ========== PBD PARAMETERS ==========
+  // Stiffness : fraction de correction appliquée par itération (0.0-1.0)
+  // 1.0 = correction complète (rigide), 0.5 = correction progressive
+  private readonly PBD_STIFFNESS = 0.8;
+
+  // Damping coefficient : dissipe l'énergie basée sur la vitesse relative
+  // Réduit les oscillations. Valeur typique: 0.1-0.3
+  private readonly PBD_DAMPING = 0.2;
+
+  // Nombre d'itérations de résolution par frame
+  // Plus élevé = meilleure convergence mais coûteux
+  // PhysX recommande 2-4 itérations par frame (120-300 Hz)
+  private readonly PBD_ITERATIONS = 3;
+
+  // Baumgarte stabilization coefficient
+  // Compense les erreurs numériques accumulées
+  // Valeur typique: 0.05-0.2
+  private readonly BAUMGARTE_COEF = 0.1;
+
+  // Epsilon pour les calculs (évite les divisions par zéro)
+  private readonly EPSILON = 1e-6;
+
   constructor() {
     super('ConstraintSystem', PRIORITY);
   }
@@ -90,15 +112,19 @@ export class ConstraintSystem extends System {
   }
 
   /**
-   * MODE PBD : Position-Based Dynamics - SIMPLE ET STABLE
+   * MODE PBD AMÉLIORÉ: Position-Based Dynamics avec amortissement et Baumgarte
    * 
-   * Approche ultra-simple : contrainte de distance inélastique
-   * - Mesurer la distance entre CTRL et handle
-   * - Si distance > restLength, projeter le kite pour ramener à restLength
-   * - Pas d'itérations complexes, pas de calculs de lambda
+   * Algorithme:
+   * 1. Boucle d'itérations (2-4 fois):
+   *    a. Calculer elongation (distance - restLength)
+   *    b. Appliquer force ressort + damping
+   *    c. Appliquer Baumgarte stabilization
+   *    d. Projeter position (hard constraint si slack)
+   * 2. Générer torques pour l'orientation du kite
+   * 3. Collision sol
    */
   private updatePBD(context: SimulationContext): void {
-    const { entityManager } = context;
+    const { entityManager, deltaTime } = context;
 
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
@@ -112,21 +138,19 @@ export class ConstraintSystem extends System {
     const kiteTransform = kite.getComponent<TransformComponent>('transform');
     const kitePhysics = kite.getComponent<PhysicsComponent>('physics');
 
-    if (!kiteTransform || !kitePhysics) {
-      return;
-    }
-
-    if (kitePhysics.isKinematic) {
+    if (!kiteTransform || !kitePhysics || kitePhysics.isKinematic) {
       return;
     }
 
     const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
-    if (!kiteGeometry) return;
-
     const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
-    if (!barGeometry) return;
+    if (!kiteGeometry || !barGeometry) return;
 
-    // Récupérer positions monde actuelles
+    const leftLineComp = leftLine.getComponent<LineComponent>('line');
+    const rightLineComp = rightLine.getComponent<LineComponent>('line');
+    if (!leftLineComp || !rightLineComp) return;
+
+    // Points de contrôle du kite
     const ctrlGauche = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
     const ctrlDroit = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
     const leftHandle = barGeometry.getPointWorld('leftHandle', controlBar);
@@ -136,110 +160,104 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    const leftLineComp = leftLine.getComponent<LineComponent>('line');
-    const rightLineComp = rightLine.getComponent<LineComponent>('line');
-
-    if (!leftLineComp || !rightLineComp) {
-      return;
-    }
-
-    // === SIMPLE CONSTRAINT : Project onto distance sphere ===
-    // Si distance > restLength, rapprocher le kite du handle
-    const leftDist = leftHandle.distanceTo(ctrlGauche);
-    const rightDist = rightHandle.distanceTo(ctrlDroit);
-
-    // Mettre à jour les états des lignes
-    leftLineComp.currentLength = leftDist;
-    leftLineComp.state.currentLength = leftDist;
-    rightLineComp.currentLength = rightDist;
-    rightLineComp.state.currentLength = rightDist;
-
-    if (leftDist > leftLineComp.restLength) {
-      leftLineComp.state.isTaut = true;
-      leftLineComp.state.elongation = leftDist - leftLineComp.restLength;
-      leftLineComp.state.strainRatio = leftLineComp.state.elongation / leftLineComp.restLength;
-      leftLineComp.currentTension = leftLineComp.state.elongation * 100; // Approximation
-    } else {
-      leftLineComp.state.isTaut = false;
-      leftLineComp.state.elongation = 0;
-      leftLineComp.state.strainRatio = 0;
-      leftLineComp.currentTension = 0;
-    }
-
-    if (rightDist > rightLineComp.restLength) {
-      rightLineComp.state.isTaut = true;
-      rightLineComp.state.elongation = rightDist - rightLineComp.restLength;
-      rightLineComp.state.strainRatio = rightLineComp.state.elongation / rightLineComp.restLength;
-      rightLineComp.currentTension = rightLineComp.state.elongation * 100;
-    } else {
-      rightLineComp.state.isTaut = false;
-      rightLineComp.state.elongation = 0;
-      rightLineComp.state.strainRatio = 0;
-      rightLineComp.currentTension = 0;
-    }
-
-    // === ÉTAPE 1: APPLIQUER LES FORCES DES LIGNES POUR GÉNÉRER DU TORQUE ===
-    // IMPORTANT: Sans les forces, le kite ne peut pas se tourner pour générer de la portance!
-    // On applique une force qui crée un torque permettant au kite de s'orienter au vent.
-    
-    // Ligne gauche - calcul de la force pour créer un torque
-    if (leftDist > 0) {
-      const direction = leftHandle.clone().sub(ctrlGauche).normalize();
-      const elongation = Math.max(0, leftDist - leftLineComp.restLength);
-      const k = 100; // Rigidité de la ligne
-      const magnitude = k * elongation;
-      
-      // Force sur le CTRL point crée un torque autour du centre du kite
-      const force = direction.multiplyScalar(magnitude);
-      kitePhysics.forces.add(force);
-      
-      // Torque = r × F (r = vecteur du centre à CTRL)
-      const r = ctrlGauche.clone().sub(kiteTransform.position);
-      const torque = new THREE.Vector3().crossVectors(r, force);
-      kitePhysics.torques.add(torque);
-    }
-
-    // Ligne droite
-    if (rightDist > 0) {
-      const direction = rightHandle.clone().sub(ctrlDroit).normalize();
-      const elongation = Math.max(0, rightDist - rightLineComp.restLength);
-      const k = 100;
-      const magnitude = k * elongation;
-      
-      const force = direction.multiplyScalar(magnitude);
-      kitePhysics.forces.add(force);
-      
-      const r = ctrlDroit.clone().sub(kiteTransform.position);
-      const torque = new THREE.Vector3().crossVectors(r, force);
-      kitePhysics.torques.add(torque);
-    }
-
-    // === ÉTAPE 2: PROJECTION DE DISTANCE - CONTRAINTE RIGIDE ===
-    // Ramener le kite si les lignes dépassent la limite
-    let correction = new THREE.Vector3(0, 0, 0);
-
-    // Contrainte gauche
-    if (leftDist > leftLineComp.restLength) {
-      const direction = ctrlGauche.clone().sub(leftHandle).normalize();
-      const delta = leftDist - leftLineComp.restLength;
-      correction.add(direction.multiplyScalar(delta * 0.5)); // 50% de la correction pour chaque ligne
-    }
-
-    // Contrainte droite
-    if (rightDist > rightLineComp.restLength) {
-      const direction = ctrlDroit.clone().sub(rightHandle).normalize();
-      const delta = rightDist - rightLineComp.restLength;
-      correction.add(direction.multiplyScalar(delta * 0.5));
-    }
-
-    // Appliquer la correction (ramener le kite VERS la barre, pas le repousser)
-    if (correction.length() > EPSILON) {
-      correction.multiplyScalar(-1); // Inverser pour rapprocher
-      kiteTransform.position.add(correction);
+    // === ITÉRATIONS DE RÉSOLUTION MULTIPLES ===
+    // Chaque itération améliore la convergence
+    for (let iter = 0; iter < this.PBD_ITERATIONS; iter++) {
+      this.solvePBDConstraint(
+        leftHandle, ctrlGauche, leftLineComp, kiteTransform, kitePhysics, deltaTime, 'left'
+      );
+      this.solvePBDConstraint(
+        rightHandle, ctrlDroit, rightLineComp, kiteTransform, kitePhysics, deltaTime, 'right'
+      );
     }
 
     // Collision sol
     this.handleGroundCollision(kiteTransform, kitePhysics);
+  }
+
+  /**
+   * Solveur PBD pour UNE contrainte (ligne)
+   * Applique ressort + damping + Baumgarte
+   */
+  private solvePBDConstraint(
+    handlePos: THREE.Vector3,
+    ctrlPos: THREE.Vector3,
+    lineComp: LineComponent,
+    kiteTransform: TransformComponent,
+    kitePhysics: PhysicsComponent,
+    deltaTime: number,
+    side: 'left' | 'right'
+  ): void {
+    const direction = handlePos.clone().sub(ctrlPos);
+    const distance = direction.length();
+
+    if (distance < this.EPSILON) return;
+
+    direction.normalize(); // direction: du ctrl vers le handle
+
+    const elongation = Math.max(0, distance - lineComp.restLength);
+
+    // === SLACK LINE : si pas en tension, pas de force ===
+    if (elongation < this.EPSILON) {
+      lineComp.state.isTaut = false;
+      lineComp.state.elongation = 0;
+      lineComp.state.strainRatio = 0;
+      lineComp.currentTension = 0;
+      lineComp.currentLength = distance;
+      return;
+    }
+
+    lineComp.state.isTaut = true;
+    lineComp.state.elongation = elongation;
+    lineComp.state.strainRatio = elongation / lineComp.restLength;
+    lineComp.currentLength = distance;
+
+    // === CALCUL DES FORCES ===
+
+    // 1. Force du ressort
+    const F_spring = this.PBD_STIFFNESS * elongation;
+
+    // 2. Force d'amortissement (basée sur vitesse relative)
+    const velocityHandle = new THREE.Vector3(0, 0, 0); // La barre est statique
+    const velocityCtrl = kitePhysics.velocity.clone(); // Vitesse du kite
+
+    // Vitesse relative et composante radiale
+    const v_relative = velocityHandle.clone().sub(velocityCtrl);
+    const v_radial = v_relative.dot(direction); // Composante le long de la ligne
+
+    // Damping force = -c * v_radial
+    const F_damping = -this.PBD_DAMPING * v_radial;
+
+    // 3. Baumgarte stabilization (corrige les erreurs accumulées)
+    // Ajoute une force proportionnelle à l'erreur de contrainte
+    const F_baumgarte = this.BAUMGARTE_COEF * elongation;
+
+    // Force totale (clamped pour éviter les valeurs négatives)
+    const F_total = Math.max(0, F_spring + F_damping + F_baumgarte);
+
+    // === APPLICATION DE LA FORCE ===
+    // Force appliquée au point de contrôle du kite
+    const force = direction.clone().multiplyScalar(F_total);
+    kitePhysics.forces.add(force);
+
+    // Mise à jour de la tension (approximation)
+    lineComp.currentTension = F_total;
+
+    // === GÉNÉRATION DU TORQUE ===
+    // Crucial pour l'orientation du kite!
+    // τ = r × F (r = vecteur du centre du kite au point de contrôle)
+    const r = ctrlPos.clone().sub(kiteTransform.position);
+    const torque = new THREE.Vector3().crossVectors(r, force);
+    kitePhysics.torques.add(torque);
+
+    // === PROJECTION DE POSITION (hard constraint) ===
+    // Si la distance dépasse encore la limite après les forces, corriger directement
+    const currentDist = handlePos.distanceTo(ctrlPos);
+    if (currentDist > lineComp.restLength + this.EPSILON) {
+      const excess = currentDist - lineComp.restLength;
+      const correction = direction.clone().multiplyScalar(excess * this.PBD_STIFFNESS);
+      kiteTransform.position.add(correction);
+    }
   }
 
   /**
