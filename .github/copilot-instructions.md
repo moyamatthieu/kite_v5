@@ -124,4 +124,42 @@ Utilisez les commandes npm définies dans `package.json` pour les tâches couran
     *   Lors de problèmes de performance ou de rendu
 -   **Objectif** : Garantir que chaque décision technique respecte les principes ECS et maintient la cohérence du simulateur.
 
+## 🧲 Simulation des cordes (ConstraintSystem.ts)
+
+Le système de contrainte implémente deux modes pour simuler les lignes de cerf-volant :
+
+### Mode PBD (Position-Based Dynamics) - Amélioré
+Le mode PBD est une approche robuste basée sur les contraintes de distance. Implémentation actuelle (feat/improve-pbd-stability) :
+
+**Paramètres configurables :**
+- `PBD_STIFFNESS = 0.8` : Fraction de correction appliquée par itération (0.0-1.0)
+  - 1.0 = correction complète (très rigide)
+  - 0.5 = correction progressive (élastique)
+- `PBD_DAMPING = 0.2` : Coefficient d'amortissement (0.1-0.3)
+  - Dissipe l'énergie basée sur la vitesse relative
+  - Réduit les oscillations non-physiques
+- `PBD_ITERATIONS = 3` : Nombre d'itérations par frame
+  - Chaque itération améliore la convergence
+  - PhysX recommande 120-300 Hz (2-4 itérations à 60 fps)
+- `BAUMGARTE_COEF = 0.1` : Stabilization coefficient
+  - Compense les erreurs numériques accumulées
+  - Prévient la divergence
+
+**Algorithme (par itération) :**
+1. Calculer l'élongation: `delta = distance - restLength`
+2. Si slack (pas en tension): retourner sans appliquer de forces
+3. Calculer forces:
+   - Force ressort: `F_spring = k × elongation`
+   - Force amortissement: `F_damp = -c × v_radial`
+   - Baumgarte: `F_baum = β × elongation`
+4. Appliquer la force totale `F_total = max(0, F_spring + F_damp + F_baum)`
+5. Générer le torque: `τ = r × F` (pour l'orientation du kite)
+6. Projection de position si encore en dépassement
+
+**Avantages du PBD :**
+- Stable même avec grands timesteeps
+- Support natif des slack lines (cordes molles)
+- Contrôle fin de la rigidité via paramètres
+- Génération correcte de torques pour la rotation
+
 En suivant ces instructions, vous serez en mesure de contribuer efficacement au projet tout en respectant son architecture fondamentale.
