@@ -67,10 +67,18 @@ interface LogEntry {
     id: string;
     centroid: THREE.Vector3;
     normal: THREE.Vector3;
-    lift: number;
-    drag: number;
+    liftVector: THREE.Vector3;
+    dragVector: THREE.Vector3;
+    apparentWind: THREE.Vector3;
+    liftMagnitude: number;
+    dragMagnitude: number;
     angleOfAttack: number;
   }>;
+  windState?: {
+    ambient: THREE.Vector3;
+    speed: number;
+    direction: THREE.Vector3;
+  };
   bridles: {
     nez: number;
     inter: number;
@@ -257,7 +265,8 @@ export class SimulationLogger extends System {
         constraint: new THREE.Vector3(0, 0, 0), // À calculer
         aero: new THREE.Vector3(0, 0, 0), // À récupérer
       },
-      faces: [], // À calculer
+      faces: this.collectFaceData(kitePhysics),
+      windState: this.collectWindState(kitePhysics),
       bridles: kiteBridle
         ? {
             nez: kiteBridle.lengths.nez,
@@ -268,6 +277,62 @@ export class SimulationLogger extends System {
     };
 
     return entry;
+  }
+
+  /**
+   * Collecte les données aérodynamiques depuis kitePhysics.faceForces
+   */
+  private collectFaceData(kitePhysics: PhysicsComponent): Array<{
+    id: string;
+    centroid: THREE.Vector3;
+    normal: THREE.Vector3;
+    liftVector: THREE.Vector3;
+    dragVector: THREE.Vector3;
+    apparentWind: THREE.Vector3;
+    liftMagnitude: number;
+    dragMagnitude: number;
+    angleOfAttack: number;
+  }> {
+    if (!kitePhysics.faceForces || kitePhysics.faceForces.length === 0) {
+      return [];
+    }
+
+    return kitePhysics.faceForces.map((face) => {
+      const liftMag = face.lift.length();
+      const dragMag = face.drag.length();
+      
+      // Calculer l'angle d'attaque depuis les vecteurs
+      const windDir = face.apparentWind.clone().normalize();
+      const dotNW = Math.abs(face.normal.dot(windDir));
+      const alphaRad = Math.acos(Math.max(0.0, Math.min(1.0, dotNW)));
+      const alphaDeg = alphaRad * 180 / Math.PI;
+
+      return {
+        id: face.name,
+        centroid: face.centroid.clone(),
+        normal: face.normal.clone(),
+        liftVector: face.lift.clone(),
+        dragVector: face.drag.clone(),
+        apparentWind: face.apparentWind.clone(),
+        liftMagnitude: liftMag,
+        dragMagnitude: dragMag,
+        angleOfAttack: alphaDeg,
+      };
+    });
+  }
+
+  /**
+   * Collecte l'état du vent global (si disponible)
+   */
+  private collectWindState(kitePhysics: PhysicsComponent): {
+    ambient: THREE.Vector3;
+    speed: number;
+    direction: THREE.Vector3;
+  } | undefined {
+    // Récupérer le vent ambiant depuis le premier faceForce (tous partagent le même vent ambiant)
+    // Note: Le vent apparent varie selon la position, mais le vent ambiant est global
+    // Pour l'instant, on utilise une approximation
+    return undefined; // À améliorer si nécessaire
   }
 
   private formatAndPrint(entry: LogEntry): void {
@@ -346,6 +411,41 @@ export class SimulationLogger extends System {
     lines.push(
       `  Gravity: (${entry.forces.gravity.x.toFixed(3)}, ${entry.forces.gravity.y.toFixed(3)}, ${entry.forces.gravity.z.toFixed(3)}) N`
     );
+
+    // Aero forces par surface (détaillé)
+    if (entry.faces && entry.faces.length > 0) {
+      lines.push(`\n🌬️  AERODYNAMICS (${entry.faces.length} surfaces):`);
+      
+      entry.faces.forEach((face, idx) => {
+        lines.push(`\n  ━━━ Surface ${idx + 1}: ${face.id} ━━━`);
+        lines.push(`    📍 CP: (${face.centroid.x.toFixed(2)}, ${face.centroid.y.toFixed(2)}, ${face.centroid.z.toFixed(2)})`);
+        lines.push(`    📐 α = ${face.angleOfAttack.toFixed(1)}°`);
+        
+        // Normale (direction perpendiculaire à la surface)
+        lines.push(`    🔶 Normal: (${face.normal.x.toFixed(3)}, ${face.normal.y.toFixed(3)}, ${face.normal.z.toFixed(3)})`);
+        
+        // Vent apparent local
+        const windSpeed = face.apparentWind.length();
+        const windDir = face.apparentWind.clone().normalize();
+        lines.push(`    💨 Wind apparent: ${windSpeed.toFixed(2)} m/s`);
+        lines.push(`       Direction: (${windDir.x.toFixed(3)}, ${windDir.y.toFixed(3)}, ${windDir.z.toFixed(3)})`);
+        
+        // Portance (perpendiculaire au vent)
+        const liftDir = face.liftVector.clone().normalize();
+        lines.push(`    ⬆️  Lift: ${face.liftMagnitude.toFixed(2)} N`);
+        lines.push(`       Direction: (${liftDir.x.toFixed(3)}, ${liftDir.y.toFixed(3)}, ${liftDir.z.toFixed(3)})`);
+        
+        // Traînée (parallèle au vent)
+        const dragDir = face.dragVector.clone().normalize();
+        lines.push(`    ⬅️  Drag: ${face.dragMagnitude.toFixed(2)} N`);
+        lines.push(`       Direction: (${dragDir.x.toFixed(3)}, ${dragDir.y.toFixed(3)}, ${dragDir.z.toFixed(3)})`);
+        
+        // Vérification orthogonalité (lift ⊥ wind)
+        const liftWindDot = liftDir.dot(windDir);
+        const orthogonality = Math.abs(liftWindDot);
+        lines.push(`    ✓ Lift⊥Wind: ${orthogonality < 0.01 ? '✅' : '⚠️'} (dot=${liftWindDot.toFixed(4)})`);
+      });
+    }
 
     // Bridles
     lines.push(`\n🌉 BRIDLES:`);
