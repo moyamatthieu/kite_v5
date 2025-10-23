@@ -26,9 +26,11 @@ export class ControlBarFactory {
     const geometry = new GeometryComponent();
 
     // Handles espacés de 65cm
+    // ⚠️ INVERSÉ : Pour correspondre à la vue caméra (depuis la droite regardant vers gauche)
+    // La caméra crée un effet miroir, donc on inverse les X pour que les noms correspondent à l'écran
     const handleSpacing = 0.65;
-    geometry.setPoint('leftHandle', new THREE.Vector3(-handleSpacing / 2, 0, 0));
-    geometry.setPoint('rightHandle', new THREE.Vector3(handleSpacing / 2, 0, 0));
+    geometry.setPoint('leftHandle', new THREE.Vector3(handleSpacing / 2, 0, 0));   // X = +0.325 (apparaît à GAUCHE à l'écran)
+    geometry.setPoint('rightHandle', new THREE.Vector3(-handleSpacing / 2, 0, 0)); // X = -0.325 (apparaît à DROITE à l'écran)
 
     // Point pivot au centre de la barre (pour rotation et référence)
     geometry.setPoint('pivot', new THREE.Vector3(0, 0, 0));

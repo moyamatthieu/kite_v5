@@ -90,8 +90,8 @@ export class TetherSystem extends System {
 
     // === LIGNE GAUCHE ===
     this.solveSimpleTether({
-      pointA: handleLeft,      // Handle (fixe)
-      pointB: ctrlLeft,        // CTRL sur kite (mobile)
+      pointA: handleLeft,      // Handle gauche (X<0)
+      pointB: ctrlLeft,        // CTRL gauche sur kite (X<0)
       maxLength: leftLineComp.restLength,
       kiteTransform,
       kitePhysics,
@@ -100,8 +100,8 @@ export class TetherSystem extends System {
 
     // === LIGNE DROITE ===
     this.solveSimpleTether({
-      pointA: handleRight,     // Handle (fixe)
-      pointB: ctrlRight,       // CTRL sur kite (mobile)
+      pointA: handleRight,     // Handle droite (X>0)
+      pointB: ctrlRight,       // CTRL droit sur kite (X>0)
       maxLength: rightLineComp.restLength,
       kiteTransform,
       kitePhysics,

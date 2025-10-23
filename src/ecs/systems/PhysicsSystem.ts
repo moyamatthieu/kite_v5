@@ -277,7 +277,7 @@ export class PhysicsSystem extends System {
       // Amortir les rotations pour stabiliser
       physics.angularVelocity.multiplyScalar(0.8);
 
-      console.log(`🛑 [PhysicsSystem] Kite collision avec sol corrigée: penetration=${maxPenetration.toFixed(3)}m, points vérifiés=${criticalPoints.length}`);
+      
     }
   }
 

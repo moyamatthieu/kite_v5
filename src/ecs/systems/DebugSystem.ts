@@ -234,8 +234,10 @@ export class DebugSystem extends System {
       const barPoint = barGeometry.getPointWorld(handleName, controlBar);
       if (!kitePoint || !barPoint) return;
 
-      // Calcul factorisé de la direction normalisée
-      const direction = barPoint.clone().sub(kitePoint).normalize();
+      // ✅ DIRECTION CORRIGÉE : Du point CTRL vers le handle (tire le kite vers la barre)
+      // Cohérent avec TetherSystem.ts ligne 207 : force = direction × (-tension)
+      // où direction = de handle vers CTRL, donc force tire vers handle
+      const direction = barPoint.clone().sub(kitePoint).normalize(); // Vers la barre
       const tensionVector = direction.multiplyScalar(lineComp.currentTension);
 
       debugComp.addForceArrow(
@@ -279,15 +281,19 @@ export class DebugSystem extends System {
     if (!barGeometry || !barTransform || !kiteTransform) return;
 
     // Fonction utilitaire pour afficher la force de grip d'une ligne
-    const displayGripForce = (line: Entity, handleName: string, arrowId: string): void => {
+    const displayGripForce = (line: Entity, handleName: string, ctrlPointName: string, arrowId: string): void => {
       const lineComp = line.getComponent('line') as LineComponent | null;
       if (!lineComp || !lineComp.state.isTaut || lineComp.currentTension <= DebugConfig.FORCE_THRESHOLD) return;
 
       const barPoint = barGeometry.getPointWorld(handleName, controlBar);
-      if (!barPoint) return;
+      const kiteGeometry = kiteEntity.getComponent('geometry') as GeometryComponent | null;
+      const kitePoint = kiteGeometry?.getPointWorld(ctrlPointName, kiteEntity);
+      if (!barPoint || !kitePoint) return;
 
-      // Calcul factorisé de la direction normalisée (du kite vers la barre)
-      const direction = kiteTransform.position.clone().sub(barTransform.position).normalize();
+      // ✅ DIRECTION CORRIGÉE : Newton 3 - Force opposée à celle sur le kite
+      // La ligne tire le handle VERS le CTRL (direction du kite vers la barre inversée)
+      // = Réaction à la force appliquée au kite
+      const direction = kitePoint.clone().sub(barPoint).normalize(); // Vers le kite
       const gripForce = direction.multiplyScalar(lineComp.currentTension);
 
       debugComp.addForceArrow(
@@ -300,12 +306,12 @@ export class DebugSystem extends System {
 
     // Force sur le poignet gauche
     if (leftLine) {
-      displayGripForce(leftLine, 'leftHandle', 'grip-force-left');
+      displayGripForce(leftLine, 'leftHandle', 'CTRL_GAUCHE', 'grip-force-left');
     }
 
     // Force sur le poignet droit
     if (rightLine) {
-      displayGripForce(rightLine, 'rightHandle', 'grip-force-right');
+      displayGripForce(rightLine, 'rightHandle', 'CTRL_DROIT', 'grip-force-right');
     }
   }
 

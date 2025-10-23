@@ -47,7 +47,7 @@ export class CameraControlsSystem extends System {
     this.controls.minDistance = 5;
     this.controls.maxDistance = 200;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Empêche la caméra de passer sous le sol
-    this.controls.target.set(-3.92, 0, -12.33); // Target optimale trouvée manuellement
+    this.controls.target.set(0, 6, -10); // Vue derrière le pilote vers le kite
     
     // Note : L'avertissement "non-passive event listener" vient de Three.js OrbitControls
     // et ne peut être corrigé sans modifier la bibliothèque elle-même.

@@ -1,0 +1,108 @@
+═══════════════════════════════════════════════════════════════════════════════
+  TODO - Simulateur de cerf-volant V5
+═══════════════════════════════════════════════════════════════════════════════
+
+📅 Créé le : 23 octobre 2025
+📋 Priorité : MOYENNE
+🏷️  Catégorie : Architecture / Conventions
+
+───────────────────────────────────────────────────────────────────────────────
+🔴 PROBLÈME DE CONVENTION DE COORDONNÉES
+───────────────────────────────────────────────────────────────────────────────
+
+SYMPTÔME :
+----------
+La caméra est positionnée sur le côté droit (X=13.37) et regarde vers la gauche,
+créant un effet miroir : les objets à X+ apparaissent à gauche de l'écran.
+
+IMPACT ACTUEL :
+--------------
+- Les handles de la barre ont été inversés pour correspondre à la vue caméra
+- leftHandle est maintenant à X=+0.325 (au lieu de X=-0.325)
+- rightHandle est maintenant à X=-0.325 (au lieu de X=+0.325)
+- Les NOMS dans le code ne correspondent plus à la RÉALITÉ PHYSIQUE
+
+FICHIERS AFFECTÉS :
+------------------
+- src/ecs/entities/ControlBarFactory.ts (lignes 32-33)
+  → Handles inversés pour correspondre à la vue écran
+  
+- src/ecs/config/Config.ts (RenderConfig)
+  → Caméra position: (13.37, 11.96, 0.45)
+  → Caméra target: (-3.92, 0, -12.33)
+
+───────────────────────────────────────────────────────────────────────────────
+✅ SOLUTIONS POSSIBLES
+───────────────────────────────────────────────────────────────────────────────
+
+OPTION A : Repositionner la caméra derrière le pilote (RECOMMANDÉ)
+--------------------------------------------------------------------
+✅ Avantages :
+  - Convention gauche/droite intuitive (correspond au pilote)
+  - Pas d'effet miroir
+  - Noms left/right correspondent visuellement
+  
+⚠️  Actions :
+  - Modifier RenderConfig.CAMERA_POSITION_* dans Config.ts
+    → Position: (0, 2, 5) - Derrière le pilote
+    → LookAt: (0, 6, -10) - Vers le kite
+  - Restaurer ControlBarFactory.ts avec coordonnées correctes
+    → leftHandle: X=-0.325 (gauche physique)
+    → rightHandle: X=+0.325 (droite physique)
+  - Mettre à jour CameraControlsSystem.ts target
+
+OPTION B : Renommer systématiquement dans le code
+--------------------------------------------------------------------
+⚠️  Moins recommandé (confusion avec conventions aéronautiques)
+
+✅ Avantages :
+  - Garde la caméra actuelle
+  - Noms correspondent à l'écran
+  
+❌ Inconvénients :
+  - Contre-intuitif pour la physique
+  - Confusion avec conventions standard (gauche pilote = gauche réelle)
+  
+⚠️  Actions :
+  - Ajouter des commentaires partout expliquant la convention écran
+  - Renommer ou préfixer (ex: screenLeft, physicsLeft)
+
+OPTION C : Transformation de vue séparée
+--------------------------------------------------------------------
+✅ Avantages :
+  - Physique correcte (X- = gauche pilote)
+  - Affichage correct (transformation visuelle seulement)
+  
+❌ Inconvénients :
+  - Plus complexe
+  - Ajoute une couche d'abstraction
+  
+⚠️  Actions :
+  - Créer une classe ViewTransform
+  - Appliquer transformation miroir seulement pour le rendu
+  - Garder la physique avec convention standard
+
+───────────────────────────────────────────────────────────────────────────────
+📌 RECOMMANDATION
+───────────────────────────────────────────────────────────────────────────────
+
+→ OPTION A (Repositionner caméra derrière pilote)
+
+RAISONS :
+  1. Convention standard en aéronautique (gauche = gauche pilote)
+  2. Cohérence avec les forces/vecteurs physiques
+  3. Plus simple à comprendre et maintenir
+  4. Pas de transformation mentale gauche/droite
+
+EFFORT : 🟢 FAIBLE (3 fichiers à modifier, ~10 lignes)
+
+───────────────────────────────────────────────────────────────────────────────
+📝 NOTES ADDITIONNELLES
+───────────────────────────────────────────────────────────────────────────────
+
+- La physique fonctionne correctement (vecteurs réciproques ✅)
+- C'est uniquement un problème de convention visuelle
+- Ne pas bloquer le développement pour ça
+- À traiter lors d'un refactoring dédié aux conventions
+
+───────────────────────────────────────────────────────────────────────────────
