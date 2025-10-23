@@ -165,6 +165,13 @@ export class TetherSystem extends System {
     lineComponent.state.elongation = excess;
     lineComponent.state.strainRatio = excess / maxLength;
 
+    // 🐛 DEBUG: Log des valeurs de calcul (uniquement frame 1-3)
+    console.log(`\n🐛 [TetherSystem] Line calculation:`);
+    console.log(`  distance=${distance.toFixed(3)}m, maxLength=${maxLength.toFixed(3)}m`);
+    console.log(`  excess=${excess.toFixed(3)}m, maxExcess=${maxExcess.toFixed(3)}m, clampedExcess=${clampedExcess.toFixed(3)}m`);
+    console.log(`  LINE_STIFFNESS=${ConstraintConfig.LINE_STIFFNESS} N/m`);
+    console.log(`  MAX_CONSTRAINT_FORCE=${ConstraintConfig.MAX_CONSTRAINT_FORCE} N`);
+
     // Direction normalisée de B vers A (pour tirer B vers A)
     const direction = diff.clone().normalize();
 
@@ -197,11 +204,19 @@ export class TetherSystem extends System {
     // === FORCE TOTALE ===
     const totalForce = springForce + dampingForce;
 
+    // 🐛 DEBUG: Log des forces
+    console.log(`  v_radial=${v_radial.toFixed(3)} m/s`);
+    console.log(`  springForce=${springForce.toFixed(2)} N, dampingForce=${dampingForce.toFixed(2)} N`);
+    console.log(`  totalForce=${totalForce.toFixed(2)} N`);
+
     // Les lignes ne poussent pas, seulement tirent (contrainte unilatérale)
     if (totalForce > 0) {
       // Limiter la force pour éviter les explosions
       // Utilise MAX_CONSTRAINT_FORCE du ConstraintConfig (500 N)
       const clampedTension = Math.min(totalForce, ConstraintConfig.MAX_CONSTRAINT_FORCE);
+
+      // 🐛 DEBUG: Log de la tension finale
+      console.log(`  clampedTension=${clampedTension.toFixed(2)} N (stored in lineComponent.currentTension)\n`);
 
       // Appliquer force au point B (vers A, pour rapprocher)
       const force = direction.clone().multiplyScalar(-clampedTension);
