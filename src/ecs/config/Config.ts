@@ -120,7 +120,7 @@ namespace ConstraintConfig {
    * This is dimensionless and scales the damping force relative to stiffness.
    * 
    * Physical interpretation:
-   *   • At v_radial = 1 m/s, damping force = 0.04 × 1 × 8000 = 320 N
+   *   • At v_radial = 1 m/s, damping force = 0.04 × 1 × 2000 = 80 N
    *   • Typical damping ratios for cables: 0.01-0.10 (1-10%)
    * 
    * Tuning guidelines:
@@ -129,9 +129,9 @@ namespace ConstraintConfig {
    *   • Too high (>0.15) = over-damped, sluggish response
    *   • Too low (<0.005) = under-damped, persistent oscillations
    * 
-   * ⚠️ Current value: 0.04 (moderate damping, stable behavior)
+   * ⚠️ CORRIGÉ: 0.04 pour damping modéré (0.12 créait des forces énormes)
    */
-  export const PBD_DAMPING = 0.12; // Augmenté de 0.08 à 0.12 pour plus de stabilité // Augmenté de 0.04 à 0.08 pour plus de stabilité
+  export const PBD_DAMPING = 0.04; // RÉTABLI à la valeur Makani originale
 
   /** Nombre d'itérations de résolution PBD par frame 
    * Plus d'itérations = meilleure convergence mais plus coûteux
@@ -161,10 +161,14 @@ namespace ConstraintConfig {
    * Prevents infinite force accumulation in numerical simulations.
    * 
    * Physical interpretation:
-   *   • Typical kite lines break at 5-10% elongation
-   *   • Safety limit: 20% (allows some stretch but prevents explosion)
+   *   • Typical Dyneema kite lines: elastic ~3-5% under normal load
+   *   • Safety limit: 2% (30cm sur 15m) allows realistic stretch
+   *   • Beyond 5%: risk of line damage or simulation instability
+   * 
+   * ⚠️ CRITIQUE: 20% était ABSURDE (3m d'élongation → 6000N de force)
+   * Maintenant: 2% max = 30cm élongation → tension réaliste 200-600N
    */
-  export const MAX_ELONGATION_RATIO = 0.20;
+  export const MAX_ELONGATION_RATIO = 0.002; // CORRIGÉ: 2% au lieu de 20% !
 
   /** Force minimale pour considérer une ligne tendue (N)
    * 
