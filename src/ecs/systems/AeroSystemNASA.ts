@@ -429,19 +429,20 @@ export class AeroSystemNASA extends System {
    * - Portance (lift) : composante PERPENDICULAIRE au vent
    * - Traînée (drag) : composante PARALLÈLE au vent
    *
-   * Méthode: Projection de la normale de surface sur le plan perpendiculaire au vent
-   * liftDir = normale - (normale · vent) * vent, puis normalisé
+   * Méthode: Double produit vectoriel AVEC correction de signe
+   * liftDir = (normale × vent) × vent
+   * Si liftDir · normale < 0, inverser liftDir (doit pointer du même côté que normale)
    *
-   * @param surfaceNormal - Normale de la surface (unitaire)
+   * @param surfaceNormal - Normale de la surface (unitaire, après auto-correction)
    * @param windDir - Direction du vent apparent (unitaire)
-   * @returns Direction de la portance (unitaire, perpendiculaire au vent)
+   * @returns Direction de la portance (unitaire, perpendiculaire au vent, même côté que normale)
    */
   private calculateNASALiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 {
     // ✅ CORRECTION CRITIQUE : Double produit vectoriel
     // liftDir = (normale × vent) × vent
     // Cela garantit que la portance est perpendiculaire au vent
     const crossProduct = new THREE.Vector3().crossVectors(surfaceNormal, windDir);
-    const liftDir = new THREE.Vector3().crossVectors(crossProduct, windDir);
+    let liftDir = new THREE.Vector3().crossVectors(crossProduct, windDir);
 
     // Protection contre les vecteurs nuls (si normale parallèle au vent)
     if (liftDir.lengthSq() < 0.0001) {
@@ -450,7 +451,16 @@ export class AeroSystemNASA extends System {
       return new THREE.Vector3(0, 1, 0);
     }
 
-    return liftDir.normalize();
+    liftDir.normalize();
+
+    // ✅ CORRECTION DE SIGNE : La portance doit pointer du MÊME CÔTÉ que la normale
+    // Si liftDir pointe du côté opposé (dot < 0), l'inverser
+    const dotProduct = liftDir.dot(surfaceNormal);
+    if (dotProduct < 0) {
+      liftDir.negate();
+    }
+
+    return liftDir;
   }
   
   /**
