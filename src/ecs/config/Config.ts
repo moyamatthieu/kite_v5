@@ -98,7 +98,7 @@ namespace ConstraintConfig {
    * 
    * ⚠️ Current value: 8000 N/m (good balance rigidity/stability)
    */
-  export const LINE_STIFFNESS = 2000; // Réduit de 4000 à 2000 N/m pour un comportement plus doux // Réduit de 8000 à 4000 pour plus de réalisme
+  export const LINE_STIFFNESS = 100; // Réduit de 4000 à 2000 N/m pour un comportement plus doux // Réduit de 8000 à 4000 pour plus de réalisme
 
   /** Position-based projection factor (0.0-1.0)
    * 
@@ -153,7 +153,7 @@ namespace ConstraintConfig {
    *   • Breaking force of typical kite lines: ~2000-5000 N
    *   • Safety limit: 1000 N (conservative, prevents instability)
    */
-  export const MAX_CONSTRAINT_FORCE = 500; // Réduit de 1000 à 500 N pour plus de sécurité
+  export const MAX_CONSTRAINT_FORCE = 50; // Réduit de 1000 à 500 N pour plus de sécurité
 
   /** Limite d'élongation maximale (% de longueur au repos)
    * 

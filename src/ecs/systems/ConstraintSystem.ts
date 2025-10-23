@@ -30,6 +30,11 @@ import { CONFIG, PhysicsConstants, ConstraintConfig } from '../config/Config';
 const PRIORITY = 40;
 
 export class ConstraintSystem extends System {
+  // Debug logging
+  private debugForces = true; // Activer pour logger les forces aux CTRL
+  private debugFrameCounter = 0;
+  private readonly DEBUG_LOG_INTERVAL = 60; // Log toutes les 60 frames (1 fois/seconde à 60fps)
+
   constructor() {
     super('ConstraintSystem', PRIORITY);
   }
@@ -77,6 +82,9 @@ export class ConstraintSystem extends System {
 
     // Ground collision
     this.handleGroundCollision(kiteTransform, kitePhysics);
+
+    // Increment debug frame counter
+    this.debugFrameCounter++;
   }
 
   /**
@@ -440,6 +448,24 @@ export class ConstraintSystem extends System {
     const r = ctrlPos.clone().sub(kiteTransform.position);
     const torque = new THREE.Vector3().crossVectors(r, constraintForce);
     kitePhysics.torques.add(torque);
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DEBUG LOGGING
+    // ─────────────────────────────────────────────────────────────────────
+    if (this.debugForces && this.debugFrameCounter % this.DEBUG_LOG_INTERVAL === 0) {
+      const lineName = handlePos.x < 0 ? 'LEFT' : 'RIGHT';
+      console.log(`\n🔗 [ConstraintSystem] ${lineName} LINE at CTRL:`);
+      console.log(`   📏 Distance: ${distance.toFixed(3)}m (rest: ${lineComp.restLength.toFixed(1)}m)`);
+      console.log(`   ↔️  Elongation: ${excess.toFixed(3)}m (${(lineComp.state.strainRatio * 100).toFixed(1)}%)`);
+      console.log(`   💨 Velocity radial: ${v_radial.toFixed(2)} m/s ${v_radial < 0 ? '(separating ⬅️)' : '(approaching ➡️)'}`);
+      console.log(`   🔧 Forces:`);
+      console.log(`      - Spring: ${springForce.toFixed(1)} N`);
+      console.log(`      - Damping: ${dampingForce.toFixed(1)} N`);
+      console.log(`      - Total: ${clampedTotalForce.toFixed(1)} N`);
+      console.log(`   ⚡ Force vector: (${constraintForce.x.toFixed(1)}, ${constraintForce.y.toFixed(1)}, ${constraintForce.z.toFixed(1)}) N`);
+      console.log(`   🔄 Torque: (${torque.x.toFixed(2)}, ${torque.y.toFixed(2)}, ${torque.z.toFixed(2)}) N·m`);
+      console.log(`   📊 Tension (for viz): ${lineComp.currentTension.toFixed(1)} N`);
+    }
   }
 
   /**
