@@ -35,12 +35,9 @@ import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
-import { PhysicsConstants } from '../config/Config';
+import { PhysicsConstants, ConstraintConfig } from '../config/Config';
 
 const PRIORITY = 40;
-
-/** Rigidité pour maintenir la longueur (N/m) - Valeur élevée pour inextensibilité */
-const TETHER_STIFFNESS = 10000; // 10 kN/m (plus doux que 50k)
 
 export class TetherSystem extends System {
   constructor() {
@@ -159,6 +156,12 @@ export class TetherSystem extends System {
     // 2. DROITE/INEXTENSIBLE si distance >= maxLength
     lineComponent.state.isTaut = true;
     const excess = distance - maxLength;
+    
+    // Clamper l'élongation pour éviter les forces absurdes
+    // MAX_ELONGATION_RATIO = 2% (30cm sur 15m) après corrections
+    const maxExcess = maxLength * ConstraintConfig.MAX_ELONGATION_RATIO;
+    const clampedExcess = Math.min(excess, maxExcess);
+    
     lineComponent.state.elongation = excess;
     lineComponent.state.strainRatio = excess / maxLength;
 
@@ -180,12 +183,22 @@ export class TetherSystem extends System {
 
     // SEULEMENT tirer si le kite s'éloigne (éviter de pousser)
     if (v_radial > 0) { // Kite s'éloigne du point A
-      // Force de rappel douce pour maintenir la longueur
-      const tension = TETHER_STIFFNESS * excess;
+      // === FORCE RESSORT (Loi de Hooke) ===
+      // Utilise LINE_STIFFNESS du ConstraintConfig (2000 N/m après corrections)
+      // Utilise clampedExcess pour éviter forces absurdes (max 30cm élongation)
+      const springForce = ConstraintConfig.LINE_STIFFNESS * clampedExcess;
+
+      // === FORCE DAMPING (Amortissement longitudinal) ===
+      // Oppose la vitesse radiale pour stabiliser les oscillations
+      // F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
+      const dampingForce = ConstraintConfig.PBD_DAMPING * v_radial * ConstraintConfig.LINE_STIFFNESS;
+
+      // === FORCE TOTALE ===
+      const totalForce = springForce + dampingForce;
 
       // Limiter la force pour éviter les explosions
-      const maxTension = 1000; // N
-      const clampedTension = Math.min(tension, maxTension);
+      // Utilise MAX_CONSTRAINT_FORCE du ConstraintConfig (500 N)
+      const clampedTension = Math.min(totalForce, ConstraintConfig.MAX_CONSTRAINT_FORCE);
 
       // Appliquer force au point B (vers A, pour rapprocher)
       const force = direction.clone().multiplyScalar(-clampedTension);
