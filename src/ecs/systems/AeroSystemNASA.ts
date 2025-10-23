@@ -202,22 +202,28 @@ export class AeroSystemNASA extends System {
         // - α = 90° : normale perpendiculaire au vent (plaque parallèle, portance nulle)
         //
         // Les formules NASA CL = 2π×α utilisent cet angle directement
-        const surfaceNormal = sample.normal.clone();
-        const dotNW = surfaceNormal.dot(localWindDir);
+        let surfaceNormal = sample.normal.clone();
+        let dotNW = surfaceNormal.dot(localWindDir);
 
-        // Protection: si le vent vient de derrière (dot < 0), pas de portance
-        // On utilise abs() pour gérer les deux orientations de la normale
-        const alphaRad = Math.acos(Math.max(-1.0, Math.min(1.0, Math.abs(dotNW))));
-        const alphaDeg = alphaRad * 180 / Math.PI;
-
-        // Détection vent défavorable (de derrière la surface)
+        // ✅ AUTO-CORRECTION DE L'ORIENTATION DE LA NORMALE ✅
+        // Si dotNW < 0, la normale pointe "à l'envers" par rapport au vent
+        // (ordre des vertices défini dans la géométrie)
+        // Solution: inverser la normale pour qu'elle pointe toujours vers le vent
+        // Ainsi la portance sera calculée du bon côté automatiquement
+        let normalFlipped = false;
         if (dotNW < 0) {
-          // Vent de derrière: forces très réduites (quasi nulles)
+          surfaceNormal.negate();
+          dotNW = -dotNW; // Recalculer avec normale inversée
+          normalFlipped = true;
+          
           if (this.debugFaces && (this.debugSurfaceIndex === -1 || this.debugSurfaceIndex === index)) {
-            console.log(`[AeroSystemNASA] ${sample.descriptor.name}: Vent de derrière (dotNW=${dotNW.toFixed(3)}), forces nulles`);
+            console.log(`[AeroSystemNASA] ${sample.descriptor.name}: Normale inversée (vent de l'autre côté)`);
           }
-          return; // Skip cette surface
         }
+
+        // Angle d'attaque (toujours positif maintenant car dotNW >= 0)
+        const alphaRad = Math.acos(Math.max(0.0, Math.min(1.0, dotNW)));
+        const alphaDeg = alphaRad * 180 / Math.PI;
 
         const aspectRatio = Math.max(kiteComp.aspectRatio, 0.1);
 
@@ -336,7 +342,7 @@ export class AeroSystemNASA extends System {
           drag: panelDrag.clone(),
           gravity: gravityPerFace.clone(),
           apparentWind: localApparentWind.clone(),
-          normal: liftDir.clone()
+          normal: surfaceNormal.clone() // ✅ Normale de surface (auto-corrigée si nécessaire)
         });
       });
     });
