@@ -157,26 +157,14 @@ export class TetherSystem extends System {
     lineComponent.state.isTaut = true;
     const excess = distance - maxLength;
     
-    // Clamper l'élongation pour éviter les forces absurdes
-    // MAX_ELONGATION_RATIO = 2% (30cm sur 15m) après corrections
-    const maxExcess = maxLength * ConstraintConfig.MAX_ELONGATION_RATIO;
-    const clampedExcess = Math.min(excess, maxExcess);
-    
     lineComponent.state.elongation = excess;
     lineComponent.state.strainRatio = excess / maxLength;
-
-    // 🐛 DEBUG: Log des valeurs de calcul (uniquement frame 1-3)
-    console.log(`\n🐛 [TetherSystem] Line calculation:`);
-    console.log(`  distance=${distance.toFixed(3)}m, maxLength=${maxLength.toFixed(3)}m`);
-    console.log(`  excess=${excess.toFixed(3)}m, maxExcess=${maxExcess.toFixed(3)}m, clampedExcess=${clampedExcess.toFixed(3)}m`);
-    console.log(`  LINE_STIFFNESS=${ConstraintConfig.LINE_STIFFNESS} N/m`);
-    console.log(`  MAX_CONSTRAINT_FORCE=${ConstraintConfig.MAX_CONSTRAINT_FORCE} N`);
 
     // Direction normalisée de B vers A (pour tirer B vers A)
     const direction = diff.clone().normalize();
 
     // ═══════════════════════════════════════════════════════════════════════
-    // TRANSFERT TRACTION BIDIRECTIONNEL (mais pas pousser)
+    // MODÈLE PHYSIQUE: RESSORT-AMORTISSEUR DOUX
     // ═══════════════════════════════════════════════════════════════════════
 
     // Calculer la vitesse du point B (sur le kite)
@@ -188,35 +176,26 @@ export class TetherSystem extends System {
     // Vitesse radiale : composante le long de la ligne (positive si s'éloigne de A)
     const v_radial = pointVelocity.dot(direction);
 
-    // === FORCE RESSORT (Loi de Hooke) - TOUJOURS appliquée si étiré ===
-    // Utilise LINE_STIFFNESS du ConstraintConfig (2000 N/m après corrections)
-    // Utilise clampedExcess pour éviter forces absurdes (max 30cm élongation)
-    const springForce = ConstraintConfig.LINE_STIFFNESS * clampedExcess;
+    // === FORCE RESSORT (Loi de Hooke) - Utilise élongation RÉELLE ===
+    // LINE_STIFFNESS = 50 N/m (très doux)
+    // À 1m excès → 50N, à 5m excès → 250N (progressif et stable)
+    const springForce = ConstraintConfig.LINE_STIFFNESS * excess;
 
-    // === FORCE DAMPING (Amortissement longitudinal) ===
-    // Oppose la vitesse radiale pour stabiliser les oscillations
+    // === FORCE DAMPING (Amortissement ABSOLU) ===
+    // ABSOLUTE_DAMPING = 2 N·s/m (indépendant de la rigidité)
+    // À 1 m/s → 2N, à 10 m/s → 20N (pas d'explosion comme avant!)
     // Ne s'applique QUE si le kite s'éloigne (v_radial > 0)
-    // Si v_radial < 0 (rapprochement), pas de damping (on veut qu'il revienne vite)
     const dampingForce = v_radial > 0 
-      ? ConstraintConfig.PBD_DAMPING * v_radial * ConstraintConfig.LINE_STIFFNESS 
+      ? ConstraintConfig.ABSOLUTE_DAMPING * v_radial
       : 0;
 
     // === FORCE TOTALE ===
     const totalForce = springForce + dampingForce;
 
-    // 🐛 DEBUG: Log des forces
-    console.log(`  v_radial=${v_radial.toFixed(3)} m/s`);
-    console.log(`  springForce=${springForce.toFixed(2)} N, dampingForce=${dampingForce.toFixed(2)} N`);
-    console.log(`  totalForce=${totalForce.toFixed(2)} N`);
-
     // Les lignes ne poussent pas, seulement tirent (contrainte unilatérale)
     if (totalForce > 0) {
-      // Limiter la force pour éviter les explosions
-      // Utilise MAX_CONSTRAINT_FORCE du ConstraintConfig (500 N)
+      // Limiter la force pour éviter les explosions numériques
       const clampedTension = Math.min(totalForce, ConstraintConfig.MAX_CONSTRAINT_FORCE);
-
-      // 🐛 DEBUG: Log de la tension finale
-      console.log(`  clampedTension=${clampedTension.toFixed(2)} N (stored in lineComponent.currentTension)\n`);
 
       // Appliquer force au point B (vers A, pour rapprocher)
       const force = direction.clone().multiplyScalar(-clampedTension);

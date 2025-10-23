@@ -92,13 +92,14 @@ namespace ConstraintConfig {
    * 
    * Tuning guidelines:
    *   • Higher values (10000-20000) = stiffer lines, less stretch
-   *   • Lower values (5000-8000) = more realistic elasticity
+   *   • Lower values (20-100) = soft elastic behavior, progressive forces
+   *   • Higher values (1000-5000) = stiff cables, can cause oscillations
    *   • Too high (>50000) = numerical instability
-   *   • Too low (<1000) = excessive stretch, unrealistic
    * 
-   * ⚠️ Current value: 8000 N/m (good balance rigidity/stability)
+   * ⚠️ Current value: 50 N/m (très souple pour forces progressives douces)
+   *    À 1m excès → 50N, à 5m excès → 250N (gérable pour kite 0.12kg)
    */
-  export const LINE_STIFFNESS = 100; // Réduit de 4000 à 2000 N/m pour un comportement plus doux // Réduit de 8000 à 4000 pour plus de réalisme
+  export const LINE_STIFFNESS = 50; // Rigidité douce pour comportement stable et progressif
 
   /** Position-based projection factor (0.0-1.0)
    * 
@@ -109,29 +110,21 @@ namespace ConstraintConfig {
    */
   export const PBD_PROJECTION_FACTOR = 0.3;
 
-  /** Longitudinal damping coefficient (dimensionless)
+  /** Longitudinal damping coefficient (N·s/m - absolute damping)
    * 
-   * Makani reference: tether.cc line 119-124
-   *   c_damp = damping_ratio × sqrt(2 × EA × linear_density)
-   * 
-   * Our simplified implementation:
-   *   F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
-   * 
-   * This is dimensionless and scales the damping force relative to stiffness.
+   * Changed from proportional (0.04 × v × k) to absolute (DAMPING_COEF × v)
+   * to avoid explosive damping forces when stiffness or velocity is high.
    * 
    * Physical interpretation:
-   *   • At v_radial = 1 m/s, damping force = 0.04 × 1 × 2000 = 80 N
-   *   • Typical damping ratios for cables: 0.01-0.10 (1-10%)
+   *   • At v_radial = 1 m/s → damping force = 2 N
+   *   • At v_radial = 10 m/s → damping force = 20 N (not 960N!)
    * 
-   * Tuning guidelines:
-   *   • Higher values (0.05-0.10) = more damping, less oscillation
-   *   • Lower values (0.01-0.03) = less damping, more oscillation
-   *   • Too high (>0.15) = over-damped, sluggish response
-   *   • Too low (<0.005) = under-damped, persistent oscillations
-   * 
-   * ⚠️ CORRIGÉ: 0.04 pour damping modéré (0.12 créait des forces énormes)
+   * ⚠️ MODIFIÉ: Damping absolu pour éviter explosions
    */
-  export const PBD_DAMPING = 0.04; // RÉTABLI à la valeur Makani originale
+  export const ABSOLUTE_DAMPING = 2.0; // N·s/m - damping absolu indépendant de la rigidité
+  
+  /** @deprecated Use ABSOLUTE_DAMPING instead */
+  export const PBD_DAMPING = 0.04;
 
   /** Nombre d'itérations de résolution PBD par frame 
    * Plus d'itérations = meilleure convergence mais plus coûteux
@@ -147,13 +140,15 @@ namespace ConstraintConfig {
   /** Limite de sécurité pour les forces de contrainte (N)
    * 
    * Prevents numerical explosions when lines are severely overstretched.
-   * Physical interpretation: maximum tension before line breaks or becomes unstable.
    * 
-   * For a 15m line with 8000 N/m stiffness:
-   *   • Breaking force of typical kite lines: ~2000-5000 N
-   *   • Safety limit: 1000 N (conservative, prevents instability)
+   * With LINE_STIFFNESS=50 N/m:
+   *   • At 5m excess → spring force = 250 N
+   *   • At 10m/s velocity → damping = 20 N
+   *   • Total max ≈ 270 N (well below limit)
+   * 
+   * ⚠️ Current value: 300 N (cohérent avec nouvelle rigidité douce)
    */
-  export const MAX_CONSTRAINT_FORCE = 50; // Réduit de 1000 à 500 N pour plus de sécurité
+  export const MAX_CONSTRAINT_FORCE = 300; // Limite adaptée à LINE_STIFFNESS=50
 
   /** Limite d'élongation maximale (% de longueur au repos)
    * 
