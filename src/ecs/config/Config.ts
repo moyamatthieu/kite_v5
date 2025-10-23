@@ -33,7 +33,7 @@ namespace PhysicsConstants {
   // ============================================================================
 
   /** Nombre d'itérations PBD pour convergence (10-20 recommandé) */
-  export const PBD_ITERATIONS = 20;
+  export const PBD_ITERATIONS = 10;
 
   /** Compliance PBD (inverse de rigidité): α = 1/k
    * α = 0     → infiniment rigide (hard constraint)
@@ -43,7 +43,7 @@ namespace PhysicsConstants {
    *
    * Pour lignes de kite: quasi-rigide (hard constraint)
    */
-  export const PBD_COMPLIANCE = 0.00001;
+  export const PBD_COMPLIANCE = 0.001;
 
   /** Correction max PBD par frame (m) - Sécurité anti-divergence */
   export const PBD_MAX_CORRECTION = 0.5;
@@ -438,18 +438,22 @@ namespace InitConfig {
   /** Distance avant du pivot (m) - 60cm devant le pilote */
   export const CONTROL_BAR_POSITION_Z_M = -0.6;
 
-  /** Altitude du kite au-dessus de la barre (m) */
-  export const KITE_ALTITUDE_M = 8;
+  /** Altitude du kite au-dessus de la barre (m) 
+   * ✅ AUGMENTÉ pour que distance > 15m et lignes tendues dès le départ
+   */
+  export const KITE_ALTITUDE_M = 12;
 
   /** Distance du kite devant la barre (m)
-   * IMPORTANT: Distance 3D totale doit être < LENGTH_M (15m) pour lignes slack au départ
-   * Distance 3D = √(altitude² + distance²) = √(64 + 121) = 13.6m < 15m ✅
+   * ✅ AJUSTÉ pour distance 3D initiale > 15m
+   * Distance 3D = √(12² + 11²) = √(144 + 121) = 16.3m > 15m ✅ LIGNES TENDUES
    */
   export const KITE_DISTANCE_M = 11;
 
   // === Orientation initiale ===
-  /** Pitch initial (deg) - Face au vent, angle d'attaque faible */
-  export const ORIENTATION_PITCH_DEG = 0;
+  /** Pitch initial (deg) - Face au vent avec angle d'attaque favorable
+   * ✅ AJUSTÉ à 15° pour générer portance immédiate au démarrage
+   */
+  export const ORIENTATION_PITCH_DEG = 15;
 
   /** Yaw initial (deg) */
   export const ORIENTATION_YAW_DEG = 0;

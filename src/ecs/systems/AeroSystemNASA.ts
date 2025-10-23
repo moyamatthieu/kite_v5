@@ -431,12 +431,11 @@ export class AeroSystemNASA extends System {
    * @returns Direction de la portance (unitaire, perpendiculaire au vent)
    */
   private calculateNASALiftDirection(surfaceNormal: THREE.Vector3, windDir: THREE.Vector3): THREE.Vector3 {
-    // Méthode: Projection de la normale sur le plan perpendiculaire au vent
-    // liftDir = normale - (normale · vent) * vent
-    const projection = surfaceNormal.dot(windDir);
-    const liftDir = surfaceNormal.clone()
-      .sub(windDir.clone().multiplyScalar(projection))
-      .normalize();
+    // ✅ CORRECTION CRITIQUE : Double produit vectoriel
+    // liftDir = (normale × vent) × vent
+    // Cela garantit que la portance est perpendiculaire au vent
+    const crossProduct = new THREE.Vector3().crossVectors(surfaceNormal, windDir);
+    const liftDir = new THREE.Vector3().crossVectors(crossProduct, windDir);
 
     // Protection contre les vecteurs nuls (si normale parallèle au vent)
     if (liftDir.lengthSq() < 0.0001) {
@@ -445,7 +444,7 @@ export class AeroSystemNASA extends System {
       return new THREE.Vector3(0, 1, 0);
     }
 
-    return liftDir;
+    return liftDir.normalize();
   }
   
   /**
