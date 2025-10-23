@@ -181,21 +181,24 @@ export class TetherSystem extends System {
     // Vitesse radiale : composante le long de la ligne (positive si s'éloigne de A)
     const v_radial = pointVelocity.dot(direction);
 
-    // SEULEMENT tirer si le kite s'éloigne (éviter de pousser)
-    if (v_radial > 0) { // Kite s'éloigne du point A
-      // === FORCE RESSORT (Loi de Hooke) ===
-      // Utilise LINE_STIFFNESS du ConstraintConfig (2000 N/m après corrections)
-      // Utilise clampedExcess pour éviter forces absurdes (max 30cm élongation)
-      const springForce = ConstraintConfig.LINE_STIFFNESS * clampedExcess;
+    // === FORCE RESSORT (Loi de Hooke) - TOUJOURS appliquée si étiré ===
+    // Utilise LINE_STIFFNESS du ConstraintConfig (2000 N/m après corrections)
+    // Utilise clampedExcess pour éviter forces absurdes (max 30cm élongation)
+    const springForce = ConstraintConfig.LINE_STIFFNESS * clampedExcess;
 
-      // === FORCE DAMPING (Amortissement longitudinal) ===
-      // Oppose la vitesse radiale pour stabiliser les oscillations
-      // F_damp = PBD_DAMPING × v_radial × LINE_STIFFNESS
-      const dampingForce = ConstraintConfig.PBD_DAMPING * v_radial * ConstraintConfig.LINE_STIFFNESS;
+    // === FORCE DAMPING (Amortissement longitudinal) ===
+    // Oppose la vitesse radiale pour stabiliser les oscillations
+    // Ne s'applique QUE si le kite s'éloigne (v_radial > 0)
+    // Si v_radial < 0 (rapprochement), pas de damping (on veut qu'il revienne vite)
+    const dampingForce = v_radial > 0 
+      ? ConstraintConfig.PBD_DAMPING * v_radial * ConstraintConfig.LINE_STIFFNESS 
+      : 0;
 
-      // === FORCE TOTALE ===
-      const totalForce = springForce + dampingForce;
+    // === FORCE TOTALE ===
+    const totalForce = springForce + dampingForce;
 
+    // Les lignes ne poussent pas, seulement tirent (contrainte unilatérale)
+    if (totalForce > 0) {
       // Limiter la force pour éviter les explosions
       // Utilise MAX_CONSTRAINT_FORCE du ConstraintConfig (500 N)
       const clampedTension = Math.min(totalForce, ConstraintConfig.MAX_CONSTRAINT_FORCE);
@@ -213,7 +216,7 @@ export class TetherSystem extends System {
       // Mettre à jour tension pour visualisation
       lineComponent.currentTension = clampedTension;
     } else {
-      // Kite se rapproche ou stationnaire → pas de force
+      // Pas de force (ne devrait jamais arriver car springForce > 0 si excess > 0)
       lineComponent.currentTension = 0;
     }
   }
