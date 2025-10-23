@@ -25,7 +25,7 @@ import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
-import { CONFIG, PhysicsConstants } from '../config/Config';
+import { CONFIG, PhysicsConstants, ConstraintConfig } from '../config/Config';
 
 const PRIORITY = 40;
 
@@ -35,7 +35,7 @@ export class ConstraintSystem extends System {
   }
 
   update(context: SimulationContext): void {
-    const { entityManager } = context;
+    const { entityManager, deltaTime } = context;
 
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
@@ -71,9 +71,9 @@ export class ConstraintSystem extends System {
       return;
     }
 
-    // Apply constraints for each line
-    this.applyLineConstraint(leftHandle, ctrlGauche, leftLineComp, kitePhysics);
-    this.applyLineConstraint(rightHandle, ctrlDroit, rightLineComp, kitePhysics);
+    // Apply constraints for each line - USING MAKANI VERSION
+    this.solvePBDConstraint(leftHandle, ctrlGauche, leftLineComp, kiteTransform, kitePhysics, deltaTime);
+    this.solvePBDConstraint(rightHandle, ctrlDroit, rightLineComp, kiteTransform, kitePhysics, deltaTime);
 
     // Ground collision
     this.handleGroundCollision(kiteTransform, kitePhysics);
@@ -134,19 +134,6 @@ export class ConstraintSystem extends System {
     const r = pointB.clone().sub(kiteCenter);
     const torque = new THREE.Vector3().crossVectors(r, constraintForce);
     kitePhysics.torques.add(torque);
-  }
-
-  /**
-   * Handle ground collision for kite
-   */
-  private handleGroundCollision(transform: TransformComponent, physics: PhysicsComponent): void {
-    // Simple ground collision: prevent kite from going below ground
-    if (transform.position.y < PhysicsConstants.GROUND_Y) {
-      transform.position.y = PhysicsConstants.GROUND_Y;
-      if (physics.velocity.y < 0) {
-        physics.velocity.y = 0; // Stop downward velocity
-      }
-    }
   }
 
   /**
