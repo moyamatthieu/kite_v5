@@ -379,7 +379,7 @@ namespace AeroConfig {
 namespace EnvironmentConfig {
   // === Vent ===
   /** Vitesse du vent par défaut (m/s) - 0 = pas de vent pour tests gravité pure */
-  export const WIND_SPEED_M_S = 0.0; // Changé de 8.0 à 0.0
+  export const WIND_SPEED_M_S = 5.0; // Changé de 8.0 à 0.0
 
   /** Direction du vent par défaut (degrés) - 270 = -Z = Nord */
   export const WIND_DIRECTION_DEG = 270;
@@ -396,10 +396,10 @@ namespace EnvironmentConfig {
 
   // === Physique générale ===
   /** Damping linéaire (réduction de vélocité) - Plus fort pour stabilité */
-  export const LINEAR_DAMPING = 0.1;
+  export const LINEAR_DAMPING = 0.5;
 
   /** Damping angulaire (réduction de rotation) - Plus fort pour stabilité */
-  export const ANGULAR_DAMPING = 0.05;
+  export const ANGULAR_DAMPING = 0.5;
 }
 
 // ============================================================================
@@ -439,15 +439,17 @@ namespace InitConfig {
   export const CONTROL_BAR_POSITION_Z_M = -0.6;
 
   /** Altitude du kite au-dessus de la barre (m) 
-   * ✅ AUGMENTÉ pour que distance > 15m et lignes tendues dès le départ
+   * ✅ CORRIGÉ : Kite démarre 1m À L'INTÉRIEUR de la sphère de vol (14m)
+   * Le vent va pousser le kite vers l'arrière jusqu'à tendre les lignes à 15m
    */
-  export const KITE_ALTITUDE_M = 12;
+  export const KITE_ALTITUDE_M = 10;
 
   /** Distance du kite devant la barre (m)
-   * ✅ AJUSTÉ pour distance 3D initiale > 15m
-   * Distance 3D = √(12² + 11²) = √(144 + 121) = 16.3m > 15m ✅ LIGNES TENDUES
+   * Distance 3D = √(10² + 10²) = √200 ≈ 14.14m < 15m ✅ LIGNES SLACK AU DÉPART
+   * Élongation initiale = 0m (impossible d'avoir élongation au repos !)
+   * Le vent pousse → lignes se tendent progressivement → kite se stabilise à 15m
    */
-  export const KITE_DISTANCE_M = 11;
+  export const KITE_DISTANCE_M = 10;
 
   // === Orientation initiale ===
   /** Pitch initial (deg) - Face au vent avec angle d'attaque favorable
@@ -530,7 +532,7 @@ namespace DebugConfig {
   export const FRAME_LOG_INTERVAL = 60;
 
   /** Facteur d'échelle pour vecteurs de force */
-  export const FORCE_VECTOR_SCALE = 0.5;
+  export const FORCE_VECTOR_SCALE = 1;
 
   /** Seuil minimum de force pour afficher (N) */
   export const FORCE_THRESHOLD = 0.001;
