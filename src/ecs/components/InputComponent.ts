@@ -14,7 +14,6 @@ export class InputComponent extends Component {
   windTurbulence: number; // %
 
   // === Lignes ===
-  constraintMode: 'pbd' | 'spring-force';
   lineLength: number; // m
   bridleNez: number; // m
   bridleInter: number; // m
@@ -46,8 +45,7 @@ export class InputComponent extends Component {
     this.windDirection = initialValues.windDirection ?? 0; // degrés
     this.windTurbulence = initialValues.windTurbulence ?? 10; // %
 
-    // Lignes
-    this.constraintMode = initialValues.constraintMode ?? 'spring-force';
+    // Lignes (mode PBD uniquement - contraintes géométriques pures)
     this.lineLength = initialValues.lineLength ?? 150; // m
     this.bridleNez = initialValues.bridleNez ?? 1.5; // m
     this.bridleInter = initialValues.bridleInter ?? 2.0; // m

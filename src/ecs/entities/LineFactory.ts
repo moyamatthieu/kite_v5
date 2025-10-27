@@ -22,10 +22,11 @@ export class LineFactory {
     }));
     
     // === LINE COMPONENT ===
+    // Mode PBD : les lignes sont des contraintes géométriques
     entity.addComponent(new LineComponent({
       length: CONFIG.lines.length,
-      stiffness: CONFIG.lines.springForce.stiffness,
-      damping: CONFIG.lines.springForce.damping,
+      stiffness: 0, // Non utilisé en mode PBD
+      damping: 0, // Non utilisé en mode PBD
       maxTension: CONFIG.lines.maxTension
     }));
     

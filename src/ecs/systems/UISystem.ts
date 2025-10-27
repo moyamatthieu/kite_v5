@@ -258,25 +258,8 @@ export class UISystem extends System {
       debugBtn.classList.toggle('active', this.inputComponent.debugMode);
     }
 
-    // Toggle Mode de Contrainte
-    const constraintModeToggle = document.getElementById('constraint-mode-toggle') as HTMLInputElement;
-    if (constraintModeToggle) {
-      // Initialiser l'état du toggle selon inputComponent.constraintMode
-      // Unchecked = 'pbd', Checked = 'spring-force'
-      constraintModeToggle.checked = this.inputComponent.constraintMode === 'spring-force';
-      
-      this.logger.info(`Constraint mode initialized to: ${this.inputComponent.constraintMode}, toggle checked: ${constraintModeToggle.checked}`, 'UISystem');
-
-      // Event listener pour mettre à jour le mode de contrainte
-      constraintModeToggle.addEventListener('change', () => {
-        this.inputComponent.constraintMode = constraintModeToggle.checked ? 'spring-force' : 'pbd';
-        this.logger.info(`Constraint mode changed to: ${this.inputComponent.constraintMode}`, 'UISystem');
-        
-        // Reset la simulation lors du changement de mode
-        this.inputComponent.resetSimulation = true;
-        this.logger.info('Reset simulation requested after constraint mode change', 'UISystem');
-      });
-    }
+    // Note : Le mode PBD est maintenant le seul mode de contrainte
+    // Les lignes sont des contraintes géométriques pures (pas de forces artificielles)
   }
 
   /**

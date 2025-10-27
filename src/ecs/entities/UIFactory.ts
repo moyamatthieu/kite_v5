@@ -21,14 +21,11 @@ export class UIFactory {
         windDirection: savedInputValues?.windDirection ?? CONFIG.wind.direction,
         windTurbulence: savedInputValues?.windTurbulence ?? CONFIG.wind.turbulence,
 
-        // === Lignes ===
+        // === Lignes (mode PBD uniquement) ===
         lineLength: savedInputValues?.lineLength ?? CONFIG.lines.length,
         bridleNez: savedInputValues?.bridleNez ?? CONFIG.bridles.nez,
         bridleInter: savedInputValues?.bridleInter ?? CONFIG.bridles.inter,
         bridleCentre: savedInputValues?.bridleCentre ?? CONFIG.bridles.centre,
-        
-        // === Mode de contrainte ===
-        constraintMode: savedInputValues?.constraintMode ?? CONFIG.lines.constraintMode,
 
         // === Physique ===
         linearDamping: savedInputValues?.linearDamping ?? CONFIG.physics.linearDamping,

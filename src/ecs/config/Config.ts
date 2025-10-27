@@ -132,25 +132,12 @@ namespace LineSpecs {
   /** Couleur des lignes en RGB hex */
   export const COLOR = 0x0000ff; // Bleu
 
-  // === Mode de contrainte ===
-  /** Mode : 'pbd' (Position-Based Dynamics) ou 'spring-force' (ressort physique) */
-  export const CONSTRAINT_MODE = 'spring-force' as const;
-
-  // === Paramètres Spring-Force ===
-  /** Rigidité du ressort (N/m) - Réduit de 500 à 50 pour stabilité */
-  export const STIFFNESS_N_PER_M = 50;
-
-  /** Fréquence propre : ω = sqrt(k/m) = sqrt(50/0.12) ≈ 20 rad/s (~3 Hz) */
-  export const EXPECTED_FREQUENCY_HZ = 3;
-
-  /** Amortissement visqueux (N·s/m) */
-  export const DAMPING_N_S_PER_M = 5;
-
-  /** Amortissement critique théorique ≈ 4.9 (légèrement sur-amorti) */
-  export const DAMPING_RATIO = 0.7; // Légèrement sur-amorti pour stabilité
-
-  /** Force maximale appliquée (N) - ~83× poids du kite */
-  export const MAX_FORCE_N = 10;
+  // === Contraintes Position-Based Dynamics (PBD) ===
+  /** Les lignes sont des contraintes géométriques pures (pas de forces artificielles) */
+  export const PBD_ITERATIONS = 2; // Nombre de passes pour convergence
+  
+  /** Tolérance pour ligne molle (mètres) */
+  export const PBD_TOLERANCE = 0.01; // 1 cm
 }
 
 // ============================================================================
@@ -473,18 +460,9 @@ export const CONFIG = {
     length: LineSpecs.LENGTH_M,
     maxTension: LineSpecs.MAX_TENSION_N,
     color: LineSpecs.COLOR,
-    constraintMode: LineSpecs.CONSTRAINT_MODE,
     pbd: {
-      iterations: PhysicsConstants.PBD_ITERATIONS,
-      compliance: PhysicsConstants.PBD_COMPLIANCE,
-      maxCorrection: PhysicsConstants.PBD_MAX_CORRECTION,
-      maxLambda: PhysicsConstants.PBD_MAX_LAMBDA,
-      angularDamping: PhysicsConstants.PBD_ANGULAR_DAMPING
-    },
-    springForce: {
-      stiffness: LineSpecs.STIFFNESS_N_PER_M,
-      damping: LineSpecs.DAMPING_N_S_PER_M,
-      maxForce: LineSpecs.MAX_FORCE_N
+      iterations: LineSpecs.PBD_ITERATIONS,
+      tolerance: LineSpecs.PBD_TOLERANCE
     }
   },
 

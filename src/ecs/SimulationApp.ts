@@ -276,7 +276,6 @@ export class SimulationApp {
           bridleNez: oldInput.bridleNez,
           bridleInter: oldInput.bridleInter,
           bridleCentre: oldInput.bridleCentre,
-          constraintMode: oldInput.constraintMode, // ✨ IMPORTANT : sauvegarder le mode !
           linearDamping: oldInput.linearDamping,
           angularDamping: oldInput.angularDamping,
           meshSubdivisionLevel: oldInput.meshSubdivisionLevel,
