@@ -54,6 +54,34 @@ export class MathUtils {
     return localPoint.clone().applyMatrix4(matrix);
   }
 
+  // ========================================================================
+  // PHYSIQUE - FORCES ET TORQUES
+  // ========================================================================
+
+  /**
+   * Calcule le torque généré par une force appliquée à un point d'un corps rigide
+   * 
+   * Formule : τ = r × F
+   * où :
+   * - r = vecteur bras de levier (centre de masse → point d'application)
+   * - F = force appliquée
+   * 
+   * Utilisé par : TetherSystem, AeroSystemNASA, ConstraintSystem
+   * 
+   * @param applicationPoint Position monde où la force est appliquée
+   * @param centerOfMass Centre de masse du corps rigide
+   * @param force Force appliquée (N)
+   * @returns Torque généré (N·m)
+   */
+  static computeTorque(
+    applicationPoint: THREE.Vector3, 
+    centerOfMass: THREE.Vector3, 
+    force: THREE.Vector3
+  ): THREE.Vector3 {
+    const leverArm = new THREE.Vector3().subVectors(applicationPoint, centerOfMass);
+    return new THREE.Vector3().crossVectors(leverArm, force);
+  }
+
   /**
    * Calcule l'orientation et la position pour aligner un cylindre entre deux points
    * @param start Point de départ
@@ -308,6 +336,37 @@ export class MathUtils {
       this.lerp(a.x, b.x, t),
       this.lerp(a.y, b.y, t),
       this.lerp(a.z, b.z, t)
+    );
+  }
+
+  /**
+   * Lissage exponentiel (Exponential Moving Average)
+   * 
+   * Formule : smooth = α × current + (1 - α) × previous
+   * où α = smoothingFactor (0 à 1)
+   * 
+   * Utilisé pour : Lisser les forces/torques aérodynamiques entre frames
+   * 
+   * @param current Valeur actuelle (nouveau calcul)
+   * @param previous Valeur précédente (lissée)
+   * @param smoothingFactor Facteur de lissage (0 = tout ancien, 1 = tout nouveau)
+   * @returns Valeur lissée
+   */
+  static exponentialSmoothing(
+    current: THREE.Vector3, 
+    previous: THREE.Vector3 | null, 
+    smoothingFactor: number
+  ): THREE.Vector3 {
+    if (!previous) {
+      // Premier frame : pas de lissage
+      return current.clone();
+    }
+
+    const alpha = MathUtils.clamp(smoothingFactor, 0, 1);
+    return new THREE.Vector3(
+      alpha * current.x + (1 - alpha) * previous.x,
+      alpha * current.y + (1 - alpha) * previous.y,
+      alpha * current.z + (1 - alpha) * previous.z
     );
   }
 

@@ -5,6 +5,50 @@
  * - Initialisation : EntityManager, SystemManager, création des entités
  * - Update loop : mise à jour des systèmes à chaque frame
  * - Gestion du cycle de vie : pause/resume/reset/dispose
+ * 
+ * =============================================================================
+ * ARCHITECTURE ECS - RESPONSABILITÉS DES SYSTEMS
+ * =============================================================================
+ * 
+ * ORDRE D'EXÉCUTION (critique) :
+ * 1. INPUT & SYNC (Priority 1-10)
+ *    - EnvironmentSystem : Setup scène 3D (lumières, sol, axes)
+ *    - CameraControlsSystem : Gestion caméra (OrbitControls)
+ *    - InputSyncSystem : Sync InputComponent ↔ WindSystem
+ *    - BridleConstraintSystem : Calcul points CTRL_L/R par trilatération
+ *    - InputSystem : Capture clavier/souris
+ * 
+ * 2. SIMULATION (Priority 20-40)
+ *    - WindSystem : Calcul vent apparent (ambiant - vitesse_kite + turbulence)
+ *    - AeroSystemNASA : Forces aérodynamiques (portance/traînée NASA) → accumule forces
+ *    - TetherSystem : Contraintes lignes (SLACK/TAUT) → accumule forces + torques
+ *    - PilotSystem : Input pilote → déplacement barre (TODO: actuellement cinématique)
+ *    - PhysicsSystem : Intégration Euler (forces → velocity → position)
+ * 
+ * 3. RENDERING (Priority 50-100)
+ *    - GeometryRenderSystem : Crée meshes Three.js (barre, kite, spheres)
+ *    - LineRenderSystem : Visualise lignes (couleur selon tension)
+ *    - BridleRenderSystem : Visualise brides (système de 6 lignes)
+ *    - DebugSystem : Affiche vecteurs forces/velocity (F5 pour toggle)
+ *    - RenderSystem : Rendu final Three.js
+ *    - UISystem : Interface utilisateur (dat.GUI)
+ *    - SimulationLogger : Logs périodiques (tous les N frames)
+ * 
+ * FLUX DE DONNÉES :
+ * InputComponent → WindSystem → AeroSystemNASA → PhysicsComponent.forces
+ *                             → TetherSystem → PhysicsComponent.forces + torques
+ *                                           → PhysicsSystem → TransformComponent
+ * 
+ * PRINCIPES ECS STRICTS :
+ * - Components = DONNÉES PURES (pas de logique, sérialisables POJO)
+ * - Systems = LOGIQUE PURE (opèrent sur entités avec certains composants)
+ * - Entities = ID + Collection de composants
+ * - Pas de logique dans Components, pas de données dans Systems
+ * 
+ * DUPLICATIONS IDENTIFIÉES À REFACTORISER :
+ * - Intégration Euler : PhysicsSystem (peut être extrait dans PhysicsIntegrator)
+ * - Calcul torque : TetherSystem, AeroSystemNASA (τ = r × F, identique)
+ * - Smoothing forces : AeroSystemNASA (lissage exponentiel générique)
  */
 
 import * as THREE from 'three';
