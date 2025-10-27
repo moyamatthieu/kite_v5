@@ -21,7 +21,7 @@
  * 2. SIMULATION (Priority 20-40)
  *    - WindSystem : Calcul vent apparent (ambiant - vitesse_kite + turbulence)
  *    - AeroSystemNASA : Forces aérodynamiques (portance/traînée NASA) → accumule forces
- *    - TetherSystem : Contraintes lignes (SLACK/TAUT) → accumule forces + torques
+ *    - LineSystem : Gestion des lignes de vol (SLACK/TAUT) → accumule forces + torques
  *    - PilotSystem : Input pilote → déplacement barre (TODO: actuellement cinématique)
  *    - PhysicsSystem : Intégration Euler (forces → velocity → position)
  * 
@@ -36,7 +36,7 @@
  * 
  * FLUX DE DONNÉES :
  * InputComponent → WindSystem → AeroSystemNASA → PhysicsComponent.forces
- *                             → TetherSystem → PhysicsComponent.forces + torques
+ *                             → LineSystem → PhysicsComponent.forces + torques
  *                                           → PhysicsSystem → TransformComponent
  * 
  * PRINCIPES ECS STRICTS :
@@ -47,7 +47,7 @@
  * 
  * DUPLICATIONS IDENTIFIÉES À REFACTORISER :
  * - Intégration Euler : PhysicsSystem (peut être extrait dans PhysicsIntegrator)
- * - Calcul torque : TetherSystem, AeroSystemNASA (τ = r × F, identique)
+ * - Calcul torque : LineSystem, AeroSystemNASA (τ = r × F, identique)
  * - Smoothing forces : AeroSystemNASA (lissage exponentiel générique)
  */
 
@@ -73,7 +73,7 @@ import {
   UISystem,
   DebugSystem,
   SimulationLogger,
-  TetherSystem,
+  LineSystem,
 } from './systems';
 import { AeroSystemNASA } from './systems/AeroSystemNASA';
 import { CONFIG, SimulationConstants } from './config/Config';
@@ -94,7 +94,7 @@ export class SimulationApp {
   private aeroSystemNASA!: AeroSystemNASA;
 
   // Système de lignes simplifié (inextensible)
-  private tetherSystem!: TetherSystem;
+  private lineSystem!: LineSystem;
   
   private animationFrameId: number | null = null;
   
@@ -192,7 +192,7 @@ export class SimulationApp {
 
     // Initialiser les systèmes aérodynamiques et de lignes
     this.initializeAeroSystems();
-    this.initializeTetherSystem();
+    this.initializeLineSystem();
 
     // Configurer le pipeline de systèmes
     this.setupSystemPipeline(scene, this.canvas, camera, debugSystem, renderSystem);
@@ -210,13 +210,13 @@ export class SimulationApp {
   }
 
   /**
-   * Initialise le système de lignes (tethers)
+   * Initialise le système de lignes (LineSystem)
    */
-  private initializeTetherSystem(): void {
-    this.tetherSystem = new TetherSystem();
-    this.tetherSystem.setEnabled(true);
+  private initializeLineSystem(): void {
+    this.lineSystem = new LineSystem();
+    this.lineSystem.setEnabled(true);
 
-    // TetherSystem : lignes inextensibles simplifiées
+    // LineSystem : lignes inextensibles simplifiées
     // - Contrainte unilatérale (distance ≤ maxLength)
     // - SLACK : aucune force
     // - TAUT : force de tension (pas de compression)
@@ -244,8 +244,8 @@ export class SimulationApp {
     // Système aérodynamique NASA (seul mode disponible)
     this.systemManager.add(this.aeroSystemNASA); // Priority 30
 
-    // Système de lignes (tethers inextensibles)
-    this.systemManager.add(this.tetherSystem); // Priority 40
+    // Système de lignes (lignes inextensibles)
+    this.systemManager.add(this.lineSystem); // Priority 40
     
     this.systemManager.add(new SimulationLogger()); // Priority 45
     this.systemManager.add(new PhysicsSystem()); // Priority 50

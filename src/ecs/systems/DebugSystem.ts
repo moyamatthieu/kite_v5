@@ -235,7 +235,7 @@ export class DebugSystem extends System {
       if (!kitePoint || !barPoint) return;
 
       // ✅ DIRECTION CORRIGÉE : Du point CTRL vers le handle (tire le kite vers la barre)
-      // Cohérent avec TetherSystem.ts ligne 207 : force = direction × (-tension)
+      // Cohérent avec LineSystem.ts ligne 207 : force = direction × (-tension)
       // où direction = de handle vers CTRL, donc force tire vers handle
       const direction = barPoint.clone().sub(kitePoint).normalize(); // Vers la barre
       const tensionVector = direction.multiplyScalar(lineComp.currentTension);

@@ -1,5 +1,5 @@
 /**
- * TetherSystem.ts - Système de lignes inextensibles ultra-simplifié
+ * LineSystem.ts - Système de gestion des lignes de vol (inextensibles ultra-simplifié)
  *
  * PHYSIQUE ULTRA-SIMPLE D'UNE LIGNE DE KITE:
  * ═══════════════════════════════════════════
@@ -40,9 +40,9 @@ import { MathUtils } from '../utils/MathUtils';
 
 const PRIORITY = 40;
 
-export class TetherSystem extends System {
+export class LineSystem extends System {
   constructor() {
-    super('TetherSystem', PRIORITY);
+    super('LineSystem', PRIORITY);
   }
 
   update(context: SimulationContext): void {

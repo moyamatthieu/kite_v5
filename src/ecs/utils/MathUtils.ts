@@ -66,7 +66,7 @@ export class MathUtils {
    * - r = vecteur bras de levier (centre de masse → point d'application)
    * - F = force appliquée
    * 
-   * Utilisé par : TetherSystem, AeroSystemNASA, ConstraintSystem
+   * Utilisé par : LineSystem, AeroSystemNASA, ConstraintSystem
    * 
    * @param applicationPoint Position monde où la force est appliquée
    * @param centerOfMass Centre de masse du corps rigide
