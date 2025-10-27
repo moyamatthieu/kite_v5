@@ -172,6 +172,20 @@ export class AeroSystemNASA extends System {
         // v_total = v_CoM + v_rotation
         const pointVelocity = physics.velocity.clone().add(rotationVelocity);
 
+        // 🔍 DEBUG: Vérifier les vecteurs AVANT calcul du vent apparent
+        if (!this.isValidVector(wind.ambient)) {
+          console.error(`[AeroSystemNASA] Invalid wind.ambient for ${sample.descriptor.name}:`, wind.ambient);
+          return;
+        }
+        if (!this.isValidVector(pointVelocity)) {
+          console.error(`[AeroSystemNASA] Invalid pointVelocity for ${sample.descriptor.name}:`, pointVelocity);
+          console.error(`  physics.velocity:`, physics.velocity);
+          console.error(`  rotationVelocity:`, rotationVelocity);
+          console.error(`  physics.angularVelocity:`, physics.angularVelocity);
+          console.error(`  leverArm:`, leverArm);
+          return;
+        }
+
         // Vent apparent = vent ambiant - vitesse du point
         const localApparentWind = wind.ambient.clone().sub(pointVelocity);
         const localWindSpeed = localApparentWind.length();
@@ -251,7 +265,23 @@ export class AeroSystemNASA extends System {
         let panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
         let panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
 
-        // 🛡️ SAFETY CAP: Limiter les forces par surface pour éviter instabilité
+        // � DEBUG NaN: Vérifier toutes les variables avant multiplication
+        if (isNaN(panelLift.x) || isNaN(panelLift.y) || isNaN(panelLift.z)) {
+          console.error(`[AeroSystemNASA] NaN detected in panelLift calculation for ${sample.descriptor.name}`);
+          console.error(`  liftDir: (${liftDir.x}, ${liftDir.y}, ${liftDir.z})`);
+          console.error(`  CL: ${CL}, q: ${q}, sample.area: ${sample.area}, liftScale: ${liftScale}`);
+          console.error(`  alphaRad: ${alphaRad}, aspectRatio: ${aspectRatio}`);
+          console.error(`  dotNW: ${dotNW}, surfaceNormal: (${surfaceNormal.x}, ${surfaceNormal.y}, ${surfaceNormal.z})`);
+          console.error(`  localWindDir: (${localWindDir.x}, ${localWindDir.y}, ${localWindDir.z})`);
+        }
+        
+        if (isNaN(panelDrag.x) || isNaN(panelDrag.y) || isNaN(panelDrag.z)) {
+          console.error(`[AeroSystemNASA] NaN detected in panelDrag calculation for ${sample.descriptor.name}`);
+          console.error(`  dragDir: (${dragDir.x}, ${dragDir.y}, ${dragDir.z})`);
+          console.error(`  CD: ${CD}, q: ${q}, sample.area: ${sample.area}, dragScale: ${dragScale}`);
+        }
+
+        // �🛡️ SAFETY CAP: Limiter les forces par surface pour éviter instabilité
         const liftMag = panelLift.length();
         const dragMag = panelDrag.length();
 
@@ -311,7 +341,12 @@ export class AeroSystemNASA extends System {
         const smoothedForce = this.smoothForce(surfaceKey, panelForce);
 
         // Décomposer en lift/drag/gravity pour application
-        const forceRatio = smoothedForce.length() / (panelForce.length() || 1);
+        // ✅ PROTECTION NaN: Éviter division par zéro si panelForce est nul
+        const panelForceLength = panelForce.length();
+        const forceRatio = panelForceLength > 0.001 
+          ? smoothedForce.length() / panelForceLength 
+          : 1.0; // Si force originale nulle, ratio = 1 (pas de changement)
+          
         const smoothedLift = panelLift.clone().multiplyScalar(forceRatio);
         const smoothedDrag = panelDrag.clone().multiplyScalar(forceRatio);
         const smoothedGravity = gravityPerFace.clone(); // Gravité ne change pas
@@ -466,6 +501,13 @@ export class AeroSystemNASA extends System {
     }
 
     return liftDir;
+  }
+  
+  /**
+   * Vérifie qu'un vecteur est valide (pas de NaN, pas d'Infinity)
+   */
+  private isValidVector(v: THREE.Vector3): boolean {
+    return isFinite(v.x) && isFinite(v.y) && isFinite(v.z);
   }
   
   /**

@@ -91,15 +91,32 @@ export class WindSystem extends System {
    * Le vent est dans le plan horizontal XZ (Y = 0)
    */
   private updateAmbientWind(): void {
+    // 🛡️ Protection NaN: Vérifier que les paramètres sont valides
+    if (!isFinite(this.windSpeed) || !isFinite(this.windDirection)) {
+      console.error('[WindSystem] Invalid wind parameters detected:', {
+        windSpeed: this.windSpeed,
+        windDirection: this.windDirection
+      });
+      // Valeurs par défaut sécurisées
+      this.windSpeed = WindConfig.DEFAULT_WIND_SPEED_MS;
+      this.windDirection = WindConfig.DEFAULT_WIND_DIRECTION;
+    }
+
     const DEG_TO_RAD = Math.PI / 180;
     const dirRad = this.windDirection * DEG_TO_RAD;
     
     // Plan horizontal XZ : X = cos(angle), Y = 0 (horizontal), Z = sin(angle)
-    this.ambientWind = new THREE.Vector3(
-      Math.cos(dirRad) * this.windSpeed,
-      0, // Horizontal (Y est l'axe vertical dans Three.js)
-      Math.sin(dirRad) * this.windSpeed
-    );
+    const x = Math.cos(dirRad) * this.windSpeed;
+    const z = Math.sin(dirRad) * this.windSpeed;
+    
+    // 🛡️ Vérification finale que les valeurs calculées sont valides
+    if (!isFinite(x) || !isFinite(z)) {
+      console.error('[WindSystem] NaN detected in calculated wind vector:', { x, z, dirRad });
+      this.ambientWind = new THREE.Vector3(0, 0, 0);
+      return;
+    }
+    
+    this.ambientWind = new THREE.Vector3(x, 0, z);
   }
   
   update(context: SimulationContext): void {
@@ -111,14 +128,19 @@ export class WindSystem extends System {
     if (inputEntities.length > 0 && currentTime - this.lastWindUpdate > WindConfig.UPDATE_INTERVAL) {
       const inputComp = inputEntities[0].getComponent<InputComponent>('Input');
       if (inputComp) {
-        const speedChanged = Math.abs(inputComp.windSpeed - this.windSpeed) > WindConfig.SPEED_CHANGE_THRESHOLD;
-        const directionChanged = Math.abs(inputComp.windDirection - this.windDirection) > WindConfig.DIRECTION_CHANGE_THRESHOLD;
-        const turbulenceChanged = Math.abs(inputComp.windTurbulence - this.turbulence) > WindConfig.TURBULENCE_CHANGE_THRESHOLD;
+        // 🛡️ Vérifier que les valeurs de InputComponent sont valides
+        const newSpeed = isFinite(inputComp.windSpeed) ? inputComp.windSpeed : this.windSpeed;
+        const newDirection = isFinite(inputComp.windDirection) ? inputComp.windDirection : this.windDirection;
+        const newTurbulence = isFinite(inputComp.windTurbulence) ? inputComp.windTurbulence : this.turbulence;
+        
+        const speedChanged = Math.abs(newSpeed - this.windSpeed) > WindConfig.SPEED_CHANGE_THRESHOLD;
+        const directionChanged = Math.abs(newDirection - this.windDirection) > WindConfig.DIRECTION_CHANGE_THRESHOLD;
+        const turbulenceChanged = Math.abs(newTurbulence - this.turbulence) > WindConfig.TURBULENCE_CHANGE_THRESHOLD;
         
         if (speedChanged || directionChanged || turbulenceChanged) {
-          this.windSpeed = inputComp.windSpeed;
-          this.windDirection = inputComp.windDirection;
-          this.turbulence = inputComp.windTurbulence;
+          this.windSpeed = newSpeed;
+          this.windDirection = newDirection;
+          this.turbulence = newTurbulence;
           this.updateAmbientWind();
         }
         this.lastWindUpdate = currentTime;

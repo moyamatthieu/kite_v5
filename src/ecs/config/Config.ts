@@ -377,7 +377,7 @@ namespace AeroConfig {
 
 namespace EnvironmentConfig {
   // === Vent ===
-  /** Vitesse du vent par défaut (m/s) 
+  /** Vitesse du vent par défaut (m/s) */
   export const WIND_SPEED_M_S = 5.0;
 
   /** Direction du vent par défaut (degrés) - 270 = -Z = Nord */
