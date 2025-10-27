@@ -167,8 +167,8 @@ export class GeometryRenderSystem extends System {
     const group = new THREE.Group();
     group.name = 'ControlBarGroup';
 
-    const leftHandle = geometry.getPoint('leftHandle');
-    const rightHandle = geometry.getPoint('rightHandle');
+    const leftHandle = geometry.getPoint('poignet_gauche');
+    const rightHandle = geometry.getPoint('poignet_droit');
 
     if (!leftHandle || !rightHandle) return group;
 
