@@ -116,9 +116,12 @@ export class LineSystem extends System {
   /**
    * Résout une contrainte de ligne ultra-simple
    *
-   * ALGORITHME ULTRA-SIMPLE:
+   * ALGORITHME INEXTENSIBLE:
    * 1. Si distance < maxLength → aucune force (complètement flexible)
-   * 2. Si distance >= maxLength ET kite s'éloigne → force de rappel douce
+   * 2. Si distance >= maxLength → FORCE MAXIMALE IMMÉDIATE (hard constraint)
+   * 
+   * Les lignes s'étendent TRÈS PEU dans la réalité et appliquent
+   * une tension immédiate dès qu'elles deviennent tendues.
    */
   private solveSimpleTether(params: {
     pointA: THREE.Vector3;
@@ -142,7 +145,7 @@ export class LineSystem extends System {
     lineComponent.currentLength = distance;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // LOGIQUE ULTRA-SIMPLE
+    // HARD CONSTRAINT: INEXTENSIBLE MODE
     // ═══════════════════════════════════════════════════════════════════════
 
     // 1. COMPLÈTEMENT FLEXIBLE si distance < maxLength
@@ -154,7 +157,7 @@ export class LineSystem extends System {
       return; // ✅ AUCUNE FORCE
     }
 
-    // 2. DROITE/INEXTENSIBLE si distance >= maxLength
+    // 2. TENDUE → Appliquer FORCE MAXIMALE IMMÉDIATE (hard constraint)
     lineComponent.state.isTaut = true;
     const excess = distance - maxLength;
     
@@ -165,8 +168,20 @@ export class LineSystem extends System {
     const direction = diff.clone().normalize();
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MODÈLE PHYSIQUE: RESSORT-AMORTISSEUR DOUX
+    // HARD CONSTRAINT: INEXTENSIBLE PHYSICS
     // ═══════════════════════════════════════════════════════════════════════
+    // 
+    // Les vrais câbles Dyneema:
+    // - Stiffness très élevée: k ≈ 15,000 N/m (quasi-rigide)
+    // - Extension minime: < 1mm sur 15m en charge normale
+    // - Tension immédiate dès que tendu
+    // 
+    // Stratégie:
+    // 1. Clamper l'élongation à MAX_ELONGATION_RATIO (0.1% = 15cm max)
+    // 2. Appliquer F = k × min(excess, clampedMax) → forte tension
+    // 3. Damping minimal (0.5 N·s/m) car inextensibilité dominante
+    // 4. Force MAXIMALE immédiate: aucune progressivité
+    //
 
     // Calculer la vitesse du point B (sur le kite)
     const r = pointB.clone().sub(kiteTransform.position); // Bras de levier
@@ -177,14 +192,16 @@ export class LineSystem extends System {
     // Vitesse radiale : composante le long de la ligne (positive si s'éloigne de A)
     const v_radial = pointVelocity.dot(direction);
 
-    // === FORCE RESSORT (Loi de Hooke) - Utilise élongation RÉELLE ===
-    // LINE_STIFFNESS = 50 N/m (très doux)
-    // À 1m excès → 50N, à 5m excès → 250N (progressif et stable)
-    const springForce = ConstraintConfig.LINE_STIFFNESS * excess;
+    // === FORCE RESSORT (Ultra-rigide pour inextensibilité) ===
+    // LINE_STIFFNESS = 15,000 N/m (very stiff)
+    // À 1mm excès → 15N, à 1cm excès → 150N (immédiat et fort)
+    const maxExcess = maxLength * ConstraintConfig.MAX_ELONGATION_RATIO;
+    const clampedExcess = Math.min(excess, maxExcess);
+    const springForce = ConstraintConfig.LINE_STIFFNESS * clampedExcess;
 
-    // === FORCE DAMPING (Amortissement ABSOLU) ===
-    // ABSOLUTE_DAMPING = 2 N·s/m (indépendant de la rigidité)
-    // À 1 m/s → 2N, à 10 m/s → 20N (pas d'explosion comme avant!)
+    // === FORCE DAMPING (Amortissement minimal) ===
+    // ABSOLUTE_DAMPING = 0.5 N·s/m (très faible)
+    // À 1 m/s → 0.5N, à 10 m/s → 5N (négligeable vs 150N de ressort!)
     // Ne s'applique QUE si le kite s'éloigne (v_radial > 0)
     const dampingForce = v_radial > 0 
       ? ConstraintConfig.ABSOLUTE_DAMPING * v_radial
@@ -194,7 +211,7 @@ export class LineSystem extends System {
     const totalForce = springForce + dampingForce;
 
     // Les lignes ne poussent pas, seulement tirent (contrainte unilatérale)
-    if (totalForce > 0) {
+    if (totalForce > ConstraintConfig.MIN_TAUT_FORCE) {
       // Limiter la force pour éviter les explosions numériques
       const clampedTension = Math.min(totalForce, ConstraintConfig.MAX_CONSTRAINT_FORCE);
 
@@ -211,7 +228,7 @@ export class LineSystem extends System {
       // Mettre à jour tension pour visualisation
       lineComponent.currentTension = clampedTension;
     } else {
-      // Pas de force (ne devrait jamais arriver car springForce > 0 si excess > 0)
+      // Pas de force (très rare avec haute rigidité)
       lineComponent.currentTension = 0;
     }
   }

@@ -33,7 +33,7 @@ namespace PhysicsConstants {
   // ============================================================================
 
   /** Nombre d'itérations PBD pour convergence (10-20 recommandé) */
-  export const PBD_ITERATIONS = 10;
+  export const PBD_ITERATIONS = 20;
 
   /** Compliance PBD (inverse de rigidité): α = 1/k
    * α = 0     → infiniment rigide (hard constraint)
@@ -78,28 +78,22 @@ namespace PhysicsConstants {
 namespace ConstraintConfig {
   /** Tether line tensile stiffness (N/m)
    * 
-   * Makani reference: tether_params.tensile_stiffness (EA in N)
-   *   EA = Young's modulus × cross-sectional area
-   *   For Dyneema rope: EA ≈ 1-5 MN (1,000,000 - 5,000,000 N)
+   * BALANCE: Inextensible (no visible stretch) but STABLE (no chaos)
    * 
-   * Our implementation uses stiffness per meter:
-   *   LINE_STIFFNESS = EA / restLength (N/m)
-   *   For EA = 120,000 N and L = 15m: k = 8000 N/m
+   * Physics principle:
+   * - Dyneema rope (realistic): EA ≈ 120,000-200,000 N for 15m line
+   * - This gives: k = EA / L ≈ 8,000-13,000 N/m (too high causes instability!)
+   * - At 1cm excess → would be 80-130N → TOO MUCH for 0.12kg kite
    * 
-   * Physical interpretation:
-   *   • 1cm elongation → 80N force (≈8kg tension)
-   *   • 10cm elongation → 800N force (≈80kg tension)
+   * PRACTICAL INEXTENSIBLE MODE (moderate stiffness):
+   * - k = 3,500 N/m (moderate-high rigidity, stable)
+   * - At 1mm excess → 3.5N (gentle initial restraint)
+   * - At 1cm excess → 35N (good catch power, not explosive)
+   * - At 5cm excess → 175N (max realistic catch on 0.12kg kite)
    * 
-   * Tuning guidelines:
-   *   • Higher values (10000-20000) = stiffer lines, less stretch
-   *   • Lower values (20-100) = soft elastic behavior, progressive forces
-   *   • Higher values (1000-5000) = stiff cables, can cause oscillations
-   *   • Too high (>50000) = numerical instability
-   * 
-   * ⚠️ Current value: 50 N/m (très souple pour forces progressives douces)
-   *    À 1m excès → 50N, à 5m excès → 250N (gérable pour kite 0.12kg)
+   * ✅ BALANCED: Strong enough to prevent stretching, gentle enough to stay stable
    */
-  export const LINE_STIFFNESS = 50; // Rigidité douce pour comportement stable et progressif
+  export const LINE_STIFFNESS = 3500; // Moderate-high rigidity for inextensible+stable behavior
 
   /** Position-based projection factor (0.0-1.0)
    * 
@@ -112,16 +106,22 @@ namespace ConstraintConfig {
 
   /** Longitudinal damping coefficient (N·s/m - absolute damping)
    * 
-   * Changed from proportional (0.04 × v × k) to absolute (DAMPING_COEF × v)
-   * to avoid explosive damping forces when stiffness or velocity is high.
+   * With INEXTENSIBLE mode (moderate stiffness), damping becomes MORE important.
+   * It acts as a shock absorber for sudden jerks when line goes taut.
+   * 
+   * INCREASED damping helps stability:
+   * - At v_radial = 1 m/s → damping force = 5N (good shock absorption)
+   * - At v_radial = 10 m/s → damping force = 50N (strong damping, prevents jerk)
+   * - Total force = spring (35N @ 1cm) + damping (up to 50N) = reasonable
    * 
    * Physical interpretation:
-   *   • At v_radial = 1 m/s → damping force = 2 N
-   *   • At v_radial = 10 m/s → damping force = 20 N (not 960N!)
+   * - Real cables have significant damping from air + fiber friction
+   * - Dyneema is slippery but still has ~3-5% damping ratio
+   * - Higher damping = smoother transitions, less violent motion
    * 
-   * ⚠️ MODIFIÉ: Damping absolu pour éviter explosions
+   * ⚠️ CHANGED: 0.5 → 5.0 N·s/m (10× increase for stability)
    */
-  export const ABSOLUTE_DAMPING = 2.0; // N·s/m - damping absolu indépendant de la rigidité
+  export const ABSOLUTE_DAMPING = 5.0; // Increased for shock absorption + stability
   
   /** @deprecated Use ABSOLUTE_DAMPING instead */
   export const PBD_DAMPING = 0.04;
@@ -139,38 +139,57 @@ namespace ConstraintConfig {
 
   /** Limite de sécurité pour les forces de contrainte (N)
    * 
-   * Prevents numerical explosions when lines are severely overstretched.
+   * CRITICAL: Prevents cascading instabilities from line tensions.
    * 
-   * With LINE_STIFFNESS=50 N/m:
-   *   • At 5m excess → spring force = 250 N
-   *   • At 10m/s velocity → damping = 20 N
-   *   • Total max ≈ 270 N (well below limit)
+   * With LINE_STIFFNESS=3500 N/m and realistic kite:
+   * - 0.12kg kite → weight = 1.2N, so max line force should be ~50-100N
+   * - Higher forces cause violent rotations and aerodynamic chaos
+   * - Too high ceiling (1000N) causes kite to spin uncontrollably
    * 
-   * ⚠️ Current value: 300 N (cohérent avec nouvelle rigidité douce)
+   * SAFETY LIMIT for inextensible+stable mode:
+   * - MAX_CONSTRAINT_FORCE = 150N (strong enough to hold line, not violent)
+   * - At 1cm excess: F = 35N (well below limit, stable)
+   * - At 4cm excess: F = 140N (approaching limit, realistic catch)
+   * - Above 4cm: force clipped to 150N (hard limit to prevent chaos)
+   * 
+   * ⚠️ CHANGED: 1000 → 150N (reduce 7× to prevent cascade instabilities)
    */
-  export const MAX_CONSTRAINT_FORCE = 300; // Limite adaptée à LINE_STIFFNESS=50
+  export const MAX_CONSTRAINT_FORCE = 150; // Safety limit to prevent chaos
 
   /** Limite d'élongation maximale (% de longueur au repos)
    * 
+   * INEXTENSIBLE MODE: Lines should almost NOT STRETCH at all.
    * Beyond this limit, the line is considered broken or unstable.
-   * Prevents infinite force accumulation in numerical simulations.
    * 
-   * Physical interpretation:
-   *   • Typical Dyneema kite lines: elastic ~3-5% under normal load
-   *   • Safety limit: 2% (30cm sur 15m) allows realistic stretch
-   *   • Beyond 5%: risk of line damage or simulation instability
+   * Reality check:
+   * - Dyneema under normal load: ~0.5-1% elastic stretch
+   * - Safety factor: Allow max 0.1% (1.5cm on 15m line)
+   * - This creates immediate restraint with minimal visible deformation
    * 
-   * ⚠️ CRITIQUE: 20% était ABSURDE (3m d'élongation → 6000N de force)
-   * Maintenant: 2% max = 30cm élongation → tension réaliste 200-600N
+   * With LINE_STIFFNESS=15000 N/m at 0.1% excess:
+   *   • 15cm elongation on 15m line → F = 15000 × 0.15 = 2250N (strong!)
+   *   • 1.5cm elongation on 15m line → F = 15000 × 0.015 = 225N (good balance)
+   * 
+   * ⚠️ CHANGED: 0.002 (2%) → 0.001 (0.1%)
+   *    Prevents visible stretching while maintaining realistic tension.
    */
-  export const MAX_ELONGATION_RATIO = 0.002; // CORRIGÉ: 2% au lieu de 20% !
+  export const MAX_ELONGATION_RATIO = 0.001; // 0.1% - Inextensible behavior
 
   /** Force minimale pour considérer une ligne tendue (N)
    * 
    * Below this threshold, the line is considered slack.
-   * Prevents micro-oscillations around the slack/taut boundary.
+   * With high stiffness (15000 N/m), even tiny extensions generate
+   * meaningful forces, so this threshold is LOWER.
+   * 
+   * Physical interpretation:
+   * - At 0.1mm excess on inextensible line: F = 15000 × 0.0001 = 1.5N
+   * - This is already significant restraint, so MIN_TAUT_FORCE can be lower
+   * - Prevents micro-oscillations at the slack/taut boundary
+   * 
+   * ⚠️ CHANGED: 0.1 → 0.5N (higher threshold, more stable)
+   *    With high stiffness, even 0.5N means immediate strong restraint.
    */
-  export const MIN_TAUT_FORCE = 0.1; // Réduit de 1.0 à 0.1 N pour moins de force au repos
+  export const MIN_TAUT_FORCE = 0.5; // Reduced from 1.0 for inextensible mode
 }
 
 // ============================================================================

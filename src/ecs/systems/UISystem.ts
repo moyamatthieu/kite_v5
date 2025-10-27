@@ -57,8 +57,21 @@ export class UISystem extends System {
 
     if (this.kiteEntity) {
       this.logger.info('Kite entity found in initialize: ' + this.kiteEntity.id, 'UISystem');
+      const kiteGeom = this.kiteEntity.getComponent<GeometryComponent>('geometry');
+      if (kiteGeom) {
+        this.logger.debug(`✅ Kite geometry points: ${kiteGeom.getPointNames().join(', ')}`, 'UISystem');
+      }
     } else {
       this.logger.warn('Kite entity not found in initialize', 'UISystem');
+    }
+
+    // Chercher la barre de contrôle
+    const controlBar = entityManager.getEntity('controlBar');
+    if (controlBar) {
+      const barGeom = controlBar.getComponent<GeometryComponent>('geometry');
+      if (barGeom) {
+        this.logger.debug(`✅ Control bar geometry points: ${barGeom.getPointNames().join(', ')}`, 'UISystem');
+      }
     }
 
     // Initialiser les boutons une seule fois (ils se réfèrent à l'InputComponent qui peut changer)
@@ -526,15 +539,21 @@ export class UISystem extends System {
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
 
-    if (!kite || !controlBar) return;
+    if (!kite || !controlBar) {
+      this.logger.warn('🔴 Kite ou controlBar non trouvés', 'UISystem');
+      return;
+    }
 
     const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
     const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
 
-    if (!kiteGeometry || !barGeometry) return;
+    if (!kiteGeometry || !barGeometry) {
+      this.logger.warn('🔴 Géométries du kite ou controlBar non trouvées', 'UISystem');
+      return;
+    }
 
     // === Ligne gauche ===
-    const leftHandleWorld = barGeometry.getPointWorld('leftHandle', controlBar);
+    const leftHandleWorld = barGeometry.getPointWorld('poignet_gauche', controlBar);
     const leftCtrlWorld = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
 
     if (leftHandleWorld && leftCtrlWorld) {
@@ -564,10 +583,14 @@ export class UISystem extends System {
           leftDiffElem.style.color = '#4da6ff';
         }
       }
+    } else {
+      // Debug: points non trouvés
+      if (!leftHandleWorld) this.logger.warn('🔴 poignet_gauche non trouvé sur controlBar', 'UISystem');
+      if (!leftCtrlWorld) this.logger.warn('🔴 CTRL_GAUCHE non trouvé sur kite', 'UISystem');
     }
 
     // === Ligne droite ===
-    const rightHandleWorld = barGeometry.getPointWorld('rightHandle', controlBar);
+    const rightHandleWorld = barGeometry.getPointWorld('poignet_droit', controlBar);
     const rightCtrlWorld = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
 
     if (rightHandleWorld && rightCtrlWorld) {
@@ -597,6 +620,10 @@ export class UISystem extends System {
           rightDiffElem.style.color = '#4da6ff';
         }
       }
+    } else {
+      // Debug: points non trouvés
+      if (!rightHandleWorld) this.logger.warn('🔴 poignet_droit non trouvé sur controlBar', 'UISystem');
+      if (!rightCtrlWorld) this.logger.warn('🔴 CTRL_DROIT non trouvé sur kite', 'UISystem');
     }
   }
 }

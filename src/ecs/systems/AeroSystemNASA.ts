@@ -73,11 +73,26 @@ namespace NASAAeroConfig {
   export const CP_POSITION_RATIO = 0.25;
 
   // === SAFETY LIMITS ===
-  /** Force maximale par surface (N) - Limite de sécurité pour éviter instabilité */
-  export const MAX_FORCE_PER_SURFACE = 500;
+  /** Force maximale par surface (N) - Limite de sécurité pour éviter instabilité
+   * 
+   * REALITY CHECK for 0.12kg kite:
+   * - Weight = 0.12 × 9.81 = 1.2N
+   * - Realistic lift in flight: 5-20N per surface (max 4 surfaces = 80N total)
+   * - At extreme angles (80°+): could reach 50N per surface but SHOULDN'T
+   * - 500N per surface = 2000N total = 167× the kite's weight (!!! ABSURD !!!)
+   * 
+   * Physical limits:
+   * - Gentle flight: ~10N per surface (reasonable)
+   * - Good maneuver: ~20N per surface (aggressive but stable)
+   * - Limit: 50N per surface (anything higher = chaos + spinning)
+   * 
+   * ⚠️ CHANGED: 500 → 50N (10× reduction!)
+   *    Prevents aerodynamic chaos that causes cascading instabilities.
+   */
+  export const MAX_FORCE_PER_SURFACE = 50;
 
   /** Couple maximal par surface (N·m) - Limite de sécurité */
-  export const MAX_TORQUE_PER_SURFACE = 200;
+  export const MAX_TORQUE_PER_SURFACE = 20;
 
   /** Vitesse apparente maximale considérée (m/s) - Cap réaliste pour kite */
   export const MAX_APPARENT_WIND_SPEED = 30;
