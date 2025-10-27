@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
