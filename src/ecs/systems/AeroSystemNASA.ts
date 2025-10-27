@@ -191,6 +191,8 @@ export class AeroSystemNASA extends System {
           return; // Pas de forces aérodynamiques
         }
 
+        // ✅ Normaliser le vent APRÈS vérifier que sa longueur est non-nulle
+        // Sinon normalize() sur un vecteur ~0 crée des NaN
         const localWindDir = localApparentWind.clone().normalize();
 
         // 3. Calcul de l'angle d'attaque selon NASA

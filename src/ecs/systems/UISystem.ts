@@ -209,7 +209,12 @@ export class UISystem extends System {
     }
 
     // Définir la valeur initiale
-    const initialValue = this.inputComponent[config.property] as number;
+    const initialValue = this.inputComponent[config.property] as number | undefined;
+    if (initialValue === undefined) {
+      this.logger.warn(`Property ${config.property} not found in InputComponent for slider ${config.id}`, 'UISystem');
+      return;
+    }
+
     slider.value = initialValue.toString();
     slider.min = config.min.toString();
     slider.max = config.max.toString();
@@ -480,13 +485,13 @@ export class UISystem extends System {
 
     // Vent ambiant
     const windInfo = document.getElementById('wind-info-value');
-    if (windInfo) {
+    if (windInfo && this.inputComponent.windSpeed !== undefined) {
       windInfo.textContent = `${this.inputComponent.windSpeed.toFixed(DECIMAL_PRECISION_POSITION)} m/s`;
     }
 
     // Direction du vent
     const windDirValue = document.getElementById('wind-direction-info-value');
-    if (windDirValue) {
+    if (windDirValue && this.inputComponent.windDirection !== undefined) {
       windDirValue.textContent = `${this.inputComponent.windDirection.toFixed(0)} °`;
     }
 
