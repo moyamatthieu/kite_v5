@@ -1,5 +1,5 @@
 import { Entity } from '../core/Entity';
-import { InputComponent } from '../components/InputComponent';
+import { InputComponent, type InputState } from '../components/InputComponent';
 import { CONFIG } from '../config/Config';
 
 /**
@@ -11,7 +11,7 @@ export class UIFactory {
    * 
    * @param savedInputValues - Valeurs optionnelles à restaurer après un reset
    */
-  public static create(savedInputValues?: any): Entity {
+  public static create(savedInputValues?: InputState): Entity {
     const uiEntity = new Entity('ui');
 
     uiEntity.addComponent(

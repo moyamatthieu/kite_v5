@@ -5,6 +5,8 @@ import { EntityManager } from '../core/EntityManager';
 import { InputComponent } from '../components/InputComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { TransformComponent } from '../components/TransformComponent';
+import { GeometryComponent } from '../components/GeometryComponent';
+import { LineComponent } from '../components/LineComponent';
 import { Entity } from '../core/Entity';
 import { Logger } from '../utils/Logging';
 import { UI_METADATA } from '../config/UIConfig';
@@ -445,9 +447,9 @@ export class UISystem extends System {
 
     // Tension ligne gauche
     if (leftLine) {
-      const lineComp = leftLine.getComponent('line');
-      if (lineComp && (lineComp as any).currentTension !== undefined) {
-        const tension = (lineComp as any).currentTension;
+      const lineComp = leftLine.getComponent<LineComponent>('line');
+      if (lineComp && 'currentTension' in lineComp && lineComp.currentTension !== undefined) {
+        const tension = (lineComp as LineComponent & { currentTension: number }).currentTension;
         tensionLeftValue.textContent = `${tension.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
       } else {
         tensionLeftValue.textContent = '0.0 N';
@@ -458,9 +460,9 @@ export class UISystem extends System {
 
     // Tension ligne droite
     if (rightLine) {
-      const lineComp = rightLine.getComponent('line');
-      if (lineComp && (lineComp as any).currentTension !== undefined) {
-        const tension = (lineComp as any).currentTension;
+      const lineComp = rightLine.getComponent<LineComponent>('line');
+      if (lineComp && 'currentTension' in lineComp && lineComp.currentTension !== undefined) {
+        const tension = (lineComp as LineComponent & { currentTension: number }).currentTension;
         tensionRightValue.textContent = `${tension.toFixed(DECIMAL_PRECISION_VELOCITY)} N`;
       } else {
         tensionRightValue.textContent = '0.0 N';
@@ -521,8 +523,8 @@ export class UISystem extends System {
 
     if (!kite || !controlBar) return;
 
-    const kiteGeometry = kite.getComponent('geometry') as any;
-    const barGeometry = controlBar.getComponent('geometry') as any;
+    const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
+    const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
 
     if (!kiteGeometry || !barGeometry) return;
 

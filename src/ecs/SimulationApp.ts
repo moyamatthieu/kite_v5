@@ -81,6 +81,7 @@ import { Logger } from './utils/Logging';
 import type { SimulationContext } from './core/System';
 import type { RenderSystem as RenderSystemType } from './systems/RenderSystem';
 import type { DebugSystem as DebugSystemType } from './systems/DebugSystem';
+import { InputComponent, type InputState } from './components/InputComponent';
 
 export class SimulationApp {
   private entityManager: EntityManager;
@@ -120,7 +121,7 @@ export class SimulationApp {
   /**
    * Crée les entités de la simulation
    */
-  private createEntities(savedInputValues?: any): void {
+  private createEntities(savedInputValues?: InputState): void {
     const controlBarPos = CONFIG.initialization.controlBarPosition.clone();
     
     // Position du kite calculée depuis controlBar
@@ -264,7 +265,7 @@ export class SimulationApp {
     const uiEntity = this.entityManager.query(['Input'])[0];
     if (!uiEntity) return;
     
-    const inputComp = uiEntity.getComponent('Input') as any;
+    const inputComp = uiEntity.getComponent<InputComponent>('Input');
     if (!inputComp) return;
     
     // Synchroniser l'état de pause avec InputComponent
@@ -355,7 +356,7 @@ export class SimulationApp {
    */
   async reset(): Promise<void> {
     const wasPaused = this.paused;
-    const savedInputValues = this.saveInputState();
+    const savedInputValues = this.saveInputState() ?? undefined;
     
     this.cleanupBeforeReset();
     this.removeAllEntities();
@@ -370,11 +371,11 @@ export class SimulationApp {
   /**
    * Sauvegarde l'état actuel de l'InputComponent
    */
-  private saveInputState(): any {
+  private saveInputState(): InputState | null {
     const uiEntity = this.entityManager.query(['Input'])[0];
     if (!uiEntity) return null;
 
-    const input = uiEntity.getComponent('Input') as any;
+    const input = uiEntity.getComponent<InputComponent>('Input');
     if (!input) return null;
 
     return {
@@ -393,7 +394,11 @@ export class SimulationApp {
       liftScale: input.liftScale,
       dragScale: input.dragScale,
       forceSmoothing: input.forceSmoothing,
-      debugMode: input.debugMode
+      debugMode: input.debugMode,
+      resetSimulation: false,
+      isPaused: input.isPaused,
+      showNormals: input.showNormals,
+      barRotationInput: input.barRotationInput
     };
   }
 
@@ -401,12 +406,12 @@ export class SimulationApp {
    * Nettoie les états des systèmes avant le reset
    */
   private cleanupBeforeReset(): void {
-    const renderSystem = this.systemManager.getSystem('RenderSystem') as any;
+    const renderSystem = this.systemManager.getSystem('RenderSystem') as RenderSystemType;
     if (renderSystem?.resetRenderState) {
       renderSystem.resetRenderState();
     }
 
-    const debugSystem = this.systemManager.getSystem('DebugSystem') as any;
+    const debugSystem = this.systemManager.getSystem('DebugSystem') as DebugSystemType;
     if (debugSystem?.resetDebugState) {
       debugSystem.resetDebugState();
     }
@@ -421,13 +426,13 @@ export class SimulationApp {
   }
 
   /**
-   * Restaure l'état de pause après le reset
+   * Restaure l'état de pause après un reset
    */
   private restorePauseState(wasPaused: boolean): void {
     this.paused = wasPaused;
     const uiEntity = this.entityManager.query(['Input'])[0];
     if (uiEntity) {
-      const inputComp = uiEntity.getComponent('Input') as any;
+      const inputComp = uiEntity.getComponent<InputComponent>('Input');
       if (inputComp) {
         inputComp.isPaused = wasPaused;
       }
@@ -440,7 +445,7 @@ export class SimulationApp {
   private logResetComplete(): void {
     const uiEntity = this.entityManager.query(['Input'])[0];
     if (uiEntity) {
-      const inputComp = uiEntity.getComponent('Input') as any;
+      const inputComp = uiEntity.getComponent<InputComponent>('Input');
       if (inputComp) {
         this.logger.info(
           `🔄 RESET COMPLETE | Constraint: ${inputComp.constraintMode} | Aero: ${inputComp.aeroMode}`, 

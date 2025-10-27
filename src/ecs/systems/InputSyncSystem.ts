@@ -11,6 +11,8 @@ import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { InputComponent } from '../components/InputComponent';
 import { LineComponent } from '../components/LineComponent';
+import { BridleComponent } from '../components/BridleComponent';
+import { PhysicsComponent } from '../components/PhysicsComponent';
 import { Logger } from '../utils/Logging';
 
 const logger = Logger.getInstance();
@@ -126,15 +128,15 @@ export class InputSyncSystem extends System {
    */
   private updateBridleLength(
     entityManager: EntityManager,
-    bridleType: 'nez' | 'inter' | 'centre',
+    bridleType: string,
     newLength: number
   ): void {
     const kite = entityManager.getEntity('kite');
     if (!kite) return;
 
-    const bridle = kite.getComponent('bridle') as any;
+    const bridle = kite.getComponent<BridleComponent>('bridle');
     if (bridle && bridle.lengths) {
-      bridle.lengths[bridleType] = newLength;
+      bridle.lengths[bridleType as keyof typeof bridle.lengths] = newLength;
     }
   }
 
@@ -144,7 +146,7 @@ export class InputSyncSystem extends System {
   private updateLinearDamping(entityManager: EntityManager, newDamping: number): void {
     const entities = entityManager.query(['physics']);
     entities.forEach(entity => {
-      const physics = entity.getComponent('physics') as any;
+      const physics = entity.getComponent<PhysicsComponent>('physics');
       if (physics) {
         physics.linearDamping = newDamping;
       }
@@ -157,7 +159,7 @@ export class InputSyncSystem extends System {
   private updateAngularDamping(entityManager: EntityManager, newDamping: number): void {
     const entities = entityManager.query(['physics']);
     entities.forEach(entity => {
-      const physics = entity.getComponent('physics') as any;
+      const physics = entity.getComponent<PhysicsComponent>('physics');
       if (physics) {
         physics.angularDamping = newDamping;
       }

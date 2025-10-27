@@ -3,6 +3,44 @@ import { Logger } from '../utils/Logging';
 import { CONFIG, InputDefaults } from '../config/Config';
 
 /**
+ * Snapshot complet de l'état InputComponent pour sérialisation/sauvegarde
+ * @export InputState
+ */
+export interface InputState {
+  // === Vent ===
+  windSpeed: number;
+  windDirection: number;
+  windTurbulence: number;
+
+  // === Lignes ===
+  constraintMode: 'pbd' | 'spring-force';
+  aeroMode: 'perso' | 'nasa';
+  lineLength: number;
+  bridleNez: number;
+  bridleInter: number;
+  bridleCentre: number;
+
+  // === Physique ===
+  linearDamping: number;
+  angularDamping: number;
+  meshSubdivisionLevel: number;
+
+  // === Aérodynamique ===
+  liftScale: number;
+  dragScale: number;
+  forceSmoothing: number;
+
+  // === Actions ===
+  resetSimulation: boolean;
+  isPaused: boolean;
+  debugMode: boolean;
+  showNormals: boolean;
+
+  // === Contrôle ===
+  barRotationInput: number;
+}
+
+/**
  * Contient l'état des entrées utilisateur provenant de l'interface.
  * Les systèmes liront ce composant pour ajuster la simulation.
  */

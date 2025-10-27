@@ -404,6 +404,17 @@ export class MathUtils {
   }
 
   /**
+   * Calcule la longueur moyenne des brides (ECS pure refactoring)
+   * @param nez Longueur bride nez
+   * @param inter Longueur bride inter
+   * @param centre Longueur bride centre
+   * @returns Moyenne arithmétique des trois longueurs
+   */
+  static getAverageBridleLength(nez: number, inter: number, centre: number): number {
+    return (nez + inter + centre) / 3;
+  }
+
+  /**
    * Alias pour distance (compatibilité)
    * @deprecated Utiliser distance() à la place
    */

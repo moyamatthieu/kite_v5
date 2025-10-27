@@ -6,6 +6,11 @@
  * - 3 brides droites : NEZ → CTRL_DROIT, INTER_DROIT → CTRL_DROIT, CENTRE → CTRL_DROIT
  * 
  * Les brides sont des segments droits rigides (contraintes géométriques).
+ * 
+ * ARCHITECTURE ECS PURE:
+ * - Ce composant est DATA ONLY (pas de logique)
+ * - Logique de calcul → BridleConstraintSystem
+ * - Calcul de longueur moyenne → MathUtils
  */
 
 import { Component } from '../core/Component';
@@ -21,7 +26,7 @@ export interface BridleLengths {
 
 /**
  * Tensions dans les brides (Newtons)
- * Calculées par BridleSystem pour affichage/debug
+ * Calculées par BridleConstraintSystem pour affichage/debug
  */
 export interface BridleTensions {
   leftNez: number;
@@ -38,7 +43,7 @@ export class BridleComponent extends Component {
   /** Longueurs des brides */
   lengths: BridleLengths;
   
-  /** Tensions actuelles (calculées) */
+  /** Tensions actuelles (calculées par BridleConstraintSystem) */
   tensions: BridleTensions;
   
   constructor(lengths: BridleLengths) {
@@ -53,11 +58,9 @@ export class BridleComponent extends Component {
       rightCentre: 0
     };
   }
-  
-  /**
-   * Longueur moyenne des brides (pour calculs)
-   */
-  getAverageLength(): number {
-    return (this.lengths.nez + this.lengths.inter + this.lengths.centre) / 3;
-  }
 }
+
+/**
+ * REMARQUE: getAverageLength() a été déplacé vers MathUtils.getAverageBridleLength()
+ * pour respecter l'architecture ECS pure (Components = DATA ONLY)
+ */
