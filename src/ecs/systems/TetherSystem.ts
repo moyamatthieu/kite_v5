@@ -72,11 +72,11 @@ export class TetherSystem extends System {
     const ctrlLeft = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
     const ctrlRight = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
 
-    // Points d'attache de la barre (handles)
-    const handleLeft = barGeometry.getPointWorld('leftHandle', controlBar);
-    const handleRight = barGeometry.getPointWorld('rightHandle', controlBar);
+    // Points d'attache de la barre (poignets)
+    const poignetGauche = barGeometry.getPointWorld('poignet_gauche', controlBar);
+    const poignetDroit = barGeometry.getPointWorld('poignet_droit', controlBar);
 
-    if (!ctrlLeft || !ctrlRight || !handleLeft || !handleRight) {
+    if (!ctrlLeft || !ctrlRight || !poignetGauche || !poignetDroit) {
       return;
     }
 
@@ -90,7 +90,7 @@ export class TetherSystem extends System {
 
     // === LIGNE GAUCHE ===
     this.solveSimpleTether({
-      pointA: handleLeft,      // Handle gauche (X<0)
+      pointA: poignetGauche,      // Poignet gauche (X<0)
       pointB: ctrlLeft,        // CTRL gauche sur kite (X<0)
       maxLength: leftLineComp.restLength,
       kiteTransform,
@@ -100,7 +100,7 @@ export class TetherSystem extends System {
 
     // === LIGNE DROITE ===
     this.solveSimpleTether({
-      pointA: handleRight,     // Handle droite (X>0)
+      pointA: poignetDroit,     // Poignet droit (X>0)
       pointB: ctrlRight,       // CTRL droit sur kite (X>0)
       maxLength: rightLineComp.restLength,
       kiteTransform,

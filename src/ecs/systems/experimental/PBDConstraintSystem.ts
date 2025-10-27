@@ -78,8 +78,8 @@ interface PBDConstraintState {
   /** Point de contrôle du kite (world space) */
   kitePoint: THREE.Vector3;
 
-  /** Point du handle (world space) */
-  handlePoint: THREE.Vector3;
+  /** Point du poignet (world space) */
+  poignetPoint: THREE.Vector3;
 
   /** Longueur au repos */
   restLength: number;
@@ -234,7 +234,7 @@ export class PBDConstraintSystem extends System {
     // Contrainte gauche
     constraints.push({
       kitePoint: ctrlGauche,
-      handlePoint: leftHandle,
+      poignetPoint: leftHandle,
       restLength: leftLineComp.restLength,
       lineComponent: leftLineComp,
       name: 'leftLine'
@@ -243,7 +243,7 @@ export class PBDConstraintSystem extends System {
     // Contrainte droite
     constraints.push({
       kitePoint: ctrlDroit,
-      handlePoint: rightHandle,
+      poignetPoint: rightHandle,
       restLength: rightLineComp.restLength,
       lineComponent: rightLineComp,
       name: 'rightLine'
@@ -272,11 +272,11 @@ export class PBDConstraintSystem extends System {
     kitePhysics: PhysicsComponent,
     deltaTime: number
   ): void {
-    const { kitePoint, handlePoint, restLength, lineComponent, name } = constraint;
+    const { kitePoint, poignetPoint, restLength, lineComponent, name } = constraint;
 
     // === 1. CALCUL DE LA CONTRAINTE ===
-    // Direction: du handle vers le kite point
-    const delta = kitePoint.clone().sub(handlePoint);
+    // Direction: du poignet vers le kite point
+    const delta = kitePoint.clone().sub(poignetPoint);
     const distance = delta.length();
 
     if (distance < EPSILON) {

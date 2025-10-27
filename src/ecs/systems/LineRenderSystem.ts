@@ -2,8 +2,8 @@
  * LineRenderSystem.ts - Met à jour les positions des lignes de vol
  * 
  * Ce système connecte visuellement :
- * - leftLine : leftHandle de la barre -> CTRL_GAUCHE du kite
- * - rightLine : rightHandle de la barre -> CTRL_DROIT du kite
+ * - leftLine : poignet_gauche de la barre -> CTRL_GAUCHE du kite
+ * - rightLine : poignet_droit de la barre -> CTRL_DROIT du kite
  * 
  * Priorité 55 (AVANT GeometryRenderSystem 60 pour que les positions soient correctes)
  */
@@ -61,7 +61,7 @@ export class LineRenderSystem extends System {
         lineEntity: leftLine,
         startGeometry: barGeometry,
         startTransform: barTransform,
-        startPointName: 'leftHandle',
+        startPointName: 'poignet_gauche',
         endGeometry: kiteGeometry,
         endTransform: kiteTransform,
         endPointName: 'CTRL_GAUCHE'
@@ -75,7 +75,7 @@ export class LineRenderSystem extends System {
         lineEntity: rightLine,
         startGeometry: barGeometry,
         startTransform: barTransform,
-        startPointName: 'rightHandle',
+        startPointName: 'poignet_droit',
         endGeometry: kiteGeometry,
         endTransform: kiteTransform,
         endPointName: 'CTRL_DROIT'
@@ -104,7 +104,7 @@ export class LineRenderSystem extends System {
     const lineGeometry = lineEntity.getComponent('geometry') as GeometryComponent | undefined;
     if (!lineGeometry) return;
     
-    // Point de départ (handle de la barre) en coordonnées locales
+    // Point de départ (poignet de la barre) en coordonnées locales
     const startLocal = startGeometry.getPoint(startPointName);
     if (!startLocal) return;
     
