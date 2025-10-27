@@ -188,7 +188,8 @@ export class GeometryRenderSystem extends System {
       return group;
     }
 
-    const barGeometry = new THREE.CylinderGeometry(VisualConstants.BAR_CYLINDER_DIAMETER, VisualConstants.BAR_CYLINDER_DIAMETER, barLength, 16);
+    const barRadius = VisualConstants.BAR_CYLINDER_DIAMETER / 2;
+    const barGeometry = new THREE.CylinderGeometry(barRadius, barRadius, barLength, 16);
     const barMaterial = new THREE.MeshStandardMaterial({
       color: visual.color, // Marron défini dans ControlBarFactory
       roughness: 0.6,
@@ -204,7 +205,8 @@ export class GeometryRenderSystem extends System {
     group.add(bar);
 
     // === 2. POIGNÉE GAUCHE (rouge) ===
-    const leftHandleGeometry = new THREE.SphereGeometry(VisualConstants.HANDLE_SPHERE_DIAMETER, VisualConstants.HANDLE_SPHERE_SEGMENTS, VisualConstants.HANDLE_SPHERE_SEGMENTS);
+    const handleRadius = VisualConstants.HANDLE_SPHERE_DIAMETER / 2;
+    const leftHandleGeometry = new THREE.SphereGeometry(handleRadius, VisualConstants.HANDLE_SPHERE_SEGMENTS, VisualConstants.HANDLE_SPHERE_SEGMENTS);
     const leftHandleMaterial = new THREE.MeshStandardMaterial({
       color: VisualConstants.COLOR_RED,
       roughness: 0.4,
@@ -216,7 +218,7 @@ export class GeometryRenderSystem extends System {
     group.add(leftHandleMesh);
 
     // === 3. POIGNÉE DROITE (verte) ===
-    const rightHandleGeometry = new THREE.SphereGeometry(VisualConstants.HANDLE_SPHERE_DIAMETER, VisualConstants.HANDLE_SPHERE_SEGMENTS, VisualConstants.HANDLE_SPHERE_SEGMENTS);
+    const rightHandleGeometry = new THREE.SphereGeometry(handleRadius, VisualConstants.HANDLE_SPHERE_SEGMENTS, VisualConstants.HANDLE_SPHERE_SEGMENTS);
     const rightHandleMaterial = new THREE.MeshStandardMaterial({
       color: VisualConstants.COLOR_GREEN,
       roughness: 0.4,
