@@ -9,9 +9,7 @@ export type { WindState } from './WindSystem';
 
 export { BridleConstraintSystem } from './BridleConstraintSystem';
 export { BridleRenderSystem } from './BridleRenderSystem';
-export { TetherSystem } from './TetherSystem'; // Nouveau système simplifié
-// export { ConstraintSystem } from './ConstraintSystem'; // Ancien système (backup)
-// PBDConstraintSystem déplacé vers experimental/ (système expérimental non utilisé)
+export { TetherSystem } from './TetherSystem';
 export { PhysicsSystem } from './PhysicsSystem';
 export { GeometryRenderSystem } from './GeometryRenderSystem';
 export { LineRenderSystem } from './LineRenderSystem';
@@ -23,3 +21,9 @@ export { PilotSystem } from './PilotSystem';
 export { DebugSystem } from './DebugSystem';
 export { SimulationLogger } from './SimulationLogger';
 export { SimulationLoggerHelper } from './SimulationLoggerHelper';
+
+/**
+ * NOTE: Systèmes archivés
+ * - ConstraintSystem: Remplacé par TetherSystem (système simplifié)
+ * - PBDConstraintSystem: Système expérimental, archivé dans /archived
+ */

@@ -141,9 +141,12 @@ export class AeroSystemNASA extends System {
         return;
       }
       
-      // 🔍 DEBUG: Log le vent ambiant
+      // 🔍 DEBUG: Log le vent ambiant (uniquement si CONFIG.debug.enabled)
       if (this.debugFaces && this.debugFrameCounter % 60 === 0) {
-        console.log(`💨 [AeroSystemNASA] Vent ambiant: (${wind.ambient.x.toFixed(2)}, ${wind.ambient.y.toFixed(2)}, ${wind.ambient.z.toFixed(2)}) | vitesse=${wind.ambient.length().toFixed(2)} m/s`);
+        const logger = (globalThis as any).__kiteLogger;
+        if (logger?.enabled) {
+          logger.log(`💨 [AeroSystemNASA] Vent ambiant: (${wind.ambient.x.toFixed(2)}, ${wind.ambient.y.toFixed(2)}, ${wind.ambient.z.toFixed(2)}) | vitesse=${wind.ambient.length().toFixed(2)} m/s`);
+        }
       }
 
       // ========================================================================
