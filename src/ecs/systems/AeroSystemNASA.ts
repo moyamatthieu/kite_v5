@@ -570,6 +570,7 @@ export class AeroSystemNASA extends System {
   /**
    * Lisse une force entre le frame précédent et le frame actuel
    * Utilise un filtre passe-bas exponentiel (EMA - Exponential Moving Average)
+   * @deprecated Utiliser MathUtils.exponentialSmoothing() à la place
    *
    * @param key Identifiant unique de la surface
    * @param currentForce Force calculée ce frame
@@ -578,28 +579,22 @@ export class AeroSystemNASA extends System {
   private smoothForce(key: string, currentForce: THREE.Vector3): THREE.Vector3 {
     const previousForce = this.previousForces.get(key);
 
-    if (!previousForce) {
-      // Premier frame : pas de lissage
-      this.previousForces.set(key, currentForce.clone());
-      return currentForce.clone();
-    }
-
-    // Lissage exponentiel : F_smooth = α × F_current + (1 - α) × F_previous
-    // où α = FORCE_SMOOTHING_FACTOR
-    const smoothed = new THREE.Vector3();
-    smoothed.x = this.FORCE_SMOOTHING_FACTOR * currentForce.x + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.x;
-    smoothed.y = this.FORCE_SMOOTHING_FACTOR * currentForce.y + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.y;
-    smoothed.z = this.FORCE_SMOOTHING_FACTOR * currentForce.z + (1 - this.FORCE_SMOOTHING_FACTOR) * previousForce.z;
+    // Utiliser fonction centralisée
+    const smoothed = MathUtils.exponentialSmoothing(
+      currentForce,
+      previousForce || null,
+      this.FORCE_SMOOTHING_FACTOR
+    );
 
     // Sauvegarder pour le prochain frame
     this.previousForces.set(key, smoothed.clone());
-
     return smoothed;
   }
 
   /**
    * Lisse un torque entre le frame précédent et le frame actuel
    * Même algorithme que smoothForce
+   * @deprecated Utiliser MathUtils.exponentialSmoothing() à la place
    *
    * @param key Identifiant unique de la surface
    * @param currentTorque Torque calculé ce frame
@@ -608,21 +603,15 @@ export class AeroSystemNASA extends System {
   private smoothTorque(key: string, currentTorque: THREE.Vector3): THREE.Vector3 {
     const previousTorque = this.previousTorques.get(key);
 
-    if (!previousTorque) {
-      // Premier frame : pas de lissage
-      this.previousTorques.set(key, currentTorque.clone());
-      return currentTorque.clone();
-    }
-
-    // Lissage exponentiel : τ_smooth = α × τ_current + (1 - α) × τ_previous
-    const smoothed = new THREE.Vector3();
-    smoothed.x = this.FORCE_SMOOTHING_FACTOR * currentTorque.x + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.x;
-    smoothed.y = this.FORCE_SMOOTHING_FACTOR * currentTorque.y + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.y;
-    smoothed.z = this.FORCE_SMOOTHING_FACTOR * currentTorque.z + (1 - this.FORCE_SMOOTHING_FACTOR) * previousTorque.z;
+    // Utiliser fonction centralisée
+    const smoothed = MathUtils.exponentialSmoothing(
+      currentTorque,
+      previousTorque || null,
+      this.FORCE_SMOOTHING_FACTOR
+    );
 
     // Sauvegarder pour le prochain frame
     this.previousTorques.set(key, smoothed.clone());
-
     return smoothed;
   }
 }

@@ -36,6 +36,7 @@ import { PhysicsComponent } from '../components/PhysicsComponent';
 import { LineComponent } from '../components/LineComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
 import { PhysicsConstants, ConstraintConfig } from '../config/Config';
+import { MathUtils } from '../utils/MathUtils';
 
 const PRIORITY = 40;
 
@@ -203,8 +204,8 @@ export class TetherSystem extends System {
       // Appliquer au kite (point B)
       kitePhysics.forces.add(force);
 
-      // Générer torque
-      const torque = new THREE.Vector3().crossVectors(r, force);
+      // Générer torque (utilise fonction centralisée MathUtils)
+      const torque = MathUtils.computeTorque(pointB, kiteTransform.position, force);
       kitePhysics.torques.add(torque);
 
       // Mettre à jour tension pour visualisation
