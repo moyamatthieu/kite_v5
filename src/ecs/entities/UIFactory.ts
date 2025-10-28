@@ -21,7 +21,7 @@ export class UIFactory {
         windDirection: savedInputValues?.windDirection ?? CONFIG.wind.direction,
         windTurbulence: savedInputValues?.windTurbulence ?? CONFIG.wind.turbulence,
 
-        // === Lignes (mode PBD uniquement) ===
+        // === Lignes ===
         lineLength: savedInputValues?.lineLength ?? CONFIG.lines.length,
         bridleNez: savedInputValues?.bridleNez ?? CONFIG.bridles.nez,
         bridleInter: savedInputValues?.bridleInter ?? CONFIG.bridles.inter,

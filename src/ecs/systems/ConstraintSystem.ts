@@ -1,10 +1,15 @@
 /**
  * ConstraintSystem.ts - Contraintes de lignes via Position-Based Dynamics
  *
- * PRINCIPE : Les lignes RETIENNENT le kite, elles ne TIRENT PAS.
- * Les lignes sont des contraintes géométriques, pas des générateurs de force.
+ * MODÈLE PHYSIQUE UNIQUE : Position-Based Dynamics (PBD)
+ * ========================================================
+ * Les lignes RETIENNENT le kite avec une contrainte géométrique stricte.
+ * Elles ne TIRENT PAS (pas de force de ressort).
+ * 
+ * La longueur de ligne est maintenue exactement à restLength via corrections
+ * de position et rotation itératives. Ce modèle assure stabilité et réalisme.
  *
- * Algorithme PBD complet inspiré de la branche main
+ * Algorithme inspiré des papiers académiques sur PBD (Müller et al.)
  */
 
 import * as THREE from 'three';

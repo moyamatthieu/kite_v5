@@ -1,10 +1,18 @@
 /**
  * AeroSystem.ts - Calcul des forces aérodynamiques (lift, drag, moment)
  * 
- * Utilise le vent apparent (de WindSystem) pour calculer les forces aéro.
- * Les forces de portance/traînée sont réparties sur chaque panneau de la toile
- * pour générer un couple réaliste autour du centre de masse.
- * Priorité 30 (après vent, avant contraintes).
+ * MODÈLE PHYSIQUE UNIQUE : Plaque plane avec formule de Rayleigh
+ * ===============================================================
+ * Pour chaque panneau (face triangulaire) du cerf-volant :
+ * - Coefficient normal : CN = 2 × sin(α) × cos(α) = sin(2α)
+ * - Lift (portance) : perpendiculaire à la surface
+ * - Drag (traînée) : parallèle au vent apparent
+ * 
+ * Le vent venant de l'arrière d'une face ne génère aucune force.
+ * Les forces sont appliquées au centroïde de chaque face pour créer
+ * un couple réaliste autour du centre de masse.
+ * 
+ * Priorité 30 (après WindSystem, avant ConstraintSystem).
  */
 
 import * as THREE from 'three';

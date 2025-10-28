@@ -257,9 +257,6 @@ export class UISystem extends System {
       debugBtn.textContent = this.inputComponent.debugMode ? '🔍 Debug ON' : '🔍 Debug OFF';
       debugBtn.classList.toggle('active', this.inputComponent.debugMode);
     }
-
-    // Note : Le mode PBD est maintenant le seul mode de contrainte
-    // Les lignes sont des contraintes géométriques pures (pas de forces artificielles)
   }
 
   /**
