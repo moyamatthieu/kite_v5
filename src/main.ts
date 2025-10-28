@@ -1,18 +1,33 @@
-import { Simulation } from "./simulation";
+import { Logger, LogLevel } from '@utils/Logging';
+
+import { SimulationApp } from '@/ecs/SimulationApp';
 
 // Initialisation de la simulation
-console.log("🚀 Démarrage de la simulation ...");
+async function startSimulation() {
+  const logger = Logger.getInstance();
+  logger.setLogLevel(LogLevel.DEBUG); // Afficher tous les logs au démarrage
 
-try {
-  const app = new Simulation();
-  console.log("✅ Simulation initialisée avec succès");
+  logger.info('🚀 Starting simulation...', 'Main');
+  try {
+    const app = new SimulationApp();
+    logger.info('✅ SimulationApp created', 'Main');
 
-  // Gestion du nettoyage lors de la fermeture de la page
-  window.addEventListener("beforeunload", () => {
-    if (app && typeof app.cleanup === "function") {
-      app.cleanup();
-    }
-  });
-} catch (error) {
-  console.error("❌ Erreur lors de l'initialisation de la simulation:", error);
+    await app.initialize();
+    logger.info('✅ SimulationApp initialized', 'Main');
+
+    // Démarrer la simulation
+    app.start();
+    logger.info('✅ Simulation started', 'Main');
+
+    // Gestion du nettoyage lors de la fermeture de la page
+    window.addEventListener('beforeunload', () => {
+      app.dispose();
+    });
+  } catch (error) {
+    logger.error('❌ Simulation error:', 'Main', error);
+  }
 }
+
+// Lancer la simulation au chargement
+Logger.getInstance().info('🎬 Main.ts loaded', 'Main');
+startSimulation();

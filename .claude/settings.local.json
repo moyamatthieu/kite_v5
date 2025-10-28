@@ -17,9 +17,19 @@
       "Bash(cat:*)",
       "Bash(pkill:*)",
       "Bash(cloc:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(node:*)",
+      "Bash(npx ts-node --esm -e \"import(''./src/simulation/config/KiteGeometry'').then(m => console.log(''Masse:'', m.KiteGeometry.TOTAL_MASS, ''kg''))\")",
+      "Bash(npm install)",
+      "mcp__ide__getDiagnostics",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(npm run type-check:*)",
+      "Bash(tree:*)",
+      "Bash(npm run lint:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "default"
 }

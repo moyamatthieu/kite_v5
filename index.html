@@ -7,7 +7,6 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
             overflow: hidden;
             background-color: #000;
             font-family: Arial, sans-serif;
@@ -29,6 +28,10 @@
             display: block;
             width: 100%;
             height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
         .loading {
@@ -185,24 +188,62 @@
             <div class="control-group">
                 <label>💨 Vitesse du vent</label>
                 <div class="slider-container">
-                    <input type="range" id="wind-speed" min="0" max="50" value="15" step="1">
-                    <span class="slider-value" id="wind-speed-value">15 km/h</span>
+                    <input type="range" id="wind-speed" min="0" max="50" value="20" step="1">
+                    <span class="slider-value" id="wind-speed-value">20 km/h</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>🧭 Direction du vent</label>
                 <div class="slider-container">
-                    <input type="range" id="wind-direction" min="0" max="360" value="180" step="5">
-                    <span class="slider-value" id="wind-direction-value">180°</span>
+                    <input type="range" id="wind-direction" min="0" max="360" value="0" step="5">
+                    <span class="slider-value" id="wind-direction-value">0°</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>🌪️ Turbulences</label>
                 <div class="slider-container">
-                    <input type="range" id="wind-turbulence" min="0" max="100" value="20" step="5">
-                    <span class="slider-value" id="wind-turbulence-value">20%</span>
+                    <input type="range" id="wind-turbulence" min="0" max="100" value="0.001" step="0.001">
+                    <span class="slider-value" id="wind-turbulence-value">0.001%</span>
+                </div>
+            </div>
+
+
+            <div class="control-group" id="vector-controls" style="display: none;">
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-lift-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ff00;">🟢 Portance (Lift)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-drag-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #ff0000;">🔴 Traînée (Drag)</span>
+                    </label>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="show-wind-vectors" checked style="margin-right: 8px;">
+                        <span style="color: #00ffff;">🔵 Vent Apparent</span>
+                    </label>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Portance/Traînée</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-lift" min="0.01" max="1.0" value="0.2" step="0.01">
+                        <span class="slider-value" id="vector-scale-lift-value">0.20</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label>📏 Échelle Vent Apparent</label>
+                    <div class="slider-container">
+                        <input type="range" id="vector-scale-wind" min="0.01" max="0.5" value="0.05" step="0.01">
+                        <span class="slider-value" id="vector-scale-wind-value">0.05</span>
+                    </div>
                 </div>
             </div>
 
@@ -210,8 +251,8 @@
             <div class="control-group">
                 <label>📏 Longueur des lignes</label>
                 <div class="slider-container">
-                    <input type="range" id="line-length" min="10" max="50" value="25" step="1">
-                    <span class="slider-value" id="line-length-value">25m</span>
+                    <input type="range" id="line-length" min="10" max="50" value="15" step="1">
+                    <span class="slider-value" id="line-length-value">15m</span>
                 </div>
             </div>
 
@@ -219,41 +260,50 @@
             <div class="control-group">
                 <label>🪃 Bride NEZ→CTRL</label>
                 <div class="slider-container">
-                    <input type="range" id="bridle-nez" min="0.3" max="0.8" value="0.5" step="0.01">
-                    <span class="slider-value" id="bridle-nez-value">0.50m</span>
+                    <input type="range" id="bridle-nez" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-nez-value">0.65m</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>🪃 Bride INTER→CTRL</label>
                 <div class="slider-container">
-                    <input type="range" id="bridle-inter" min="0.2" max="0.6" value="0.35" step="0.01">
-                    <span class="slider-value" id="bridle-inter-value">0.35m</span>
+                    <input type="range" id="bridle-inter" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-inter-value">0.65m</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>🪃 Bride CENTRE→CTRL</label>
                 <div class="slider-container">
-                    <input type="range" id="bridle-centre" min="0.2" max="0.6" value="0.3" step="0.01">
-                    <span class="slider-value" id="bridle-centre-value">0.30m</span>
+                    <input type="range" id="bridle-centre" min="0.2" max="1.0" value="0.65" step="0.01">
+                    <span class="slider-value" id="bridle-centre-value">0.65m</span>
                 </div>
             </div>
 
-            <!-- Contrôles de damping physique -->
+            <!-- Amortissements -->
             <div class="control-group">
-                <label>⚡ Damping Linéaire</label>
+                <label>🔄 Amortissement linéaire</label>
                 <div class="slider-container">
-                    <input type="range" id="linear-damping" min="0.90" max="1.0" value="0.97" step="0.01">
-                    <span class="slider-value" id="linear-damping-value">0.97</span>
+                    <input type="range" id="linear-damping" min="0" max="1" value="0.2" step="0.01">
+                    <span class="slider-value" id="linear-damping-value">0.20</span>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>🔄 Damping Angulaire</label>
+                <label>🔄 Amortissement angulaire</label>
                 <div class="slider-container">
-                    <input type="range" id="angular-damping" min="0.85" max="1.0" value="0.94" step="0.01">
-                    <span class="slider-value" id="angular-damping-value">0.94</span>
+                    <input type="range" id="angular-damping" min="0" max="1" value="1.0" step="0.01">
+                    <span class="slider-value" id="angular-damping-value">1.00</span>
+                </div>
+            </div>
+
+            <!-- 🔧 Contrôle du niveau de subdivision du maillage -->
+            <div class="control-group">
+                <label>🔺 Niveau Maillage</label>
+                <div class="slider-container">
+                    <input type="range" id="mesh-subdivision-level" min="0" max="4" value="2" step="1">
+                    <span class="slider-value" id="mesh-subdivision-level-value">2 (64 triangles)</span>
                 </div>
             </div>
 
@@ -261,16 +311,59 @@
             <div class="control-group">
                 <label>🪁 Portance (Lift Scale)</label>
                 <div class="slider-container">
-                    <input type="range" id="lift-scale" min="0.1" max="1.5" value="0.5" step="0.05">
-                    <span class="slider-value" id="lift-scale-value">0.5</span>
+                    <input type="range" id="lift-scale" min="0.1" max="2.0" value="1.2" step="0.1">
+                    <span class="slider-value" id="lift-scale-value">1.2</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>🌬️ Traînée (Drag Scale)</label>
                 <div class="slider-container">
-                    <input type="range" id="drag-scale" min="0.1" max="1.5" value="0.35" step="0.05">
-                    <span class="slider-value" id="drag-scale-value">0.35</span>
+                    <input type="range" id="drag-scale" min="0.1" max="2.0" value="1.2" step="0.1">
+                    <span class="slider-value" id="drag-scale-value">1.2</span>
+                </div>
+            </div>
+
+            <!-- Contrôle du lissage des forces physiques -->
+            <div class="control-group">
+                <label>🔄 Lissage des Forces</label>
+                <div class="slider-container">
+                    <input type="range" id="force-smoothing" min="0.0" max="1.0" value="0.8" step="0.05">
+                    <span class="slider-value" id="force-smoothing-value">0.80</span>
+                </div>
+            </div>
+
+            <!-- Contrôles de Logging -->
+            <div class="control-group">
+                <label>📋 Configuration Logging</label>
+                
+                <!-- Niveau de log -->
+                <div style="margin: 10px 0;">
+                    <label for="log-level" style="font-size: 12px;">Niveau de log:</label>
+                    <select id="log-level" style="margin-left: 8px; padding: 2px;">
+                        <option value="0">DEBUG</option>
+                        <option value="1" selected>INFO</option>
+                        <option value="2">WARN</option>
+                        <option value="3">ERROR</option>
+                    </select>
+                </div>
+
+                <!-- Configurations prédéfinies -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-dev" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">🚀 Dev</button>
+                        <button id="log-prod" style="padding: 4px 8px; font-size: 11px; background: #FF9800; color: white; border: none; border-radius: 3px; cursor: pointer;">🏭 Prod</button>
+                        <button id="log-perf" style="padding: 4px 8px; font-size: 11px; background: #9C27B0; color: white; border: none; border-radius: 3px; cursor: pointer;">⚡ Perf</button>
+                        <button id="log-debug" style="padding: 4px 8px; font-size: 11px; background: #F44336; color: white; border: none; border-radius: 3px; cursor: pointer;">🐛 Debug</button>
+                    </div>
+                </div>
+
+                <!-- Utilitaires -->
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="log-stats" style="padding: 4px 8px; font-size: 11px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">📊 Stats</button>
+                        <button id="log-clear" style="padding: 4px 8px; font-size: 11px; background: #607D8B; color: white; border: none; border-radius: 3px; cursor: pointer;">🗑️ Clear</button>
+                    </div>
                 </div>
             </div>
         </div>

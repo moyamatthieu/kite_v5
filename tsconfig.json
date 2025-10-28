@@ -20,13 +20,25 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"],
-      "@core/*": ["src/core/*"],
-      "@base/*": ["src/base/*"],
-      "@objects/*": ["src/objects/*"],
-      "@factories/*": ["src/factories/*"],
-      "@types": ["src/types/index"]
+      "@ecs/*": ["src/ecs/*"],
+      "@base/*": ["src/ecs/base/*"],
+      "@components": ["src/ecs/components"],
+      "@components/*": ["src/ecs/components/*"],
+      "@systems": ["src/ecs/systems"],
+      "@systems/*": ["src/ecs/systems/*"],
+      "@entities/*": ["src/ecs/entities/*"],
+      "@entities": ["src/ecs/entities"],
+      "@config/*": ["src/ecs/config/*"],
+      "@utils/*": ["src/ecs/utils/*"],
+      "@mytypes/*": ["src/ecs/types/*"],
+      "@rendering/*": ["src/ecs/rendering/*"],
+      "@ui/*": ["src/ecs/ui/*"],
+      "@core/*": ["src/ecs/core/*"],
+      "@objects/*": ["src/ecs/objects/*"],
+      "@factories/*": ["src/ecs/factories/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "test"],
+  "exclude": ["src/ecs/.legacy"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
