@@ -1,12 +1,22 @@
 /**
  * AeroSystem.ts - Calcul des forces aérodynamiques (lift, drag, moment)
  * 
- * MODÈLE PHYSIQUE UNIQUE : Plaque plane avec formule de Rayleigh
- * ===============================================================
+ * MODÈLE PHYSIQUE : Formules NASA pour cerfs-volants
+ * ===================================================
+ * Basé sur les équations officielles NASA pour plaques planes à faible aspect ratio.
+ * Source: https://www.grc.nasa.gov/www/k-12/airplane/kiteaero.html
+ * 
  * Pour chaque panneau (face triangulaire) du cerf-volant :
- * - Coefficient normal : CN = 2 × sin(α) × cos(α) = sin(2α)
- * - Lift (portance) : perpendiculaire à la surface
- * - Drag (traînée) : parallèle au vent apparent
+ * 
+ * 1. LIFT (Portance) :
+ *    CL₀ = 2π × α  (théorie plaque plane, α en radians)
+ *    CL = CL₀ / (1 + CL₀ / (π × AR))  (correction faible aspect ratio)
+ * 
+ * 2. DRAG (Traînée) :
+ *    CD₀ = 1.28 × sin(α)  (traînée de forme)
+ *    CD = CD₀ + CL² / (0.7 × π × AR)  (traînée induite incluse)
+ * 
+ * 3. Aspect Ratio : AR = span² / area
  * 
  * Le vent venant de l'arrière d'une face ne génère aucune force.
  * Les forces sont appliquées au centroïde de chaque face pour créer
@@ -40,7 +50,7 @@ export class AeroSystem extends System {
   private readonly gravity = new THREE.Vector3(0, -PhysicsConstants.GRAVITY, 0); // Y est vertical dans Three.js
 
   // Debug: activer pour logger les informations sur chaque face
-  private debugFaces = false;
+  private debugFaces = true;  // ✨ ACTIVÉ pour diagnostic
   private debugFrameCounter = 0;
 
   constructor() {
@@ -82,6 +92,9 @@ export class AeroSystem extends System {
       const surfaceSamples = this.getSurfaceSamples(aero, geometry, kite);
       if (surfaceSamples.length === 0) return;
 
+      // 🔍 DEBUG: Compter combien de faces génèrent des forces
+      let activeFacesCount = 0;
+
       // ========================================================================
       // CALCUL PAR FACE - Application directe des forces au niveau des faces
       // ========================================================================
@@ -98,7 +111,9 @@ export class AeroSystem extends System {
         // Debug: Afficher l'orientation du kite (1 fois par seconde, 1ère face seulement)
         if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0 && index === 0) {
           const euler = new THREE.Euler().setFromQuaternion(transform.quaternion, 'XYZ');
-          console.log(`[AeroSystem] 🪁 Orientation kite: pitch=${(euler.x * 180/Math.PI).toFixed(1)}° yaw=${(euler.y * 180/Math.PI).toFixed(1)}° roll=${(euler.z * 180/Math.PI).toFixed(1)}°`);
+          console.log(`\n[AeroSystem] 🪁 Orientation kite: pitch=${(euler.x * 180/Math.PI).toFixed(1)}° yaw=${(euler.y * 180/Math.PI).toFixed(1)}° roll=${(euler.z * 180/Math.PI).toFixed(1)}°`);
+          console.log(`[AeroSystem] 🌬️  Vent ambiant: (${wind.ambient.x.toFixed(2)}, ${wind.ambient.y.toFixed(2)}, ${wind.ambient.z.toFixed(2)}) | Vitesse: ${wind.ambient.length().toFixed(2)} m/s`);
+          console.log(`[AeroSystem] 📊 Total faces: ${surfaceSamples.length}\n`);
         }
         
         // 1. Vitesse locale du centroïde (translation + rotation)
@@ -106,25 +121,42 @@ export class AeroSystem extends System {
         const rotationVelocity = new THREE.Vector3().crossVectors(physics.angularVelocity, leverArm);
         const localVelocity = physics.velocity.clone().add(rotationVelocity);
 
+        // 🔒 SÉCURITÉ: Détecter vitesses aberrantes (>1000 m/s = problème numérique)
+        if (localVelocity.length() > 1000) {
+          console.error(`[AeroSystem] ⚠️ Vitesse excessive détectée: ${localVelocity.length().toFixed(2)} m/s - RESET PHYSIQUE`);
+          // Réinitialiser la physique pour éviter divergence
+          physics.velocity.set(0, 0, 0);
+          physics.angularVelocity.set(0, 0, 0);
+          return;
+        }
+
         // 2. Vent apparent local pour cette face
         const localApparentWind = wind.ambient.clone().sub(localVelocity);
         const localWindSpeed = localApparentWind.length();
 
-        if (localWindSpeed < 0.01) return;
+        // 🔒 SÉCURITÉ: Limiter vent apparent à 100 m/s max (360 km/h)
+        const localWindSpeed_clamped = Math.min(localWindSpeed, 100);
+        
+        if (localWindSpeed_clamped < 0.01) return;
 
         const localWindDir = localApparentWind.clone().normalize();
 
         // 3. Angle d'attaque pour plaque plane (cerf-volant)
+        // CONVENTION: Le vecteur vent pointe OÙ LE VENT VA (velocity vector)
         // dot = normale · vent
-        // - dot > 0 : vent frappe la face de devant → génère une force
-        // - dot < 0 : vent frappe de derrière → PAS de force
-        // - dot = 1 : vent perpendiculaire à la face (impact frontal maximal)
+        // - dot < 0 : normale opposée au vent → face CAPTE le vent → génère une force ✅
+        // - dot > 0 : normale dans le sens du vent → vent par derrière → PAS de force ❌
+        // - dot ≈ -1 : vent perpendiculaire à la face (impact frontal maximal)
         // - dot = 0 : vent parallèle à la surface (pas d'impact)
         let surfaceNormal = sample.normal.clone();
         const dotNW = surfaceNormal.dot(localWindDir);
         
-        // Si le vent vient de derrière, pas de force aéro sur cette face
-        if (dotNW < 0) {
+        // Si le vent vient de derrière (normale et vent dans même sens), pas de force aéro
+        if (dotNW > 0) {
+          // 🔍 DEBUG: Logger les faces éliminées
+          if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
+            console.log(`[AeroSystem] ❌ Face ${sample.descriptor.name}: dotNW=${dotNW.toFixed(3)} > 0 → ÉLIMINÉE (vent de derrière)`);
+          }
           // Stocker des forces nulles pour le debug
           physics.faceForces.push({
             lift: new THREE.Vector3(),
@@ -138,23 +170,46 @@ export class AeroSystem extends System {
           return; // Pas de force si vent de derrière
         }
 
-        // 4. Coefficient normal pour plaque plane (formule de Rayleigh)
-        // C_N = 2 × sin(α) × cos(α) = sin(2α)
-        // où α est l'angle entre la normale et le vent
-        // dot = cos(α) donc sin(α) = sqrt(1 - dot²)
-        const cosAlpha = dotNW; // déjà calculé
+        // 4. ✨ MODÈLE NASA : Coefficients aérodynamiques pour cerfs-volants
+        // Source: https://www.grc.nasa.gov/www/k-12/airplane/kiteaero.html
+        
+        // Angle d'attaque α (angle entre normale et vent)
+        // Utiliser |dotNW| car dot < 0 quand face capte le vent (normale opposée au vent)
+        const cosAlpha = Math.abs(dotNW);
         const sinAlpha = Math.sqrt(Math.max(0, 1 - cosAlpha * cosAlpha));
+        const alpha = Math.acos(Math.min(1, Math.max(0, cosAlpha))); // En radians, dans [0, π/2]
         
-        // Coefficient normal pour plaque plane
-        const CN = 2.0 * sinAlpha * cosAlpha;
+        // 🔒 SÉCURITÉ: Limiter l'angle d'attaque pour éviter divergence numérique
+        // NASA assume "low angle of attack" - limiter à 30° (0.52 rad) max
+        const alpha_clamped = Math.min(alpha, 0.52); // 30° max
         
-        // Pour compatibilité avec le reste du code, on utilise CN comme "CL"
-        // et on calcule CD de manière cohérente
-        const CL = CN * aero.coefficients.CLAlpha; // Facteur d'échelle pour tuning
-        const CD = this.calculateCD(aero, CL, kiteComp.aspectRatio);
+        // === LIFT COEFFICIENT (NASA) ===
+        // CL₀ = 2π × α (théorie plaque plane, valide pour petits angles)
+        const CL0 = 2.0 * Math.PI * alpha_clamped;
+        
+        // Correction pour faible aspect ratio (effet downwash aux extrémités)
+        // CL = CL₀ / (1 + CL₀ / (π × AR))
+        const AR = Math.max(kiteComp.aspectRatio, 0.5); // AR min = 0.5 pour stabilité
+        const CL_raw = CL0 / (1.0 + CL0 / (Math.PI * AR));
+        
+        // 🔒 SÉCURITÉ: Clamp CL entre -2.0 et 2.0 (valeurs physiquement réalistes)
+        const CL = Math.max(-2.0, Math.min(2.0, CL_raw));
+        
+        // === DRAG COEFFICIENT (NASA) ===
+        // CD₀ = 1.28 × sin(α) (traînée de forme pour plaque plane)
+        const CD0 = 1.28 * sinAlpha;
+        
+        // Traînée induite (due à la portance, tourbillons marginaux)
+        // CD = CD₀ + CL² / (0.7 × π × AR)
+        // où 0.7 est le facteur d'efficacité pour aile rectangulaire
+        const CD_induced = (CL * CL) / (0.7 * Math.PI * AR);
+        const CD_raw = CD0 + CD_induced;
+        
+        // 🔒 SÉCURITÉ: Clamp CD entre 0.1 et 3.0
+        const CD = Math.max(0.1, Math.min(3.0, CD_raw));
 
-        // 5. Pression dynamique locale
-        const q = AeroConfig.DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed * localWindSpeed;
+        // 5. Pression dynamique locale (avec vitesse clampée)
+        const q = AeroConfig.DYNAMIC_PRESSURE_COEFF * aero.airDensity * localWindSpeed_clamped * localWindSpeed_clamped;
 
         // 6. ✨ CERF-VOLANT PHYSICS: Forces pour surface plane
         // Pour un cerf-volant (surface plane sans profil aérodynamique):
@@ -171,20 +226,36 @@ export class AeroSystem extends System {
         // Tire le kite dans la direction du vent apparent
         const dragDir = localWindDir.clone();
 
-        // Debug: Logger les informations de chaque face (1 fois par seconde)
-        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
-          const alphaDeg = Math.acos(Math.min(1, dotNW)) * 180 / Math.PI;
-          console.log(`[AeroSystem] Face: ${sample.descriptor.name}`);
-          console.log(`  Normal (monde): (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
-          console.log(`  Wind: (${localWindDir.x.toFixed(2)}, ${localWindDir.y.toFixed(2)}, ${localWindDir.z.toFixed(2)})`);
-          console.log(`  Dot product: ${dotNW.toFixed(3)} (cos α) ${dotNW < 0 ? '❌ VENT DE DERRIÈRE' : '✓ VENT DE DEVANT'}`);
-          console.log(`  Lift dir: (${liftDir.x.toFixed(2)}, ${liftDir.y.toFixed(2)}, ${liftDir.z.toFixed(2)})`);
-          console.log(`  α: ${alphaDeg.toFixed(1)}° | CN: ${CN.toFixed(3)} | CL: ${CL.toFixed(3)} | CD: ${CD.toFixed(3)}`);
-        }
+        // Compter face active
+        activeFacesCount++;
 
         // 7. Forces locales avec orientation correcte + application des scales UI
         const panelLift = liftDir.clone().multiplyScalar(CL * q * sample.area * liftScale);
         const panelDrag = dragDir.clone().multiplyScalar(CD * q * sample.area * dragScale);
+
+        // Debug: Logger les informations de chaque face (1 fois par seconde)
+        if (this.debugFaces && this.debugFrameCounter % DebugConfig.FRAME_LOG_INTERVAL === 0) {
+          const alphaDeg = alpha * 180 / Math.PI;
+          console.log(`[AeroSystem] ✅ Face: ${sample.descriptor.name}`);
+          console.log(`  Normal (monde): (${surfaceNormal.x.toFixed(2)}, ${surfaceNormal.y.toFixed(2)}, ${surfaceNormal.z.toFixed(2)})`);
+          console.log(`  Wind: (${localWindDir.x.toFixed(2)}, ${localWindDir.y.toFixed(2)}, ${localWindDir.z.toFixed(2)})`);
+          console.log(`  Dot product: ${dotNW.toFixed(3)} (cos α) ✓ VENT DE DEVANT`);
+          console.log(`  Lift dir: (${liftDir.x.toFixed(2)}, ${liftDir.y.toFixed(2)}, ${liftDir.z.toFixed(2)})`);
+          console.log(`  📐 NASA Model: α=${alphaDeg.toFixed(1)}° (clamped=${(alpha_clamped*180/Math.PI).toFixed(1)}°) | AR=${AR.toFixed(2)} | CL=${CL.toFixed(3)} | CD=${CD.toFixed(3)} (CD₀=${CD0.toFixed(3)} + induced=${CD_induced.toFixed(3)})`);
+          console.log(`  💪 Forces: Lift=${panelLift.length().toFixed(2)}N Drag=${panelDrag.length().toFixed(2)}N\n`);
+        }
+
+        // 🔒 VALIDATION: Vérifier que les forces sont finies (pas NaN/Infinity)
+        if (!isFinite(panelLift.length()) || !isFinite(panelDrag.length())) {
+          console.error(`[AeroSystem] ⚠️ Forces non-finies détectées sur ${sample.descriptor.name}:`, {
+            panelLift: panelLift.length(),
+            panelDrag: panelDrag.length(),
+            CL, CD, q, area: sample.area,
+            alpha: alpha * 180 / Math.PI,
+            windSpeed: localWindSpeed
+          });
+          return; // Ignorer cette face si forces invalides
+        }
 
         // 8. ✨ GRAVITÉ DISTRIBUÉE PAR FACE ===
         // La gravité est répartie sur chaque face proportionnellement à son aire
@@ -298,7 +369,7 @@ export class AeroSystem extends System {
    * 
    * Pour un cerf-volant:
    * - La force aérodynamique est perpendiculaire à la surface (normale)
-   * - L'intensité est déterminée par le coefficient normal C_N = 2×sin(α)×cos(α)
+   * - L'intensité est déterminée par le coefficient CL (modèle NASA)
    * - Seules les faces "face au vent" (dot > 0) génèrent une force
    * 
    * @param surfaceNormal - Normale de la surface (unitaire)
@@ -309,17 +380,6 @@ export class AeroSystem extends System {
     // Pour une plaque plane, la force est simplement normale à la surface
     // Le filtrage "face au vent" est fait avant l'appel (dotNW < 0 → return)
     return surfaceNormal.clone();
-  }
-  
-  /**
-   * Calcule CD depuis CL (formule polaire parabolique)
-   * Formule : CD = CD0 + k × CL² où k = 1 / (π × AR × e)
-   */
-  private calculateCD(aero: AerodynamicsComponent, CL: number, aspectRatio: number): number {
-    const CD0 = aero.coefficients.CD;
-    const safeAspectRatio = Math.max(aspectRatio, 0.1);
-    const k = 1 / (Math.PI * safeAspectRatio * AeroConfig.OSWALD_EFFICIENCY);
-    return CD0 + k * CL * CL;
   }
   
   /**
