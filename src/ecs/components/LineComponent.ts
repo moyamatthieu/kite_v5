@@ -1,8 +1,9 @@
 /**
  * LineComponent.ts - Propriétés d'une ligne de cerf-volant
  * 
- * Ligne = segment droit rigide avec élasticité simple (loi de Hooke).
- * Pas de caténaire, pas de masse linéaire, pas de damping complexe.
+ * Stocke uniquement l'ÉTAT de la ligne (longueurs, tension).
+ * Les paramètres physiques (stiffness, damping) sont dans ConstraintConfig
+ * et utilisés directement par LineSystem.
  */
 
 import { Component } from '../core/Component';
@@ -15,12 +16,6 @@ export class LineComponent extends Component {
 
   /** Longueur instantanée mesurée (mètres) */
   currentLength: number;
-  
-  /** Rigidité (N/m) - loi de Hooke : F = k × Δx */
-  stiffness: number;
-
-  /** Amortissement visqueux (N·s/m) */
-  damping: number;
   
   /** Tension maximale admissible (N) */
   maxTension: number;
@@ -38,15 +33,11 @@ export class LineComponent extends Component {
   
   constructor(options: {
     length: number;
-    stiffness?: number;
-    damping?: number;
     maxTension?: number;
   }) {
     super();
     this.restLength = options.length;
     this.currentLength = options.length;
-    this.stiffness = options.stiffness ?? 500; // 500 N/m par défaut
-    this.damping = options.damping ?? 25; // Amortissement standard
     this.maxTension = options.maxTension ?? 200; // 200 N max
     this.currentTension = 0;
     

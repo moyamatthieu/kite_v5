@@ -28,36 +28,6 @@ namespace PhysicsConstants {
   /** Densité de l'air standard (kg/m³) - Niveau mer, 15°C */
   export const AIR_DENSITY = 1.225;
 
-  // ============================================================================
-  // PBD (Position-Based Dynamics) - Paramètres optimisés
-  // ============================================================================
-
-  /** Nombre d'itérations PBD pour convergence (10-20 recommandé) */
-  export const PBD_ITERATIONS = 10;
-
-  /** Compliance PBD (inverse de rigidité): α = 1/k
-   * α = 0     → infiniment rigide (hard constraint)
-   * α = 0.001 → très rigide (k ≈ 1000)
-   * α = 0.01  → rigide (k ≈ 100)
-   * α = 0.1   → souple (k ≈ 10)
-   *
-   * Pour lignes de kite: quasi-rigide (hard constraint)
-   */
-  export const PBD_COMPLIANCE = 0.001;
-
-  /** Correction max PBD par frame (m) - Sécurité anti-divergence */
-  export const PBD_MAX_CORRECTION = 0.5;
-
-  /** Facteur d'amortissement angulaire PBD (0-1)
-   * 0.95 = 5% damp par frame
-   * 0.98 = 2% damp par frame (plus stable)
-   * 0.99 = 1% damp par frame (minimal)
-   */
-  export const PBD_ANGULAR_DAMPING = 0.98;
-
-  /** Lambda max pour PBD : limite stricte pour éviter divergence */
-  export const PBD_MAX_LAMBDA = 1000;
-
   /** Epsilon pour calculs numériques (évite division par zéro) */
   export const EPSILON = 1e-6;
 
@@ -96,10 +66,10 @@ namespace ConstraintConfig {
    *   • Higher values (1000-5000) = stiff cables, can cause oscillations
    *   • Too high (>50000) = numerical instability
    * 
-   * ⚠️ Current value: 50 N/m (très souple pour forces progressives douces)
-   *    À 1m excès → 50N, à 5m excès → 250N (gérable pour kite 0.12kg)
+   * ✅ Current value: 8000 N/m (recommandation Makani pour réalisme/stabilité)
+   *    À 1cm excès → 80N, à 10cm excès → 800N (comportement câble Dyneema réaliste)
    */
-  export const LINE_STIFFNESS = 50; // Rigidité douce pour comportement stable et progressif
+  export const LINE_STIFFNESS = 8000; // Rigidité Makani-inspired (8000 N/m)
 
   /** Position-based projection factor (0.0-1.0)
    * 
@@ -115,13 +85,19 @@ namespace ConstraintConfig {
    * Changed from proportional (0.04 × v × k) to absolute (DAMPING_COEF × v)
    * to avoid explosive damping forces when stiffness or velocity is high.
    * 
-   * Physical interpretation:
-   *   • At v_radial = 1 m/s → damping force = 2 N
-   *   • At v_radial = 10 m/s → damping force = 20 N (not 960N!)
+   * Physical interpretation (avec k=8000 N/m):
+   *   • Critical damping: c_crit = 2×√(k×m) = 2×√(8000×0.12) = 62 N·s/m
+   *   • Target: 0.1 × c_crit = 6.2 N·s/m (underdamped léger)
    * 
-   * ⚠️ MODIFIÉ: Damping absolu pour éviter explosions
+   * ✅ Avec damping = 6.0 N·s/m (OPTIMAL avec k=8000):
+   *   - excess = 0.31m → F_spring = 8000×0.31 = 2480N
+   *   - v_radial = 22m/s → F_damp = -6×22 = -132N
+   *   - F_total = 2480-132 = 2348N > 0 ✅ Force positive appliquée !
+   * 
+   * Ratio damping/spring = 6×v / (8000×excess) = 0.00075×(v/excess)
+   * Pour v/excess < 1333 s⁻¹, le ressort domine (comportement physique correct)
    */
-  export const ABSOLUTE_DAMPING = 2.0; // N·s/m - damping absolu indépendant de la rigidité
+  export const ABSOLUTE_DAMPING = 6.0; // N·s/m - 0.1 × c_crit pour underdamping optimal
   
   /** @deprecated Use ABSOLUTE_DAMPING instead */
   export const PBD_DAMPING = 0.04;
@@ -194,10 +170,10 @@ namespace VisualConstants {
   export const COLOR_RED = 0xff0000;
 
   /** Diamètre cylindre barre (m) */
-  export const BAR_CYLINDER_DIAMETER = 0.015;
-
-  /** Diamètre sphère poignée (m) */
-  export const HANDLE_SPHERE_DIAMETER = 0.035;
+  export const BAR_CYLINDER_DIAMETER = 0.03;       // 3 cm de diamètre (était 1.5 cm)
+  
+  /** Diamètre des sphères représentant les poignets (m) */
+  export const HANDLE_SPHERE_DIAMETER = 0.07;     // 7 cm de diamètre (était 3.5 cm)
 
   /** Segments sphère poignée */
   export const HANDLE_SPHERE_SEGMENTS = 16;
@@ -234,8 +210,12 @@ namespace KiteSpecs {
   /** Corde (m) - Profondeur moyenne */
   export const CHORD_M = 0.65;
 
-  /** Surface ailée (m²) - Calculée : wingspan × chord × 0.5 (delta triangulaire) */
-  export const SURFACE_AREA_M2 = 0.8; // Augmentée pour plus de portance réaliste
+  /** Surface ailée (m²) - Valeur effective pour kite delta avec profil 3D
+   * Calcul géométrique pur : wingspan × chord × 0.5 = 1.65 × 0.65 × 0.5 = 0.536 m²
+   * Valeur utilisée : 0.8 m² (surface effective incluant courbure et profil 3D)
+   * Note: La surface effective d'un kite est supérieure à la projection 2D
+   */
+  export const SURFACE_AREA_M2 = 0.8;
 
   // === Moments d'inertie (kg⋅m²) ===
   // Calcul précis pour plaque triangulaire delta (120g, 1.65m x 0.65m)
@@ -277,13 +257,13 @@ namespace KiteSpecs {
 namespace BridleConfig {
   // === Longueurs ===
   /** Longueur bride nez (m) */
-  export const LENGTH_NEZ_M = 0.65;
+  export const LENGTH_NEZ_M = 0.65; // Aligné avec InputDefaults
 
   /** Longueur bride inter (m) */
-  export const LENGTH_INTER_M = 0.65;
+  export const LENGTH_INTER_M = 0.65; // Aligné avec InputDefaults
 
   /** Longueur bride centre (m) */
-  export const LENGTH_CENTRE_M = 0.65;
+  export const LENGTH_CENTRE_M = 0.65; // Aligné avec InputDefaults
 
   // === Couleur ===
   /** Couleur des bridles en RGB hex */
@@ -305,27 +285,11 @@ namespace LineSpecs {
   // === Couleur ===
   /** Couleur des lignes en RGB hex */
   export const COLOR = 0x0000ff; // Bleu
-
-  // === Mode de contrainte ===
-  /** Mode : 'pbd' (Position-Based Dynamics) ou 'spring-force' (ressort physique) */
-  export const CONSTRAINT_MODE = 'pbd' as const;
-
-  // === Paramètres Spring-Force ===
-  /** Rigidité du ressort (N/m) - Réduit de 500 à 50 pour stabilité */
-  export const STIFFNESS_N_PER_M = 500;
-
-  /** Fréquence propre : ω = sqrt(k/m) = sqrt(50/0.12) ≈ 20 rad/s (~3 Hz) */
-  export const EXPECTED_FREQUENCY_HZ = 30;
-
-  /** Amortissement visqueux (N·s/m) */
-  export const DAMPING_N_S_PER_M = 50;
-
-  /** Amortissement critique théorique ≈ 4.9 (légèrement sur-amorti) */
-  export const DAMPING_RATIO = 0.7; // Légèrement sur-amorti pour stabilité
-
-  /** Force maximale appliquée (N) - ~83× poids du kite */
-  export const MAX_FORCE_N = 10;
+  
+  // Note: Les paramètres physiques (stiffness, damping) sont dans ConstraintConfig
+  // LineSystem utilise ConstraintConfig.LINE_STIFFNESS et ABSOLUTE_DAMPING
 }
+
 
 // ============================================================================
 // 🌬️ AÉRODYNAMIQUE
@@ -377,10 +341,10 @@ namespace AeroConfig {
 
 namespace EnvironmentConfig {
   // === Vent ===
-  /** Vitesse du vent par défaut (m/s) */
-  export const WIND_SPEED_M_S = 5.0;
+  /** Vitesse du vent par défaut (m/s) - Augmentée pour plus de poussée initiale */
+  export const WIND_SPEED_M_S = 8.0;
 
-  /** Direction du vent par défaut (degrés) - 270 = -Z = Nord */
+  /** Direction du vent par défaut (degrés) - 270 = vent du Nord (-Z vector, pousse en +Z) */
   export const WIND_DIRECTION_DEG = 270;
 
   /** Turbulence par défaut (%) - Range: [0, 100] */
@@ -394,10 +358,25 @@ namespace EnvironmentConfig {
   // Direction 270° = -Z (Nord)
 
   // === Physique générale ===
-  /** Damping linéaire (réduction de vélocité) - Plus fort pour stabilité */
-  export const LINEAR_DAMPING = 0.5;
+  /** Damping linéaire (réduction de vélocité)
+   * 
+   * IMPORTANT: Le damping exponentiel est v_new = v_old × exp(-d × dt)
+   * Avec dt ≈ 0.0167s (60 FPS):
+   * - d = 0.2  → 0.33% réduction/frame (léger damping numérique)
+   * - d = 0.5  → 0.83% réduction/frame (optimal pour stabilité)
+   * - d = 1.0  → 1.67% réduction/frame (moyen)
+   * - d = 10.0 → 15.3% réduction/frame → vitesse tombe à ZÉRO en 1s ❌ PHYSIQUEMENT ABSURDE
+   * 
+   * ⚠️ Le freinage doit venir des forces aérodynamiques (drag), PAS d'un damping artificiel !
+   * 
+   * Le LINEAR_DAMPING est uniquement pour la stabilité numérique, il doit être MINIMAL.
+   * Les forces de drag aérodynamiques (F_drag ≈ 0.5×ρ×C_d×A×v²) font le vrai freinage.
+   * 
+   * ✅ Recommandation: 0.3-0.8 (damping numérique léger uniquement)
+   */
+  export const LINEAR_DAMPING = 0.5; // Damping minimal pour stabilité numérique uniquement
 
-  /** Damping angulaire (réduction de rotation) - Plus fort pour stabilité */
+  /** Damping angulaire (réduction de rotation) - Garde synchronisé avec linéaire */
   export const ANGULAR_DAMPING = 0.5;
 }
 
@@ -692,18 +671,11 @@ export const CONFIG = {
     length: LineSpecs.LENGTH_M,
     maxTension: LineSpecs.MAX_TENSION_N,
     color: LineSpecs.COLOR,
-    constraintMode: LineSpecs.CONSTRAINT_MODE,
-    pbd: {
-      iterations: PhysicsConstants.PBD_ITERATIONS,
-      compliance: PhysicsConstants.PBD_COMPLIANCE,
-      maxCorrection: PhysicsConstants.PBD_MAX_CORRECTION,
-      maxLambda: PhysicsConstants.PBD_MAX_LAMBDA,
-      angularDamping: PhysicsConstants.PBD_ANGULAR_DAMPING
-    },
-    springForce: {
-      stiffness: LineSpecs.STIFFNESS_N_PER_M,
-      damping: LineSpecs.DAMPING_N_S_PER_M,
-      maxForce: LineSpecs.MAX_FORCE_N
+    // Paramètres physiques réels utilisés par LineSystem (depuis ConstraintConfig)
+    constraint: {
+      stiffness: ConstraintConfig.LINE_STIFFNESS,     // 8000 N/m
+      damping: ConstraintConfig.ABSOLUTE_DAMPING,     // 6.0 N·s/m
+      maxForce: ConstraintConfig.MAX_CONSTRAINT_FORCE // 300 N
     }
   },
 
@@ -784,12 +756,6 @@ export const CONFIG = {
     showForceVectors: DebugConfig.SHOW_FORCE_VECTORS,
     showPhysicsInfo: DebugConfig.SHOW_PHYSICS_INFO,
     logLevel: DebugConfig.LOG_LEVEL
-  },
-
-  // === MODES ===
-  modes: {
-    aero: SimulationModes.AERO_MODE,
-    constraint: LineSpecs.CONSTRAINT_MODE
   }
 } as const;
 
@@ -818,3 +784,56 @@ export {
   SimulationModes,
   InputDefaults
 };
+
+// ============================================================================
+// 🌌 CONFIGURATION AÉRODYNAMIQUE NASA (CENTRALISÉE)
+// ============================================================================
+
+export namespace NASAAeroConfig {
+  /** Densité de l'air standard au niveau de la mer (kg/m³) */
+  export const AIR_DENSITY_SEA_LEVEL = 1.225;
+
+  /** Coefficient de pression dynamique = 0.5 */
+  export const DYNAMIC_PRESSURE_COEFF = 0.5;
+
+  /** Facteur d'efficacité pour ailes rectangulaires (NASA: 0.7) */
+  export const RECTANGULAR_WING_EFFICIENCY = 0.7;
+
+  /** Coefficient pour plaque plane perpendiculaire (NASA: 1.28) */
+  export const FLAT_PLATE_DRAG_COEFF = 1.28;
+
+  /** Constante π */
+  export const PI = Math.PI;
+
+  // === STALL MODELING ===
+  /** Angle de décrochage (stall) en radians - ~15° pour plaque plane */
+  export const STALL_ANGLE_DEGREES = 15;
+  export const STALL_ANGLE_RAD = (STALL_ANGLE_DEGREES * Math.PI) / 180;
+
+  /** Largeur de transition (°) pour interpolation douce vers le régime post-stall */
+  export const STALL_TRANSITION_WIDTH_DEGREES = 20;
+  export const STALL_TRANSITION_WIDTH_RAD = (STALL_TRANSITION_WIDTH_DEGREES * Math.PI) / 180;
+
+  /** Post-stall CL max (coefficient de portance au stall) */
+  export const CL_MAX = 1.2;
+  export const CL_POST_STALL_COEFF = 1.1;
+
+  /** Post-stall CD (traînée augmentée après stall) */
+  export const CD_STALL = 1.8;
+  export const CD_BASE = 0.08;
+  export const CD_POST_STALL_FACTOR = 1.6;
+
+  // === CENTER OF PRESSURE ===
+  /** Position du centre de pression par rapport au centre géométrique (% chord) */
+  export const CP_POSITION_RATIO = 0.25;
+
+  // === SAFETY LIMITS ===
+  /** Force maximale par surface (N) - Limite de sécurité pour éviter instabilité */
+  export const MAX_FORCE_PER_SURFACE = 500;
+
+  /** Couple maximal par surface (N·m) - Limite de sécurité */
+  export const MAX_TORQUE_PER_SURFACE = 200;
+
+  /** Vitesse apparente maximale considérée (m/s) - Cap réaliste pour kite */
+  export const MAX_APPARENT_WIND_SPEED = 30;
+}

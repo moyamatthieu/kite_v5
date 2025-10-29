@@ -122,8 +122,8 @@ export class GeometryRenderSystem extends System {
       return this.createKiteMesh(geometry, visual);
     }
     
-    // Si c'est la barre de contrôle (identifiée par ses handles)
-    if (geometry.hasPoint('leftHandle') && geometry.hasPoint('rightHandle')) {
+    // Si c'est la barre de contrôle (identifiée par ses poignets)
+    if (geometry.hasPoint('poignet_gauche') && geometry.hasPoint('poignet_droit')) {
       return this.createControlBarMesh(geometry, visual);
     }
     

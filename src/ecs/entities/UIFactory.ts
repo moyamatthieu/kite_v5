@@ -27,11 +27,7 @@ export class UIFactory {
         bridleInter: savedInputValues?.bridleInter ?? CONFIG.bridles.inter,
         bridleCentre: savedInputValues?.bridleCentre ?? CONFIG.bridles.centre,
         
-        // === Mode de contrainte ===
-        constraintMode: savedInputValues?.constraintMode ?? CONFIG.modes.constraint,
-
-        // === Mode aérodynamique ===
-        aeroMode: savedInputValues?.aeroMode ?? CONFIG.modes.aero,
+  // ...existing code...
 
         // === Physique ===
         linearDamping: savedInputValues?.linearDamping ?? CONFIG.physics.linearDamping,

@@ -1,6 +1,6 @@
 import { Component } from '../core/Component';
 import { Logger } from '../utils/Logging';
-import { CONFIG, InputDefaults } from '../config/Config';
+import { CONFIG, InputDefaults, WindConfig, EnvironmentConfig } from '../config/Config';
 
 /**
  * Snapshot complet de l'état InputComponent pour sérialisation/sauvegarde
@@ -13,8 +13,6 @@ export interface InputState {
   windTurbulence: number;
 
   // === Lignes ===
-  constraintMode: 'pbd' | 'spring-force';
-  aeroMode: 'perso' | 'nasa';
   lineLength: number;
   bridleNez: number;
   bridleInter: number;
@@ -51,46 +49,107 @@ export class InputComponent extends Component {
   private logger = Logger.getInstance();
   
   // === Vent ===
-  windSpeed: number; // m/s
-  windDirection: number; // degrés
-  windTurbulence: number; // %
+  private _windSpeed: number = CONFIG.wind.speed; // m/s
+  private _windDirection: number = WindConfig.DEFAULT_WIND_DIRECTION; // degrés
+  private _windTurbulence: number = WindConfig.DEFAULT_TURBULENCE; // %
 
-  // === Lignes (avec backing fields pour détection de changements) ===
-  private _constraintMode: 'pbd' | 'spring-force' = CONFIG.modes.constraint;
-  private _aeroMode: 'perso' | 'nasa' = CONFIG.modes.aero;
+  // === Lignes ===
 
-  get constraintMode(): 'pbd' | 'spring-force' {
-    return this._constraintMode;
+  // ...existing code...
+      // ...existing code...
+  private _lineLength: number = InputDefaults.LINE_LENGTH_M;
+
+  get lineLength(): number {
+    return this._lineLength;
   }
 
-  set constraintMode(value: 'pbd' | 'spring-force') {
-    if (this._constraintMode !== value) {
-      const oldMode = this._constraintMode;
-      this._constraintMode = value;
-      this.logger.info(`📋 Constraint mode changed: ${oldMode} → ${value}`, 'InputComponent');
+  set lineLength(value: number) {
+    if (this._lineLength !== value) {
+      this._lineLength = value;
+      this.logger.info(`📏 Line length changed: ${value}m`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
     }
   }
-
-  get aeroMode(): 'perso' | 'nasa' {
-    return this._aeroMode;
+  private _bridleNez: number = 0.65; // Aligné avec BridleComponent
+ 
+  get bridleNez(): number {
+    return this._bridleNez;
   }
 
-  set aeroMode(value: 'perso' | 'nasa') {
-    if (this._aeroMode !== value) {
-      const oldMode = this._aeroMode;
-      this._aeroMode = value;
-      this.logger.info(`🌪️  Aero mode changed: ${oldMode} → ${value}`, 'InputComponent');
+  set bridleNez(value: number) {
+    if (this._bridleNez !== value) {
+      this._bridleNez = value;
+      this.logger.info(`🔗 Bridle Nez changed: ${value}m`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
     }
   }
-  lineLength: number; // m
-  bridleNez: number; // m
-  bridleInter: number; // m
-  bridleCentre: number; // m
+  private _bridleInter: number = 0.65; // Aligné avec BridleComponent
+ 
+  get bridleInter(): number {
+    return this._bridleInter;
+  }
+
+  set bridleInter(value: number) {
+    if (this._bridleInter !== value) {
+      this._bridleInter = value;
+      this.logger.info(`🔗 Bridle Inter changed: ${value}m`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
+  private _bridleCentre: number = 0.65; // Aligné avec BridleComponent
+ 
+  get bridleCentre(): number {
+    return this._bridleCentre;
+  }
+
+  set bridleCentre(value: number) {
+    if (this._bridleCentre !== value) {
+      this._bridleCentre = value;
+      this.logger.info(`🔗 Bridle Centre changed: ${value}m`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
 
   // === Physique ===
-  linearDamping: number;
-  angularDamping: number;
-  meshSubdivisionLevel: number;
+  private _linearDamping: number = EnvironmentConfig.LINEAR_DAMPING;
+
+  get linearDamping(): number {
+    return this._linearDamping;
+  }
+
+  set linearDamping(value: number) {
+    if (this._linearDamping !== value) {
+      this._linearDamping = value;
+      this.logger.info(`💨 Linear damping changed: ${value}`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
+  private _angularDamping: number = EnvironmentConfig.ANGULAR_DAMPING;
+
+  get angularDamping(): number {
+    return this._angularDamping;
+  }
+
+  set angularDamping(value: number) {
+    if (this._angularDamping !== value) {
+      this._angularDamping = value;
+      this.logger.info(`🔄 Angular damping changed: ${value}`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
+  private _meshSubdivisionLevel: number = InputDefaults.MESH_SUBDIVISION_LEVEL;
+
+  get meshSubdivisionLevel(): number {
+    return this._meshSubdivisionLevel;
+  }
+
+  set meshSubdivisionLevel(value: number) {
+    if (this._meshSubdivisionLevel !== value) {
+      this._meshSubdivisionLevel = value;
+      this.logger.info(`🔼 Mesh subdivision level changed: ${value}`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
 
   // === Aérodynamique ===
   liftScale: number;
@@ -113,9 +172,7 @@ export class InputComponent extends Component {
     this.windDirection = initialValues.windDirection ?? CONFIG.wind.direction;
     this.windTurbulence = initialValues.windTurbulence ?? CONFIG.wind.turbulence;
 
-    // Lignes - Modes
-    this.constraintMode = initialValues.constraintMode ?? CONFIG.modes.constraint;
-    this.aeroMode = initialValues.aeroMode ?? CONFIG.modes.aero;
+  // ...existing code...
     
     // Lignes - Dimensions
     this.lineLength = initialValues.lineLength ?? InputDefaults.LINE_LENGTH_M;
@@ -140,5 +197,41 @@ export class InputComponent extends Component {
 
     // Contrôle barre
     this.barRotationInput = initialValues.barRotationInput ?? 0;
+  }
+
+  get windSpeed(): number {
+    return this._windSpeed;
+  }
+
+  set windSpeed(value: number) {
+    if (this._windSpeed !== value) {
+      this._windSpeed = value;
+      this.logger.info(`💨 Wind speed changed: ${value} m/s`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
+
+  get windDirection(): number {
+    return this._windDirection;
+  }
+
+  set windDirection(value: number) {
+    if (this._windDirection !== value) {
+      this._windDirection = value;
+      this.logger.info(`🧭 Wind direction changed: ${value} degrees`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
+  }
+
+  get windTurbulence(): number {
+    return this._windTurbulence;
+  }
+
+  set windTurbulence(value: number) {
+    if (this._windTurbulence !== value) {
+      this._windTurbulence = value;
+      this.logger.info(`💨 Wind turbulence changed: ${value}%`, 'InputComponent');
+      // Potentiellement déclencher un événement ou une mise à jour ici
+    }
   }
 }

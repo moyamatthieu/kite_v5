@@ -29,10 +29,12 @@ import { TransformComponent } from '../components/TransformComponent';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { InputComponent } from '../components/InputComponent';
 import { GeometryComponent } from '../components/GeometryComponent';
+import { Logger } from '../utils/Logging';
 import { CONFIG } from '../config/Config';
 
 export class PilotSystem extends System {
   private barRotationAngle: number = 0; // Angle de rotation actuel (degrés)
+  private logger = Logger.getInstance();
 
   // Configuration de la rotation de la barre
   private readonly MAX_ROTATION_ANGLE = 30; // degrés max de chaque côté
@@ -169,6 +171,33 @@ export class PilotSystem extends System {
   }
 
   /**
+   * Calcule la nouvelle rotation de la barre en fonction des entrées utilisateur.
+   * @param inputComp Le composant InputComponent.
+   * @param deltaTime Le temps écoulé depuis la dernière frame.
+   */
+  private calculateBarRotation(inputComp: InputComponent, deltaTime: number): void {
+    // Appliquer l'input de rotation de la barre, limité par MAX_ROTATION_ANGLE
+    const rotationInput = inputComp.barRotationInput;
+    if (rotationInput !== 0) {
+      // La vitesse de rotation est en degrés par seconde
+      const rotationAmount = this.ROTATION_SPEED * deltaTime;
+      this.barRotationAngle += rotationInput * rotationAmount;
+      
+      // Clamper l'angle de rotation
+      this.barRotationAngle = Math.max(-this.MAX_ROTATION_ANGLE, Math.min(this.MAX_ROTATION_ANGLE, this.barRotationAngle));
+    } else {
+      // Si pas d'input, amortir doucement vers la position neutre (0 degrés)
+      // TODO: Implémenter un amortissement plus réaliste si nécessaire
+      if (this.barRotationAngle !== 0) {
+        this.barRotationAngle *= 0.9; // Amortissement simple
+        if (Math.abs(this.barRotationAngle) < 0.1) {
+          this.barRotationAngle = 0;
+        }
+      }
+    }
+  }
+
+  /**
    * Met à jour la rotation de la barre de contrôle depuis les inputs clavier
    * Rotation autour d'un axe perpendiculaire au vecteur (pivot → milieu_CTRL)
    */
@@ -204,26 +233,8 @@ export class PilotSystem extends System {
     const kiteTransform = kite.getComponent<TransformComponent>('transform');
     if (!kiteGeom || !kiteTransform) return;
 
-    // Mettre à jour l'angle de rotation selon l'input (-1, 0, ou 1)
-    const rotationInput = inputComp.barRotationInput;
-    
-    if (rotationInput !== 0) {
-      // Appliquer la rotation progressive
-      const rotationDelta = rotationInput * this.ROTATION_SPEED * deltaTime;
-      this.barRotationAngle = Math.max(
-        -this.MAX_ROTATION_ANGLE,
-        Math.min(this.MAX_ROTATION_ANGLE, this.barRotationAngle + rotationDelta)
-      );
-    } else {
-      // Retour progressif au centre quand aucun input
-      const RETURN_SPEED_FACTOR = 2.0;
-      const returnSpeed = this.ROTATION_SPEED * RETURN_SPEED_FACTOR * deltaTime;
-      if (Math.abs(this.barRotationAngle) < returnSpeed) {
-        this.barRotationAngle = 0;
-      } else {
-        this.barRotationAngle -= Math.sign(this.barRotationAngle) * returnSpeed;
-      }
-    }
+    // Calculer la nouvelle rotation de la barre en fonction des entrées utilisateur
+    this.calculateBarRotation(inputComp, deltaTime);
 
     // Calculer les positions mondiales des points CTRL
     const ctrlLeftLocal = kiteGeom.getPoint('CTRL_GAUCHE');

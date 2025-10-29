@@ -22,10 +22,10 @@ export class LineFactory {
     }));
     
     // === LINE COMPONENT ===
+    // Les paramètres physiques (stiffness, damping) sont dans ConstraintConfig
+    // et utilisés directement par LineSystem, pas stockés dans le composant
     entity.addComponent(new LineComponent({
       length: CONFIG.lines.length,
-      stiffness: CONFIG.lines.springForce.stiffness,
-      damping: CONFIG.lines.springForce.damping,
       maxTension: CONFIG.lines.maxTension
     }));
     

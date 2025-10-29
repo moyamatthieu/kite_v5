@@ -75,7 +75,7 @@ import {
   SimulationLogger,
   LineSystem,
 } from './systems';
-import { AeroSystemNASA } from './systems/AeroSystemNASA';
+import { AeroSystem } from './systems/AeroSystem';
 import { CONFIG, SimulationConstants } from './config/Config';
 import { Logger } from './utils/Logging';
 import type { SimulationContext } from './core/System';
@@ -91,7 +91,7 @@ export class SimulationApp {
   private logger = Logger.getInstance();
   
   // Système aérodynamique NASA (seul mode disponible)
-  private aeroSystemNASA!: AeroSystemNASA;
+  private aeroSystem!: AeroSystem;
 
   // Système de lignes simplifié (inextensible)
   private lineSystem!: LineSystem;
@@ -205,8 +205,8 @@ export class SimulationApp {
    * Initialise les systèmes aérodynamiques selon la configuration
    */
   private initializeAeroSystems(): void {
-    this.aeroSystemNASA = new AeroSystemNASA();
-    this.aeroSystemNASA.setEnabled(true); // NASA est le seul mode disponible
+    this.aeroSystem = new AeroSystem();
+    this.aeroSystem.setEnabled(true); // NASA est le seul mode disponible
   }
 
   /**
@@ -238,15 +238,18 @@ export class SimulationApp {
     this.systemManager.add(new CameraControlsSystem(canvas, camera)); // Priority 1
     this.systemManager.add(new InputSyncSystem()); // Priority 5
     this.systemManager.add(new BridleConstraintSystem()); // Priority 10
+    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
     this.systemManager.add(new InputSystem()); // Priority 10
+    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
     this.systemManager.add(new WindSystem()); // Priority 20
     
     // Système aérodynamique NASA (seul mode disponible)
-    this.systemManager.add(this.aeroSystemNASA); // Priority 30
+    this.systemManager.add(this.aeroSystem); // Priority 30
 
     // Système de lignes (lignes inextensibles)
     this.systemManager.add(this.lineSystem); // Priority 40
     
+    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
     this.systemManager.add(new SimulationLogger()); // Priority 45
     this.systemManager.add(new PhysicsSystem()); // Priority 50
     this.systemManager.add(new PilotSystem()); // Priority 55
@@ -256,6 +259,9 @@ export class SimulationApp {
     this.systemManager.add(renderSystem); // Priority 70 - Utiliser l'instance déjà créée
     this.systemManager.add(debugSystem); // Priority 88
     this.systemManager.add(new UISystem()); // Priority 90
+
+    // NOTE: La gestion des lignes de vol est assurée par LineSystem (simplifié) et potentiellement ConstraintSystem (plus avancé, inspiré de Makani).
+    // L'ordre d'exécution dans SimulationApp est critique. S'assurer que ConstraintSystem (si implémenté et actif) a une priorité appropriée.
   }
   
   /**
@@ -315,7 +321,7 @@ export class SimulationApp {
     if (this.paused) {
       // En pause : exécuter les systèmes physiques ET de rendu
       // Cela permet d'afficher les forces même en pause (gravité, etc)
-      const systemsToRun = ['AeroSystemNASA', 'GeometryRenderSystem', 'LineRenderSystem', 'BridleRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
+      const systemsToRun = ['AeroSystem', 'GeometryRenderSystem', 'LineRenderSystem', 'BridleRenderSystem', 'RenderSystem', 'DebugSystem', 'UISystem'];
       systemsToRun.forEach(name => {
         const system = this.systemManager.getSystem(name);
         if (system && system.isEnabled()) {
@@ -386,8 +392,6 @@ export class SimulationApp {
       bridleNez: input.bridleNez,
       bridleInter: input.bridleInter,
       bridleCentre: input.bridleCentre,
-      constraintMode: input.constraintMode,
-      aeroMode: input.aeroMode,
       linearDamping: input.linearDamping,
       angularDamping: input.angularDamping,
       meshSubdivisionLevel: input.meshSubdivisionLevel,
@@ -448,7 +452,7 @@ export class SimulationApp {
       const inputComp = uiEntity.getComponent<InputComponent>('Input');
       if (inputComp) {
         this.logger.info(
-          `🔄 RESET COMPLETE | Constraint: ${inputComp.constraintMode} | Aero: ${inputComp.aeroMode}`, 
+          `🔄 RESET COMPLETE | Wind: ${inputComp.windSpeed}m/s | Lines: ${inputComp.lineLength}m`,
           'SimulationApp'
         );
       }
@@ -470,11 +474,11 @@ export class SimulationApp {
    * ```
    */
   setAeroDebug(enabled: boolean, surfaceIndex: number = -1): void {
-    if (this.aeroSystemNASA) {
-      this.aeroSystemNASA.setDebugFaces(enabled, surfaceIndex);
+    if (this.aeroSystem) {
+      this.aeroSystem.setDebugFaces(enabled, surfaceIndex);
       console.log(`🔍 [SimulationApp] Debug aéro ${enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}${surfaceIndex >= 0 ? ` pour surface ${surfaceIndex}` : ''}`);
     } else {
-      console.warn('⚠️ [SimulationApp] AeroSystemNASA non disponible');
+      console.warn('⚠️ [SimulationApp] AeroSystem non disponible');
     }
   }
 

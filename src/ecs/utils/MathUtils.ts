@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import type { TransformComponent } from '../components/TransformComponent';
+import type { Entity } from '../core/Entity';
 
 export class MathUtils {
   /** Epsilon par défaut pour comparaisons flottantes */
@@ -52,6 +53,24 @@ export class MathUtils {
     const matrix = new THREE.Matrix4();
     matrix.compose(transform.position, transform.quaternion, new THREE.Vector3(1, 1, 1));
     return localPoint.clone().applyMatrix4(matrix);
+  }
+
+  /**
+   * Transforme un point local en coordonnées monde
+   * 
+   * @param localPoint Point dans l'espace local
+   * @param entity Entité contenant TransformComponent
+   * @param pointName Nom du point à transformer
+   * @returns Position monde ou undefined si point inexistant
+   */
+  static getPointWorld(localPoint: THREE.Vector3, entity: Entity, pointName: string): THREE.Vector3 | undefined {
+    const transform = entity.getComponent<TransformComponent>('transform');
+    if (!transform) return undefined;
+    
+    // Transforme local → monde : rotation puis translation
+    return localPoint.clone()
+      .applyQuaternion(transform.quaternion)
+      .add(transform.position);
   }
 
   // ========================================================================
@@ -369,6 +388,8 @@ export class MathUtils {
       alpha * current.z + (1 - alpha) * previous.z
     );
   }
+
+  
 
   // ========================================================================
   // DISTANCE ET MESURES

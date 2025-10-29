@@ -7,10 +7,10 @@
  */
 
 import * as THREE from 'three';
-import { EnvironmentConfig } from '../config/Config';
-import { MathUtils } from '../utils/MathUtils';
 
 import { Component } from '../core/Component';
+import { EnvironmentConfig } from '../config/Config';
+import { MathUtils } from '../utils/MathUtils';
 
 export class PhysicsComponent extends Component {
   readonly type = 'physics';

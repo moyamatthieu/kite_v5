@@ -326,7 +326,10 @@
 <body>
     <!-- Panneau d'informations (gauche) -->
     <div id="info-panel" class="panel">
-      <h2>📊 État de vol</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h2 style="margin: 0; flex: 1;">📊 État de vol</h2>
+        <button id="copy-info-btn" style="padding: 5px 10px; background: rgba(77, 166, 255, 0.3); border: 1px solid rgba(77, 166, 255, 0.5); color: #4da6ff; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; margin-left: 8px;">📋 Copier</button>
+      </div>
 
       <h3>🪁 Cerf-volant</h3>
       <div class="info-item">
@@ -413,31 +416,7 @@
     <div id="controls-panel" class="panel">
       <h2>⚙️ Contrôles Simulation</h2>
 
-      <!-- Mode de contrainte -->
-      <div class="constraint-mode-toggle">
-        <label>Mode Contrainte</label>
-        <label class="toggle-switch">
-          <input type="checkbox" id="constraint-mode-toggle">
-          <span class="toggle-slider"></span>
-          <div class="toggle-labels">
-            <span class="label-pbd">PBD</span>
-            <span class="label-force">Force</span>
-          </div>
-        </label>
-      </div>
-
-      <!-- Mode aérodynamique -->
-      <div class="constraint-mode-toggle">
-        <label>Mode Aérodynamique</label>
-        <label class="toggle-switch">
-          <input type="checkbox" id="aero-mode-toggle">
-          <span class="toggle-slider"></span>
-          <div class="toggle-labels">
-            <span class="label-pbd">Perso</span>
-            <span class="label-force">NASA</span>
-          </div>
-        </label>
-      </div>
+      <!-- ...existing code... -->
 
       <!-- Boutons de contrôle en haut -->
       <div class="button-group">
@@ -511,26 +490,20 @@
       <div class="control-group">
         <label for="linear-damping-slider">
           Amortissement linéaire
-          <span class="value-display" id="linear-damping-value">0.99</span>
+          <span class="value-display" id="linear-damping-value">0.50</span>
         </label>
-        <input type="range" id="linear-damping-slider" min="0" max="1" step="0.01" value="0.99">
+        <input type="range" id="linear-damping-slider" min="0" max="2" step="0.1" value="0.5">
       </div>
 
       <div class="control-group">
         <label for="angular-damping-slider">
           Amortissement angulaire
-          <span class="value-display" id="angular-damping-value">0.98</span>
+          <span class="value-display" id="angular-damping-value">0.50</span>
         </label>
-        <input type="range" id="angular-damping-slider" min="0" max="1" step="0.01" value="0.98">
+        <input type="range" id="angular-damping-slider" min="0" max="2" step="0.1" value="0.5">
       </div>
 
-      <div class="control-group">
-        <label for="mesh-subdivision-slider">
-          Subdivision maillage
-          <span class="value-display" id="mesh-subdivision-value">2</span>
-        </label>
-        <input type="range" id="mesh-subdivision-slider" min="0" max="4" step="1" value="2">
-      </div>
+      <!-- mesh-subdivision feature not implemented - slider removed -->
 
       <!-- Aérodynamique -->
       <h3>🌪️ Aérodynamique</h3>

@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+
 import { KiteSpecs } from './Config';
 
 export class KiteGeometry {

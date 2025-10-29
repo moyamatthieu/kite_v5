@@ -124,7 +124,7 @@ export class BridleConstraintSystem extends System {
     // === Recalculer CTRL_GAUCHE ===
     // Pyramide: NEZ-INTER_GAUCHE-CENTRE-CTRL_GAUCHE
     // Distances: nez, inter, centre
-    const ctrlGauche = this.solveTrilateration(
+    const ctrlGauche = this.calculateControlPointPosition(
       nez,
       interGauche,
       centre,
@@ -140,7 +140,7 @@ export class BridleConstraintSystem extends System {
     // === Recalculer CTRL_DROIT ===
     // Pyramide: NEZ-INTER_DROIT-CENTRE-CTRL_DROIT
     // Distances: nez, inter, centre
-    const ctrlDroit = this.solveTrilateration(
+    const ctrlDroit = this.calculateControlPointPosition(
       nez,
       interDroit,
       centre,
@@ -155,22 +155,16 @@ export class BridleConstraintSystem extends System {
   }
 
   /**
-   * Résout la trilatération 3D pour trouver le sommet d'une pyramide
-   * 
-   * Étant donné 3 points de base et 3 distances, trouve le point qui est:
-   * - À distance d1 de p1
-   * - À distance d2 de p2
-   * - À distance d3 de p3
-   * 
-   * @param p1 Premier point (NEZ)
-   * @param p2 Deuxième point (INTER)
-   * @param p3 Troisième point (CENTRE)
-   * @param d1 Distance désirée à p1
-   * @param d2 Distance désirée à p2
-   * @param d3 Distance désirée à p3
-   * @returns Position calculée du point de contrôle
+   * Calcule la position du point de contrôle en utilisant la trilatération 3D.
+   * @param p1 Premier point de base.
+   * @param p2 Deuxième point de base.
+   * @param p3 Troisième point de base.
+   * @param d1 Distance désirée au point p1.
+   * @param d2 Distance désirée au point p2.
+   * @param d3 Distance désirée au point p3.
+   * @returns La position calculée du point de contrôle, ou null si une erreur survient.
    */
-  private solveTrilateration(
+  private calculateControlPointPosition(
     p1: THREE.Vector3,
     p2: THREE.Vector3,
     p3: THREE.Vector3,

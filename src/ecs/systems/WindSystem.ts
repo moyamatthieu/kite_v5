@@ -51,6 +51,7 @@ import * as THREE from 'three';
 import { System, SimulationContext } from '../core/System';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { InputComponent } from '../components/InputComponent';
+import { TransformComponent } from '../components/TransformComponent';
 import { WindConfig } from '../config/Config';
 
 /**
@@ -69,6 +70,11 @@ export class WindSystem extends System {
   private windDirection: number; // degrés (0 = +X, 90 = +Z)
   private turbulence: number; // %
   private lastWindUpdate = 0; // Timestamp de la dernière mise à jour depuis InputComponent
+
+  // State for temporally correlated turbulence
+  private currentTurbulenceX: number = 0;
+  private currentTurbulenceY: number = 0;
+  private currentTurbulenceZ: number = 0;
   
   constructor(options: {
     windSpeed?: number;      // m/s
@@ -83,29 +89,11 @@ export class WindSystem extends System {
     this.turbulence = options.turbulence ?? WindConfig.DEFAULT_TURBULENCE;
     
     // Calculer vecteur vent ambiant dans le plan horizontal XZ
-    this.updateAmbientWind();
-  }
-  
-  /**
-   * Met à jour le vecteur de vent ambiant selon la vitesse et direction courantes
-   * Le vent est dans le plan horizontal XZ (Y = 0)
-   */
-  private updateAmbientWind(): void {
-    // 🛡️ Protection NaN: Vérifier que les paramètres sont valides
-    if (!isFinite(this.windSpeed) || !isFinite(this.windDirection)) {
-      console.error('[WindSystem] Invalid wind parameters detected:', {
-        windSpeed: this.windSpeed,
-        windDirection: this.windDirection
-      });
-      // Valeurs par défaut sécurisées
-      this.windSpeed = WindConfig.DEFAULT_WIND_SPEED_MS;
-      this.windDirection = WindConfig.DEFAULT_WIND_DIRECTION;
-    }
-
     const DEG_TO_RAD = Math.PI / 180;
     const dirRad = this.windDirection * DEG_TO_RAD;
     
     // Plan horizontal XZ : X = cos(angle), Y = 0 (horizontal), Z = sin(angle)
+    // Correction: z = sin(dirRad) * speed pour cohérence directions
     const x = Math.cos(dirRad) * this.windSpeed;
     const z = Math.sin(dirRad) * this.windSpeed;
     
@@ -133,91 +121,130 @@ export class WindSystem extends System {
         const newDirection = isFinite(inputComp.windDirection) ? inputComp.windDirection : this.windDirection;
         const newTurbulence = isFinite(inputComp.windTurbulence) ? inputComp.windTurbulence : this.turbulence;
         
-        const speedChanged = Math.abs(newSpeed - this.windSpeed) > WindConfig.SPEED_CHANGE_THRESHOLD;
-        const directionChanged = Math.abs(newDirection - this.windDirection) > WindConfig.DIRECTION_CHANGE_THRESHOLD;
+        // Vérifier si les paramètres de vent ont changé depuis la dernière mise à jour
+        const windSpeedChanged = Math.abs(newSpeed - this.windSpeed) > WindConfig.SPEED_CHANGE_THRESHOLD;
+        const windDirectionChanged = Math.abs(newDirection - this.windDirection) > WindConfig.DIRECTION_CHANGE_THRESHOLD;
         const turbulenceChanged = Math.abs(newTurbulence - this.turbulence) > WindConfig.TURBULENCE_CHANGE_THRESHOLD;
-        
-        if (speedChanged || directionChanged || turbulenceChanged) {
+
+        if (windSpeedChanged || windDirectionChanged || turbulenceChanged) {
           this.windSpeed = newSpeed;
           this.windDirection = newDirection;
           this.turbulence = newTurbulence;
-          this.updateAmbientWind();
+          this.updateAmbientWindVector();
+          this.lastWindUpdate = performance.now();
         }
-        this.lastWindUpdate = currentTime;
       }
     }
     
-    // Pour chaque kite
-    const kites = entityManager.query(['kite', 'transform', 'physics']);
-    
+    // Calculer le vent apparent
+    // Vent_apparent = Vent_ambiant - Vitesse_kite + Turbulence
+    const kites = entityManager.query(['transform', 'physics']);
+    const windCache = new Map<string, WindState>();
+
     kites.forEach(kite => {
+      const transform = kite.getComponent<TransformComponent>('transform')!;
       const physics = kite.getComponent<PhysicsComponent>('physics')!;
-      
-      // Protection contre les NaN dans velocity
-      if (isNaN(physics.velocity.x) || isNaN(physics.velocity.y) || isNaN(physics.velocity.z)) {
-        console.error('[WindSystem] NaN detected in velocity for kite:', kite.id);
-        physics.velocity.set(0, 0, 0); // Reset à zéro
+
+      // Ignorer les objets cinématiques (fixes)
+      if (physics.isKinematic) {
+        return;
       }
-      
-      // Vent apparent = vent ambiant - vitesse kite
-      // (Le vent "vu" par le kite dépend de sa propre vitesse)
-      const apparentWindBase = this.ambientWind.clone().sub(physics.velocity);
-      
-      // Ajouter de la turbulence si configurée
-      if (this.turbulence > 0) {
-        const TURBULENCE_SCALE = this.turbulence / 100;
-        const turbulenceVector = new THREE.Vector3(
-          (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE,
-          (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE * WindConfig.VERTICAL_TURBULENCE_FACTOR, // Moins de turbulence verticale
-          (Math.random() - 0.5) * this.windSpeed * TURBULENCE_SCALE
-        );
-        apparentWindBase.add(turbulenceVector);
-      }
-      
-      const apparentWind = apparentWindBase;
-      const speed = apparentWind.length();
-      const direction = speed > WindConfig.MINIMUM_WIND_SPEED ? apparentWind.clone().normalize() : new THREE.Vector3(1, 0, 0);
-      
-      // Stocker dans un cache temporaire du contexte
-      // (AeroSystem le lira ensuite)
-      if (!context.windCache) {
-        context.windCache = new Map();
-      }
-      
-      context.windCache.set(kite.id, {
+
+      // Vent apparent = vent ambiant - vitesse du point
+      const pointVelocity = physics.velocity.clone(); // Simplification: utiliser la vitesse du CoM
+      const localApparentWind = this.ambientWind.clone().sub(pointVelocity);
+      const localWindSpeed = localApparentWind.length();
+      const localWindDir = localWindSpeed > WindConfig.MINIMUM_WIND_SPEED
+        ? localApparentWind.clone().normalize()
+        : new THREE.Vector3(0, 0, 0);
+
+      // Ajouter la turbulence
+      const turbulenceEffect = this.calculateTurbulence(localWindSpeed, this.turbulence);
+      localApparentWind.add(turbulenceEffect);
+
+      const finalSpeed = localApparentWind.length();
+      const finalDirection = finalSpeed > WindConfig.MINIMUM_WIND_SPEED
+        ? localApparentWind.clone().normalize()
+        : localWindDir;
+
+      windCache.set(kite.id, {
         ambient: this.ambientWind.clone(),
-        apparent: apparentWind,
-        speed,
-        direction
-      } as WindState);
+        apparent: localApparentWind,
+        speed: finalSpeed,
+        direction: finalDirection
+      });
     });
+
+    context.windCache = windCache;
   }
-  
+
   /**
-   * Change le vent ambiant manuellement
-   * @param speedMs - Vitesse du vent en m/s
-   * @param directionDeg - Direction en degrés (0 = +X, 90 = +Z)
+   * Met à jour le vecteur de vent ambiant selon la vitesse et direction courantes
+   * Le vent est dans le plan horizontal XZ (Y = 0)
    */
-  setWind(speedMs: number, directionDeg: number): void {
-    this.windSpeed = speedMs;
-    this.windDirection = directionDeg;
-    this.updateAmbientWind();
-    
-    console.log('💨 [WindSystem] Wind manually set to:', {
-      speed: speedMs.toFixed(1) + ' m/s',
-      direction: directionDeg.toFixed(0) + '°',
-      vector: this.ambientWind
-    });
+  private updateAmbientWindVector(): void {
+    // 🛡️ Protection NaN: Vérifier que les paramètres sont valides
+    if (!isFinite(this.windSpeed) || !isFinite(this.windDirection)) {
+      console.error('[WindSystem] Invalid wind parameters detected:', {
+        windSpeed: this.windSpeed,
+        windDirection: this.windDirection
+      });
+      // Valeurs par défaut sécurisées
+      this.ambientWind = new THREE.Vector3(0, 0, 0);
+      return;
+    }
+
+    // Convertir la direction en radians
+    const angleRad = THREE.MathUtils.degToRad(this.windDirection);
+
+    // Calculer le vecteur vent ambiant dans le plan horizontal XZ
+    // Correction: z = sin(angleRad) * speed (sans le -) pour cohérence
+    // Direction 0° = +X (Est), 90° = +Z (Sud), 180° = -X (Ouest), 270° = -Z (Nord)
+    // Vent direction = provenance, vector = -direction pour poussée
+    this.ambientWind = new THREE.Vector3(
+      Math.cos(angleRad) * this.windSpeed,
+      0, // Pas de vent vertical
+      Math.sin(angleRad) * this.windSpeed // Corrigé: sans inversé pour Z+ = Sud
+    );
   }
-  
+
   /**
-   * Récupère les paramètres actuels du vent
+   * Calcule l'effet de turbulence sur le vent.
+   * @param baseWindSpeed La vitesse de base du vent.
+   * @param turbulenceLevel Le niveau de turbulence (0-100%).
+   * @returns Un vecteur de perturbation aléatoire.
    */
-  getWindParameters(): { speed: number; direction: number; turbulence: number } {
-    return {
-      speed: this.windSpeed,
-      direction: this.windDirection,
-      turbulence: this.turbulence
-    };
+  private calculateTurbulence(baseWindSpeed: number, turbulenceLevel: number): THREE.Vector3 {
+    if (turbulenceLevel === 0) {
+      // Reset turbulence state if level is 0
+      this.currentTurbulenceX = 0;
+      this.currentTurbulenceY = 0;
+      this.currentTurbulenceZ = 0;
+      return new THREE.Vector3();
+    }
+
+    // Générer une perturbation aléatoire avec corrélation temporelle (random walk)
+    const maxTurbulence = baseWindSpeed * (turbulenceLevel / 100);
+    // Approximate time step based on update interval
+    const timeStep = 1.0 / WindConfig.UPDATE_INTERVAL;
+    // Limit the change per step to avoid extreme jumps, scale factor for turbulence update
+    const turbulenceFactor = Math.min(1.0, timeStep * 5);
+
+    // X component
+    const randomX = (Math.random() - 0.5) * 2;
+    this.currentTurbulenceX += randomX * maxTurbulence * turbulenceFactor;
+    this.currentTurbulenceX = Math.max(Math.min(this.currentTurbulenceX, maxTurbulence), -maxTurbulence);
+
+    // Y component (vertical turbulence reduced)
+    const randomY = (Math.random() - 0.5) * 2;
+    this.currentTurbulenceY += randomY * maxTurbulence * WindConfig.VERTICAL_TURBULENCE_FACTOR * turbulenceFactor;
+    this.currentTurbulenceY = Math.max(Math.min(this.currentTurbulenceY, maxTurbulence * WindConfig.VERTICAL_TURBULENCE_FACTOR), -maxTurbulence * WindConfig.VERTICAL_TURBULENCE_FACTOR);
+
+    // Z component
+    const randomZ = (Math.random() - 0.5) * 2;
+    this.currentTurbulenceZ += randomZ * maxTurbulence * turbulenceFactor;
+    this.currentTurbulenceZ = Math.max(Math.min(this.currentTurbulenceZ, maxTurbulence), -maxTurbulence);
+
+    return new THREE.Vector3(this.currentTurbulenceX, this.currentTurbulenceY, this.currentTurbulenceZ);
   }
 }

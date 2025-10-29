@@ -11,6 +11,7 @@ import * as THREE from 'three';
 
 import { Component } from '../core/Component';
 import { Entity } from '../core/Entity';
+import { MathUtils } from '../utils/MathUtils';
 
 import { TransformComponent } from './TransformComponent';
 
@@ -74,13 +75,7 @@ export class GeometryComponent extends Component {
     const localPoint = this.points.get(name);
     if (!localPoint) return undefined;
     
-    const transform = entity.getComponent<TransformComponent>('transform');
-    if (!transform) return undefined;
-    
-    // Transforme local → monde : rotation puis translation
-    return localPoint.clone()
-      .applyQuaternion(transform.quaternion)
-      .add(transform.position);
+    return MathUtils.getPointWorld(localPoint, entity, name);
   }
   
   /**

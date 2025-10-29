@@ -19,9 +19,9 @@ import { Component } from '../core/Component';
  * Longueurs des brides (mètres)
  */
 export interface BridleLengths {
-  nez: number;      // Bride avant (~0.75m)
-  inter: number;    // Bride intermédiaire (~0.65m)
-  centre: number;   // Bride centrale (~0.55m)
+  nez: number;      // Bride avant (0.65m)
+  inter: number;    // Bride intermédiaire (0.65m)
+  centre: number;   // Bride centrale (0.65m)
 }
 
 /**

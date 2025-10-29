@@ -39,7 +39,7 @@ export class UISystem extends System {
   private buttonsInitialized = false; // Flag pour éviter les doublons d'event listeners
 
   constructor() {
-    super('Input', UIConfig.PRIORITY);
+    super('Input', 60); // Priorité après BridleConstraintSystem (10) et autres systèmes
   }
 
   async initialize(entityManager: EntityManager): Promise<void> {
@@ -158,18 +158,7 @@ export class UISystem extends System {
         formatter: (v) => `${v.toFixed(DECIMAL_PRECISION_ANGLE)}`,
         property: 'angularDamping'
       },
-      {
-        id: 'mesh-subdivision-slider',
-        min: meta.render.meshSubdivision.min,
-        max: meta.render.meshSubdivision.max,
-        step: meta.render.meshSubdivision.step,
-        formatter: (v) => {
-          const level = Math.floor(v);
-          const triangles = Math.pow(UIConfig.TRIANGLES_BASE, level + 1);
-          return `${level} (${triangles} tris)`;
-        },
-        property: 'meshSubdivisionLevel'
-      },
+      // mesh-subdivision slider removed - feature not implemented
 
       // === Aérodynamique ===
       {
@@ -267,43 +256,19 @@ export class UISystem extends System {
       debugBtn.classList.toggle('active', this.inputComponent.debugMode);
     }
 
-    // Toggle Mode de Contrainte
-    const constraintModeToggle = document.getElementById('constraint-mode-toggle') as HTMLInputElement;
-    if (constraintModeToggle) {
-      // Initialiser l'état du toggle selon inputComponent.constraintMode
-      // Unchecked = 'pbd', Checked = 'spring-force'
-      constraintModeToggle.checked = this.inputComponent.constraintMode === 'spring-force';
-      
-      this.logger.info(`Constraint mode initialized to: ${this.inputComponent.constraintMode}, toggle checked: ${constraintModeToggle.checked}`, 'UISystem');
-
-      // Event listener pour mettre à jour le mode de contrainte
-      constraintModeToggle.addEventListener('change', () => {
-        this.inputComponent.constraintMode = constraintModeToggle.checked ? 'spring-force' : 'pbd';
-        this.logger.info(`Constraint mode changed to: ${this.inputComponent.constraintMode}`, 'UISystem');
-        
-        // Reset la simulation lors du changement de mode
-        this.inputComponent.resetSimulation = true;
-        this.logger.info('Reset simulation requested after constraint mode change', 'UISystem');
-      });
+    // Bouton Copier les infos
+    const copyBtn = document.getElementById('copy-info-btn');
+    if (copyBtn) {
+      copyBtn.onclick = () => {
+        this.copyInfoToClipboard();
+        copyBtn.textContent = '✓ Copié !';
+        setTimeout(() => {
+          copyBtn.textContent = '📋 Copier';
+        }, 2000);
+      };
     }
 
-    // Toggle Mode Aérodynamique  
-    const aeroModeToggle = document.getElementById('aero-mode-toggle') as HTMLInputElement;
-    if (aeroModeToggle) {
-      // Initialiser l'état du toggle selon inputComponent.aeroMode
-      // Unchecked = 'perso', Checked = 'nasa'
-      aeroModeToggle.checked = this.inputComponent.aeroMode === 'nasa';
-      
-      this.logger.info(`Aero mode initialized to: ${this.inputComponent.aeroMode}, toggle checked: ${aeroModeToggle.checked}`, 'UISystem');
-
-      // Event listener pour mettre à jour le mode aérodynamique
-      aeroModeToggle.addEventListener('change', () => {
-        this.inputComponent.aeroMode = aeroModeToggle.checked ? 'nasa' : 'perso';
-        this.logger.info(`Aero mode changed to: ${this.inputComponent.aeroMode}`, 'UISystem');
-        
-        // Pas besoin de reset pour le changement de mode aéro (bascule à chaud)
-      });
-    }
+    // ...existing code...
   }
 
   /**
@@ -525,78 +490,142 @@ export class UISystem extends System {
     // Récupérer les entités
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
+    const leftLine = entityManager.getEntity('leftLine');
+    const rightLine = entityManager.getEntity('rightLine');
 
-    if (!kite || !controlBar) return;
+    if (!kite || !controlBar) {
+      // Si les entités ne sont pas trouvées, afficher "--"
+      const elements = [
+        'line-left-actual-value', 'line-left-expected-value', 'line-left-diff-value',
+        'line-right-actual-value', 'line-right-expected-value', 'line-right-diff-value'
+      ];
+      elements.forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) elem.textContent = '-- m';
+      });
+      return;
+    }
 
     const kiteGeometry = kite.getComponent<GeometryComponent>('geometry');
     const barGeometry = controlBar.getComponent<GeometryComponent>('geometry');
+    const kiteTransform = kite.getComponent<TransformComponent>('transform');
 
-    if (!kiteGeometry || !barGeometry) return;
+    if (!kiteGeometry || !barGeometry || !kiteTransform) {
+      // Si les géométries ne sont pas trouvées, afficher "--"
+      const elements = [
+        'line-left-actual-value', 'line-left-expected-value', 'line-left-diff-value',
+        'line-right-actual-value', 'line-right-expected-value', 'line-right-diff-value'
+      ];
+      elements.forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) elem.textContent = '-- m';
+      });
+      return;
+    }
+
+    const expectedDistance = this.inputComponent?.lineLength ?? 150;
 
     // === Ligne gauche ===
-    const leftHandleWorld = barGeometry.getPointWorld('leftHandle', controlBar);
-    const leftCtrlWorld = kiteGeometry.getPointWorld('CTRL_GAUCHE', kite);
+    if (leftLine) {
+      const lineComp = leftLine.getComponent<LineComponent>('line');
+      if (lineComp && lineComp.currentLength !== undefined) {
+        const actualLeftDistance = lineComp.currentLength;
+        const leftDiff = actualLeftDistance - expectedDistance;
 
-    if (leftHandleWorld && leftCtrlWorld) {
-      // Distance actuelle
-      const actualLeftDistance = leftHandleWorld.distanceTo(leftCtrlWorld);
+        const leftActual = document.getElementById('line-left-actual-value');
+        const leftExpected = document.getElementById('line-left-expected-value');
+        const leftDiffElem = document.getElementById('line-left-diff-value');
 
-      // Distance attendue depuis Config
-      const expectedDistance = this.inputComponent?.lineLength ?? 150;
-
-      // Écart
-      const leftDiff = actualLeftDistance - expectedDistance;
-
-      // Afficher
+        if (leftActual) leftActual.textContent = `${actualLeftDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (leftExpected) leftExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (leftDiffElem) {
+          const sign = leftDiff >= 0 ? '+' : '';
+          leftDiffElem.textContent = `${sign}${leftDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+          if (Math.abs(leftDiff) > 1) {
+            leftDiffElem.style.color = '#ff4444';
+          } else {
+            leftDiffElem.style.color = '#4da6ff';
+          }
+        }
+      } else {
+        const leftActual = document.getElementById('line-left-actual-value');
+        const leftExpected = document.getElementById('line-left-expected-value');
+        const leftDiffElem = document.getElementById('line-left-diff-value');
+        if (leftActual) leftActual.textContent = '-- m';
+        if (leftExpected) leftExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (leftDiffElem) leftDiffElem.textContent = '-- m';
+      }
+    } else {
       const leftActual = document.getElementById('line-left-actual-value');
       const leftExpected = document.getElementById('line-left-expected-value');
       const leftDiffElem = document.getElementById('line-left-diff-value');
-
-      if (leftActual) leftActual.textContent = `${actualLeftDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      if (leftActual) leftActual.textContent = '-- m';
       if (leftExpected) leftExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
-      if (leftDiffElem) {
-        const sign = leftDiff >= 0 ? '+' : '';
-        leftDiffElem.textContent = `${sign}${leftDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
-        // Colorer en rouge si l'écart est > 1m
-        if (Math.abs(leftDiff) > 1) {
-          leftDiffElem.style.color = '#ff4444';
-        } else {
-          leftDiffElem.style.color = '#4da6ff';
-        }
-      }
+      if (leftDiffElem) leftDiffElem.textContent = '-- m';
     }
 
     // === Ligne droite ===
-    const rightHandleWorld = barGeometry.getPointWorld('rightHandle', controlBar);
-    const rightCtrlWorld = kiteGeometry.getPointWorld('CTRL_DROIT', kite);
+    if (rightLine) {
+      const lineComp = rightLine.getComponent<LineComponent>('line');
+      if (lineComp && lineComp.currentLength !== undefined) {
+        const actualRightDistance = lineComp.currentLength;
+        const rightDiff = actualRightDistance - expectedDistance;
 
-    if (rightHandleWorld && rightCtrlWorld) {
-      // Distance actuelle
-      const actualRightDistance = rightHandleWorld.distanceTo(rightCtrlWorld);
+        const rightActual = document.getElementById('line-right-actual-value');
+        const rightExpected = document.getElementById('line-right-expected-value');
+        const rightDiffElem = document.getElementById('line-right-diff-value');
 
-      // Distance attendue depuis Config
-      const expectedDistance = this.inputComponent?.lineLength ?? 150;
-
-      // Écart
-      const rightDiff = actualRightDistance - expectedDistance;
-
-      // Afficher
-      const rightActual = document.getElementById('line-right-actual-value');
-      const rightExpected = document.getElementById('line-right-expected-value');
-      const rightDiffElem = document.getElementById('line-right-diff-value');
-
-      if (rightActual) rightActual.textContent = `${actualRightDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
-      if (rightExpected) rightExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
-      if (rightDiffElem) {
-        const sign = rightDiff >= 0 ? '+' : '';
-        rightDiffElem.textContent = `${sign}${rightDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
-        // Colorer en rouge si l'écart est > 1m
-        if (Math.abs(rightDiff) > 1) {
-          rightDiffElem.style.color = '#ff4444';
-        } else {
-          rightDiffElem.style.color = '#4da6ff';
+        if (rightActual) rightActual.textContent = `${actualRightDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (rightExpected) rightExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (rightDiffElem) {
+          const sign = rightDiff >= 0 ? '+' : '';
+          rightDiffElem.textContent = `${sign}${rightDiff.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+          if (Math.abs(rightDiff) > 1) {
+            rightDiffElem.style.color = '#ff4444';
+          } else {
+            rightDiffElem.style.color = '#4da6ff';
+          }
         }
+      } else {
+        const rightActual = document.getElementById('line-right-actual-value');
+        const rightExpected = document.getElementById('line-right-expected-value');
+        const rightDiffElem = document.getElementById('line-right-diff-value');
+        if (rightActual) rightActual.textContent = '-- m';
+        if (rightExpected) rightExpected.textContent = `${expectedDistance.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+        if (rightDiffElem) rightDiffElem.textContent = '-- m';
       }
     }
+  }
+
+  /**
+   * Copie toutes les informations du panneau d'état de vol dans le presse-papiers
+   */
+  private copyInfoToClipboard(): void {
+    const infoPanelElement = document.getElementById('info-panel');
+    if (!infoPanelElement) return;
+
+    // Extraire tous les textes du panneau
+    const infoItems = infoPanelElement.querySelectorAll('.info-item, h3');
+    let textContent = '📊 ÉTAT DE VOL\n' + '='.repeat(50) + '\n\n';
+
+    infoItems.forEach((item) => {
+      if (item.tagName === 'H3') {
+        textContent += '\n' + item.textContent + '\n' + '-'.repeat(40) + '\n';
+      } else {
+        const strong = item.querySelector('strong');
+        const span = item.querySelector('span');
+        if (strong && span) {
+          textContent += `${strong.textContent} ${span.textContent}\n`;
+        }
+      }
+    });
+
+    // Copier dans le presse-papiers
+    navigator.clipboard.writeText(textContent).then(() => {
+      this.logger.info('Informations copiées dans le presse-papiers', 'UISystem');
+    }).catch((err) => {
+      this.logger.error('Erreur lors de la copie', 'UISystem');
+      console.error('Erreur de copie:', err);
+    });
   }
 }

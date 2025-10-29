@@ -61,17 +61,13 @@ export class KiteFactory {
    * Ajoute le composant Physics avec masse, inertie et damping
    */
   private static addPhysicsComponent(entity: Entity): void {
-    // SIMPLIFICATION TEMPORAIRE : Inertie sphérique simple pour éviter les NaN
-    // Formule inertie sphère : I = (2/5) * m * r²
+    // Utilisation du tenseur d'inertie calculé à partir de la géométrie du kite
     const mass = CONFIG.kite.mass;
-    const radius = 1.0; // Rayon fictif de 1m
-    const I = (2/5) * mass * radius * radius;
-    
     const inertia = new THREE.Matrix3();
     inertia.set(
-      I, 0, 0,
-      0, I, 0,
-      0, 0, I
+      CONFIG.kite.inertia.Ixx, 0, 0,
+      0, CONFIG.kite.inertia.Iyy, 0,
+      0, 0, CONFIG.kite.inertia.Izz
     );
 
     entity.addComponent(new PhysicsComponent({
