@@ -70,7 +70,6 @@ export class UISystem extends System {
     this.initUI();
   }
 
-  // eslint-disable-next-line max-lines-per-function
   private initUI(): void {
     const sliders = this.getSliderConfigs();
     // Initialiser tous les sliders
@@ -262,7 +261,7 @@ export class UISystem extends System {
       copyBtn.onclick = () => {
         this.copyInfoToClipboard();
         copyBtn.textContent = '✓ Copié !';
-        setTimeout(() => {
+        window.setTimeout(() => {
           copyBtn.textContent = '📋 Copier';
         }, 2000);
       };
@@ -621,11 +620,16 @@ export class UISystem extends System {
     });
 
     // Copier dans le presse-papiers
-    navigator.clipboard.writeText(textContent).then(() => {
-      this.logger.info('Informations copiées dans le presse-papiers', 'UISystem');
-    }).catch((err) => {
-      this.logger.error('Erreur lors de la copie', 'UISystem');
-      console.error('Erreur de copie:', err);
-    });
+    const nav = globalThis.navigator;
+    if (nav && nav.clipboard) {
+      nav.clipboard.writeText(textContent).then(() => {
+        this.logger.info('Informations copiées dans le presse-papiers', 'UISystem');
+      }).catch((err) => {
+        this.logger.error('Erreur lors de la copie', 'UISystem');
+        console.error('Erreur de copie:', err);
+      });
+    } else {
+      this.logger.warn('Clipboard API non disponible', 'UISystem');
+    }
   }
 }

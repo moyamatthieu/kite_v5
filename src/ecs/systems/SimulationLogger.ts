@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
 import { TransformComponent } from '../components/TransformComponent';
@@ -96,7 +97,7 @@ export class SimulationLogger extends System {
     super('SimulationLogger', PRIORITY);
   }
 
-  initialize(entityManager: EntityManager): void {
+  initialize(_entityManager: EntityManager): void {
     console.log('📊 [SimulationLogger] Initialized - ready to log simulation');
     this.isLogging = true;
   }
@@ -110,7 +111,7 @@ export class SimulationLogger extends System {
     this.lastLogTime = now;
     this.frameNumber++;
 
-    const { entityManager, deltaTime } = context;
+    const { entityManager } = context;
 
     const kite = entityManager.getEntity('kite');
     const controlBar = entityManager.getEntity('controlBar');
@@ -147,7 +148,7 @@ export class SimulationLogger extends System {
     }
 
     // Récupérer les modes depuis le composant Input
-    const inputComp = ui.getComponent('Input') as any;
+    // const inputComp = ui.getComponent('Input') as any;
 
     // Collecter toutes les données
     const entry = this.collectLogEntry(
@@ -314,7 +315,7 @@ export class SimulationLogger extends System {
   /**
    * Collecte l'état du vent global (si disponible)
    */
-  private collectWindState(kitePhysics: PhysicsComponent): {
+  private collectWindState(_kitePhysics: PhysicsComponent): {
     ambient: THREE.Vector3;
     speed: number;
     direction: THREE.Vector3;

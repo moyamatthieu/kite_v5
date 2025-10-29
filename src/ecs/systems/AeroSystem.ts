@@ -45,7 +45,6 @@ interface SurfaceSample {
  */
 
 export class AeroSystem extends System {
-  private readonly gravity = new THREE.Vector3(0, -PhysicsConstants.GRAVITY, 0);
   private readonly logger = Logger.getInstance();
 
   // Debug: activer pour logger les informations sur chaque face
@@ -74,9 +73,13 @@ export class AeroSystem extends System {
       ? inputEntities[0].getComponent<InputComponent>('Input')
       : null;
 
-    const liftScale = inputComp?.liftScale ?? 1.0;
-    const dragScale = inputComp?.dragScale ?? 1.0;
-    const forceSmoothing = inputComp?.forceSmoothing ?? 0.3;
+    const DEFAULT_LIFT_SCALE = 1.0;
+    const DEFAULT_DRAG_SCALE = 1.0;
+    const DEFAULT_FORCE_SMOOTHING = 0.3;
+
+    const liftScale = inputComp?.liftScale ?? DEFAULT_LIFT_SCALE;
+    const dragScale = inputComp?.dragScale ?? DEFAULT_DRAG_SCALE;
+    const forceSmoothing = inputComp?.forceSmoothing ?? DEFAULT_FORCE_SMOOTHING;
 
     // Pour chaque kite
     const kites = entityManager.query(['kite', 'transform', 'physics', 'aerodynamics', 'geometry']);
@@ -115,10 +118,6 @@ export class AeroSystem extends System {
       // Les cerfs-volants sont traités comme des "thin flat plates" avec
       // des formules spécifiques validées expérimentalement.
       surfaceSamples.forEach((sample, index) => {
-        // === GRAVITÉ - TOUJOURS APPLIQUÉE (indépendante du vent) ===
-        const gravityPerFace = this.gravity.clone().multiplyScalar((physics.mass * sample.area) / kiteComp.surfaceArea);
-        this.addForce(physics, gravityPerFace);
-
         // Calcul du vent apparent local avec validation
         const centerOfMass = transform.position; // CoM ≈ centre géométrique pour kite delta
         const leverArm = sample.centerOfPressure.clone().sub(centerOfMass);
@@ -159,7 +158,6 @@ export class AeroSystem extends System {
             centroid: sample.centerOfPressure.clone(),
             lift: new THREE.Vector3(),
             drag: new THREE.Vector3(),
-            gravity: gravityPerFace.clone(),
             apparentWind: localApparentWind.clone(),
             normal: sample.normal.clone()
           });
@@ -185,7 +183,7 @@ export class AeroSystem extends System {
         // - α = 90° : normale perpendiculaire au vent (plaque parallèle, portance nulle)
         //
         // Les formules NASA CL = 2π×α utilisent cet angle directement
-        let surfaceNormal = sample.normal.clone();
+        const surfaceNormal = sample.normal.clone();
         let dotNW = surfaceNormal.dot(localWindDir);
 
         // ✅ AUTO-CORRECTION DE L'ORIENTATION DE LA NORMALE ✅
@@ -214,7 +212,7 @@ export class AeroSystem extends System {
         const q = NASAAeroConfig.DYNAMIC_PRESSURE_COEFF * airDensity * localWindSpeed * localWindSpeed;
 
         // 6. Directions des forces NASA
-  const liftDir = this.calculateNASALiftDirection(surfaceNormal, localWindDir);
+        const liftDir = this.calculateNASALiftDirection(surfaceNormal, localWindDir);
         const dragDir = localWindDir.clone();
 
         // 7. Forces selon équations NASA
@@ -224,12 +222,12 @@ export class AeroSystem extends System {
         // Validation NaN avec MathUtils
         if (!MathUtils.ensureFinite(panelLift, `panelLift for ${sample.descriptor.name}`)) {
           this.logger.error(`NaN detected in panelLift calculation for ${sample.descriptor.name}`, 'AeroSystem');
-          panelLift.set(0, 0, 0);
+          panelLift = new THREE.Vector3(0, 0, 0);
         }
 
         if (!MathUtils.ensureFinite(panelDrag, `panelDrag for ${sample.descriptor.name}`)) {
           this.logger.error(`NaN detected in panelDrag calculation for ${sample.descriptor.name}`, 'AeroSystem');
-          panelDrag.set(0, 0, 0);
+          panelDrag = new THREE.Vector3(0, 0, 0);
         }
 
         // 🛡️ SAFETY CAP: Limiter les forces par surface pour éviter instabilité
@@ -253,9 +251,9 @@ export class AeroSystem extends System {
         // 🔍 DEBUG DÉTAILLÉ - Afficher tous les calculs intermédiaires
         if (this.debugFaces && (this.debugSurfaceIndex === -1 || this.debugSurfaceIndex === index) && this.debugFrameCounter % 60 === 0) {
           this.logDetailedAeroCalculations(
-            index, sample, alphaDeg, localWindSpeed, leverArm, 
+            index, sample, alphaDeg, localWindSpeed, leverArm,
             Clo, CL, Cdo, CD, q, liftDir, dragDir,
-            panelLift, panelDrag, gravityPerFace
+            panelLift, panelDrag
           );
         }
 
@@ -283,7 +281,7 @@ export class AeroSystem extends System {
         // ✅ Torque généré et ajouté (rotation)
         // ✅ RÉSULTAT: Force appliquée AU CENTRE DE PRESSION ✅
         //
-        const panelForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
+        const panelForce = panelLift.clone().add(panelDrag);
 
         // ═══════════════════════════════════════════════════════════════════════
         // LISSAGE TEMPOREL DES FORCES (Temporal Smoothing)
@@ -297,19 +295,19 @@ export class AeroSystem extends System {
 
         // Décomposer en lift/drag/gravity pour application
         // ✅ PROTECTION NaN: Éviter division par zéro si panelForce est nul
+        const MIN_FORCE_THRESHOLD = 0.001; // N - Seuil minimal pour éviter division par zéro
+        const DEFAULT_FORCE_RATIO = 1.0;
+
         const panelForceLength = panelForce.length();
-        const forceRatio = panelForceLength > 0.001 
-          ? smoothedForce.length() / panelForceLength 
-          : 1.0; // Si force originale nulle, ratio = 1 (pas de changement)
+        const forceRatio = panelForceLength > MIN_FORCE_THRESHOLD
+          ? smoothedForce.length() / panelForceLength
+          : DEFAULT_FORCE_RATIO; // Si force originale nulle, ratio = 1 (pas de changement)
           
         const smoothedLift = panelLift.clone().multiplyScalar(forceRatio);
         const smoothedDrag = panelDrag.clone().multiplyScalar(forceRatio);
-        const smoothedGravity = gravityPerFace.clone(); // Gravité ne change pas
-
         // Ajouter forces lissées (translation du CoM)
         this.addForce(physics, smoothedLift);
         this.addForce(physics, smoothedDrag);
-        this.addForce(physics, smoothedGravity);
 
         // Générer torque: τ = (CP - CoM) × Force (utilise MathUtils centralisé)
         // C'est ce qui fait que la force appliquée au CP crée une rotation
@@ -339,7 +337,6 @@ export class AeroSystem extends System {
           centroid: sample.centerOfPressure.clone(), // ⚠️ Nom hérité: contient CP, pas centroïde
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
-          gravity: gravityPerFace.clone(),
           apparentWind: localApparentWind.clone(),
           normal: surfaceNormal.clone() // ✅ Normale de surface (auto-corrigée si nécessaire)
         });
@@ -483,7 +480,7 @@ export class AeroSystem extends System {
     // liftDir = (normale × vent) × vent
     // Cela garantit que la portance est perpendiculaire au vent
     const crossProduct = new THREE.Vector3().crossVectors(surfaceNormal, windDir);
-    let liftDir = new THREE.Vector3().crossVectors(crossProduct, windDir);
+    const liftDir = new THREE.Vector3().crossVectors(crossProduct, windDir);
 
     // Protection contre les vecteurs nuls (si normale parallèle au vent)
     const ZERO_VECTOR_THRESHOLD = 0.0001;
@@ -517,7 +514,7 @@ export class AeroSystem extends System {
    */
   private addForce(physics: PhysicsComponent, force: THREE.Vector3): void {
     if (isNaN(force.x) || isNaN(force.y) || isNaN(force.z)) {
-      console.error('[AeroSystem] Attempted to add NaN force:', force);
+      this.logger.error(`Attempted to add NaN force: (${force.x}, ${force.y}, ${force.z})`, 'AeroSystem');
       return;
     }
     physics.forces.add(force);
@@ -528,7 +525,7 @@ export class AeroSystem extends System {
    */
   private addTorque(physics: PhysicsComponent, torque: THREE.Vector3): void {
     if (isNaN(torque.x) || isNaN(torque.y) || isNaN(torque.z)) {
-      console.error('[AeroSystem] Attempted to add NaN torque:', torque);
+      this.logger.error(`Attempted to add NaN torque: (${torque.x}, ${torque.y}, ${torque.z})`, 'AeroSystem');
       return;
     }
     physics.torques.add(torque);
@@ -552,8 +549,7 @@ export class AeroSystem extends System {
     liftDir: THREE.Vector3,
     dragDir: THREE.Vector3,
     panelLift: THREE.Vector3,
-    panelDrag: THREE.Vector3,
-    gravityPerFace: THREE.Vector3
+    panelDrag: THREE.Vector3
   ): void {
     console.group(`🎯 [AeroSystemNASA] Surface ${index}: ${sample.descriptor.name}`);
 
@@ -589,9 +585,8 @@ export class AeroSystem extends System {
     console.log(`💪 FORCES FINALES:`);
     console.log(`   - Portance: (${panelLift.x.toFixed(3)}, ${panelLift.y.toFixed(3)}, ${panelLift.z.toFixed(3)}) [mag=${panelLift.length().toFixed(3)} N]`);
     console.log(`   - Traînée: (${panelDrag.x.toFixed(3)}, ${panelDrag.y.toFixed(3)}, ${panelDrag.z.toFixed(3)}) [mag=${panelDrag.length().toFixed(3)} N]`);
-    console.log(`   - Gravité: (${gravityPerFace.x.toFixed(3)}, ${gravityPerFace.y.toFixed(3)}, ${gravityPerFace.z.toFixed(3)}) [mag=${gravityPerFace.length().toFixed(3)} N]`);
 
-    const totalForce = panelLift.clone().add(panelDrag).add(gravityPerFace);
+    const totalForce = panelLift.clone().add(panelDrag);
     console.log(`   - ∑ Force totale: (${totalForce.x.toFixed(3)}, ${totalForce.y.toFixed(3)}, ${totalForce.z.toFixed(3)}) [mag=${totalForce.length().toFixed(3)} N]`);
 
     console.groupEnd();

@@ -5,8 +5,6 @@
  * Priorité 10 (exécuté en premier).
  */
 
-import * as THREE from 'three';
-
 import { System, SimulationContext } from '../core/System';
 import { InputComponent } from '../components/InputComponent';
 import { Logger } from '../utils/Logging';

@@ -6,8 +6,11 @@
  */
 
 import * as THREE from 'three';
+
 import type { TransformComponent } from '../components/TransformComponent';
 import type { Entity } from '../core/Entity';
+
+import { Logger } from './Logging';
 
 export class MathUtils {
   /** Epsilon par défaut pour comparaisons flottantes */
@@ -63,7 +66,7 @@ export class MathUtils {
    * @param pointName Nom du point à transformer
    * @returns Position monde ou undefined si point inexistant
    */
-  static getPointWorld(localPoint: THREE.Vector3, entity: Entity, pointName: string): THREE.Vector3 | undefined {
+  static getPointWorld(localPoint: THREE.Vector3, entity: Entity, _pointName: string): THREE.Vector3 | undefined {
     const transform = entity.getComponent<TransformComponent>('transform');
     if (!transform) return undefined;
     
@@ -321,7 +324,7 @@ export class MathUtils {
     if (typeof value === 'number') {
       if (!isFinite(value)) {
         if (context) {
-          console.error(`❌ [MathUtils] Non-finite value in ${context}:`, value);
+          Logger.getInstance().error(`❌ [MathUtils] Non-finite value in ${context}: ${value}`);
         }
         return false;
       }
@@ -331,7 +334,7 @@ export class MathUtils {
     // Vector3
     const isValid = isFinite(value.x) && isFinite(value.y) && isFinite(value.z);
     if (!isValid && context) {
-      console.error(`❌ [MathUtils] Non-finite Vector3 in ${context}:`, value);
+      Logger.getInstance().error(`❌ [MathUtils] Non-finite Vector3 in ${context}: ${JSON.stringify({x: value.x, y: value.y, z: value.z})}`);
     }
     return isValid;
   }

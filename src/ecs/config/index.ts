@@ -4,3 +4,4 @@
 
 export { CONFIG } from './Config';
 export { KiteGeometry } from './KiteGeometry';
+export { DebugConfig } from './DebugConfig';

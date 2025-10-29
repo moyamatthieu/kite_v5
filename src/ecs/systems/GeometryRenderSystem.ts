@@ -14,7 +14,6 @@ import { VisualComponent } from '../components/VisualComponent';
 import { MeshComponent } from '../components/MeshComponent';
 import { KiteComponent } from '../components/KiteComponent';
 import { MathUtils } from '../utils/MathUtils';
-
 import { VisualConstants } from '../config/Config';
 
 export class GeometryRenderSystem extends System {

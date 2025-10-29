@@ -13,8 +13,6 @@ import { Component } from '../core/Component';
 import { Entity } from '../core/Entity';
 import { MathUtils } from '../utils/MathUtils';
 
-import { TransformComponent } from './TransformComponent';
-
 /**
  * Définition d'une connexion entre deux points
  */

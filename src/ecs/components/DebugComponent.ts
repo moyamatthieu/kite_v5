@@ -39,26 +39,32 @@ export class DebugComponent extends Component {
   clearArrows(): void {
     this.forceArrows.forEach(arrow => {
       // Nettoyer les géométries et matériaux
-      if (arrow.line && (arrow.line as any).geometry) {
-        (arrow.line as any).geometry.dispose();
-      }
-      if (arrow.line && (arrow.line as any).material) {
-        const mat = (arrow.line as any).material;
-        if (Array.isArray(mat)) {
-          mat.forEach((m: any) => m.dispose?.());
-        } else {
-          mat.dispose?.();
+      if (arrow.line) {
+        const lineObject = arrow.line as THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
+        if (lineObject.geometry) {
+          lineObject.geometry.dispose();
+        }
+        if (lineObject.material) {
+          const mat = lineObject.material;
+          if (Array.isArray(mat)) {
+            mat.forEach((m: THREE.Material) => m.dispose());
+          } else {
+            mat.dispose();
+          }
         }
       }
-      if (arrow.cone && (arrow.cone as any).geometry) {
-        (arrow.cone as any).geometry.dispose();
-      }
-      if (arrow.cone && (arrow.cone as any).material) {
-        const mat = (arrow.cone as any).material;
-        if (Array.isArray(mat)) {
-          mat.forEach((m: any) => m.dispose?.());
-        } else {
-          mat.dispose?.();
+      if (arrow.cone) {
+        const coneObject = arrow.cone as THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material | THREE.Material[] };
+        if (coneObject.geometry) {
+          coneObject.geometry.dispose();
+        }
+        if (coneObject.material) {
+          const mat = coneObject.material;
+          if (Array.isArray(mat)) {
+            mat.forEach((m: THREE.Material) => m.dispose());
+          } else {
+            mat.dispose();
+          }
         }
       }
       // Retirer du groupe

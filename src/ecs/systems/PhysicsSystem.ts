@@ -15,8 +15,12 @@ import { GeometryComponent } from '../components/GeometryComponent';
 import { PhysicsConstants } from '../config/Config';
 import { MathUtils } from '../utils/MathUtils';
 import { PhysicsIntegrator } from '../utils/PhysicsIntegrator';
+import { Logger } from '../utils/Logging';
 
 export class PhysicsSystem extends System {
+  private readonly logger = Logger.getInstance();
+  private readonly gravity = new THREE.Vector3(0, -PhysicsConstants.GRAVITY, 0);
+
   constructor() {
     const PRIORITY = 50;
     super('PhysicsSystem', PRIORITY);
@@ -35,22 +39,32 @@ export class PhysicsSystem extends System {
       // Vérifier NaN avant calcul
       const posNaN = isNaN(transform.position.x) || isNaN(transform.position.y) || isNaN(transform.position.z);
       if (posNaN) {
-        console.error(`❌ [PhysicsSystem] ${entity.id} position is NaN!`, transform.position);
+        this.logger.error(`${entity.id} position is NaN: (${transform.position.x}, ${transform.position.y}, ${transform.position.z})`, 'PhysicsSystem');
         return;
       }
 
       // Ignorer les objets cinématiques (fixes)
       if (physics.isKinematic) {
+        // Les objets cinématiques n'ont pas de physique dynamique, mais il faut
+        // quand même nettoyer les forces qui auraient pu être accumulées
+        // par d'autres systèmes (ex: forces de contact non implémentées ici).
+        this.clearForces(physics);
         return;
       }
 
+      // Appliquer la gravité (force constante)
+      const gravityForce = this.gravity.clone().multiplyScalar(physics.mass);
+      physics.forces.add(gravityForce);
+
       // Utilisation de PhysicsIntegrator pour la logique d'intégration
-      PhysicsIntegrator.integrate(entity.id, transform, physics, deltaTime);
+      PhysicsIntegrator.integrate(transform, physics, deltaTime);
 
       // === COLLISION AVEC LE SOL ===
       // Vérifier que tous les points du kite restent au-dessus du sol
       this.handleGroundCollision(entity, transform, physics);
 
+      // Réinitialiser les accumulateurs de forces pour la prochaine frame
+      this.clearForces(physics);
     });
   }
 

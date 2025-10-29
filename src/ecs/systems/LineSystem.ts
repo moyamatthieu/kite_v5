@@ -1,19 +1,18 @@
 /**
  * LineSystem.ts - Gestion des lignes de cerf-volant (force-based stable)
  *
- * MODÈLE PHYSIQUE : RESSORT-AMORTISSEUR DOUX (Makani-inspired)
+ * MODÈLE PHYSIQUE : RESSORT-AMORTISSEUR (Makani-inspired)
  *
- * Les lignes sont modélisées comme des ressorts élastiques DOUX avec amortissement.
+ * Les lignes sont modélisées comme des ressorts élastiques avec amortissement.
  * Elles ne génèrent PAS de forces aérodynamiques - seulement une contrainte mécanique.
  *
  * ÉTATS :
  * 1. SLACK (distance < restLength) : aucune force (F = 0)
  * 2. TAUT (distance >= restLength) : force ressort + damping
  *
- * RÈGLES CRITIQUES :
- * - NE JAMAIS déplacer position directement (pas de PBD/projection)
- * - Stiffness FAIBLE (k = 10-50 N/m)
- * - Damping FORT (c = 5-20 N·s/m)
+ * PARAMÈTRES ACTUELS (Makani-inspired) :
+ * - Stiffness: 8000 N/m (câble Dyneema réaliste)
+ * - Damping: 6.0 N·s/m (underdamped léger pour stabilité)
  *
  * PRIORITÉ: 40 (après aéro, avant physique)
  */
@@ -97,7 +96,8 @@ export class LineSystem extends System {
       lineComponent: rightLineComp
     });
 
-    this.handleGroundCollision(kiteTransform, kitePhysics);
+    // Collision avec le sol gérée par PhysicsSystem
+    // this.handleGroundCollision(kiteTransform, kitePhysics);
   }
 
   private applyLineConstraint(params: {
@@ -167,17 +167,5 @@ export class LineSystem extends System {
 
     const torque = MathUtils.computeTorque(pointB, kiteTransform.position, forceVector);
     kitePhysics.torques.add(torque);
-  }
-
-  private handleGroundCollision(transform: TransformComponent, physics: PhysicsComponent): void {
-    if (transform.position.y < PhysicsConstants.GROUND_Y) {
-      transform.position.y = PhysicsConstants.GROUND_Y;
-
-      if (physics.velocity.y < 0) {
-        physics.velocity.y *= -0.1;
-      }
-
-      physics.angularVelocity.multiplyScalar(0.9);
-    }
   }
 }

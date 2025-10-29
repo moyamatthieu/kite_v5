@@ -176,12 +176,15 @@ export const UI_DEFAULTS = {
 /**
  * Helper pour récupérer une valeur de configuration avec métadonnées
  */
-export function getUIControl(category: string, field: string) {
-  const metadata = (UI_METADATA as any)[category]?.[field];
-  const defaultValue = (UI_DEFAULTS as any)[category]?.[field];
+export function getUIControl(category: string, field: string): Record<string, unknown> {
+  type MetadataRecord = Record<string, Record<string, unknown>>;
+  type DefaultsRecord = Record<string, Record<string, unknown>>;
+
+  const metadata = (UI_METADATA as MetadataRecord)[category]?.[field] as Record<string, unknown> | undefined;
+  const defaultValue = (UI_DEFAULTS as DefaultsRecord)[category]?.[field];
 
   return {
     value: defaultValue,
-    ...metadata
+    ...(metadata ?? {})
   };
 }

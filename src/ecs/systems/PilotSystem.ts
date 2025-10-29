@@ -282,7 +282,7 @@ export class PilotSystem extends System {
     const worldUp = new THREE.Vector3(0, 1, 0);
     
     // Calculer l'axe "right" (gauche-droite de la barre)
-    let right = worldUp.clone().cross(forward);
+    const right = worldUp.clone().cross(forward);
     
     // Cas limite : si toKite est vertical, choisir un axe right par défaut
     if (right.lengthSq() < 1e-6) {

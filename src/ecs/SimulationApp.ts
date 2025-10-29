@@ -238,18 +238,15 @@ export class SimulationApp {
     this.systemManager.add(new CameraControlsSystem(canvas, camera)); // Priority 1
     this.systemManager.add(new InputSyncSystem()); // Priority 5
     this.systemManager.add(new BridleConstraintSystem()); // Priority 10
-    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
     this.systemManager.add(new InputSystem()); // Priority 10
-    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
     this.systemManager.add(new WindSystem()); // Priority 20
-    
+
     // Système aérodynamique NASA (seul mode disponible)
     this.systemManager.add(this.aeroSystem); // Priority 30
 
     // Système de lignes (lignes inextensibles)
     this.systemManager.add(this.lineSystem); // Priority 40
-    
-    // this.systemManager.add(new ControlBarSystem()); // [ARCHIVÉ] Système non utilisé
+
     this.systemManager.add(new SimulationLogger()); // Priority 45
     this.systemManager.add(new PhysicsSystem()); // Priority 50
     this.systemManager.add(new PilotSystem()); // Priority 55
@@ -476,9 +473,12 @@ export class SimulationApp {
   setAeroDebug(enabled: boolean, surfaceIndex: number = -1): void {
     if (this.aeroSystem) {
       this.aeroSystem.setDebugFaces(enabled, surfaceIndex);
-      console.log(`🔍 [SimulationApp] Debug aéro ${enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}${surfaceIndex >= 0 ? ` pour surface ${surfaceIndex}` : ''}`);
+      this.logger.info(
+        `Debug aéro ${enabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}${surfaceIndex >= 0 ? ` pour surface ${surfaceIndex}` : ''}`,
+        'SimulationApp'
+      );
     } else {
-      console.warn('⚠️ [SimulationApp] AeroSystem non disponible');
+      this.logger.warn('AeroSystem non disponible', 'SimulationApp');
     }
   }
 

@@ -70,7 +70,7 @@ export class InputComponent extends Component {
       // Potentiellement déclencher un événement ou une mise à jour ici
     }
   }
-  private _bridleNez: number = 0.65; // Aligné avec BridleComponent
+  private _bridleNez: number = InputDefaults.BRIDLE_NEZ_M; // Longueur bride nez par défaut
  
   get bridleNez(): number {
     return this._bridleNez;
@@ -83,7 +83,7 @@ export class InputComponent extends Component {
       // Potentiellement déclencher un événement ou une mise à jour ici
     }
   }
-  private _bridleInter: number = 0.65; // Aligné avec BridleComponent
+  private _bridleInter: number = InputDefaults.BRIDLE_INTER_M; // Longueur bride intermédiaire par défaut
  
   get bridleInter(): number {
     return this._bridleInter;
@@ -96,7 +96,7 @@ export class InputComponent extends Component {
       // Potentiellement déclencher un événement ou une mise à jour ici
     }
   }
-  private _bridleCentre: number = 0.65; // Aligné avec BridleComponent
+  private _bridleCentre: number = InputDefaults.BRIDLE_CENTRE_M; // Longueur bride centre par défaut
  
   get bridleCentre(): number {
     return this._bridleCentre;

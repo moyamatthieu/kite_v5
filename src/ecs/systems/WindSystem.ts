@@ -51,7 +51,6 @@ import * as THREE from 'three';
 import { System, SimulationContext } from '../core/System';
 import { PhysicsComponent } from '../components/PhysicsComponent';
 import { InputComponent } from '../components/InputComponent';
-import { TransformComponent } from '../components/TransformComponent';
 import { WindConfig } from '../config/Config';
 
 /**
@@ -142,7 +141,6 @@ export class WindSystem extends System {
     const windCache = new Map<string, WindState>();
 
     kites.forEach(kite => {
-      const transform = kite.getComponent<TransformComponent>('transform')!;
       const physics = kite.getComponent<PhysicsComponent>('physics')!;
 
       // Ignorer les objets cinématiques (fixes)

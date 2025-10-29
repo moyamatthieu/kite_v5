@@ -35,7 +35,6 @@ export class PhysicsComponent extends Component {
     centroid: THREE.Vector3;
     lift: THREE.Vector3;
     drag: THREE.Vector3;
-    gravity: THREE.Vector3;
     apparentWind: THREE.Vector3;
     normal: THREE.Vector3;  // Normale de la face (pour debug visuel)
   }>;
@@ -76,11 +75,11 @@ export class PhysicsComponent extends Component {
       // Vérifier si l'inversion a produit des NaN
       const e = this.invInertia.elements;
       if (e.some(v => !Number.isFinite(v))) {
-        console.warn('[PhysicsComponent] Invalid invInertia, using identity');
+        // Fallback vers identité si inversion invalide
         this.invInertia = new THREE.Matrix3().identity();
       }
-    } catch (error) {
-      console.warn('[PhysicsComponent] Failed to invert inertia matrix, using identity', error);
+    } catch {
+      // Fallback vers identité en cas d'erreur d'inversion
       this.invInertia = new THREE.Matrix3().identity();
     }
     
