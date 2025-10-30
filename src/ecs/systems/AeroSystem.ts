@@ -110,9 +110,19 @@ export class AeroSystem extends System {
         const localWindDir = localApparentWind.clone().normalize();
 
         // 3. Angle d'attaque local
-        const chord = new THREE.Vector3(1, 0, 0).applyQuaternion(transform.quaternion);
-        const dotProduct = chord.dot(localWindDir);
-        const alpha = Math.asin(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
+        // Pour un cerf-volant : angle entre le plan de la toile et le vent
+        // = 90° - angle(normale, vent)
+        // La normale de chaque face pointe "vers l'extérieur" de la toile
+        const faceNormal = sample.normal.clone();
+        
+        // S'assurer que la normale pointe vers le vent (face avant du kite)
+        if (faceNormal.dot(localWindDir) < 0) {
+          faceNormal.negate();
+        }
+        
+        const cosAngleNormalWind = Math.max(-1, Math.min(1, faceNormal.dot(localWindDir)));
+        const angleNormalWind = Math.acos(cosAngleNormalWind) * 180 / Math.PI;
+        const alpha = 90 - angleNormalWind; // Angle entre le plan et le vent
 
         // 4. Coefficients aéro locaux
         const CL = this.calculateCL(aero, alpha);
