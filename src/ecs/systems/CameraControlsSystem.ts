@@ -40,7 +40,8 @@ export class CameraControlsSystem extends System {
   private setupControls(): void {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.screenSpacePanning = false;
+    this.controls.enablePan = true; // Active le pan (clic droit + déplacement)
+    this.controls.screenSpacePanning = true; // Pan en espace écran (3D)
     this.controls.minDistance = 5;
     this.controls.maxDistance = 200;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Empêche la caméra de passer sous le sol
