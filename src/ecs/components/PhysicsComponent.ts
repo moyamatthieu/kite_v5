@@ -34,6 +34,7 @@ export class PhysicsComponent extends Component {
     drag: THREE.Vector3;
     gravity: THREE.Vector3;
     apparentWind: THREE.Vector3;
+    angleOfAttack: number; // Angle d'attaque local (degrés)
   }>;
   
   // Damping (friction)

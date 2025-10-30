@@ -44,6 +44,16 @@ export class AeroSystem extends System {
     super('AeroSystem', PRIORITY);
   }
   
+  /**
+   * Initialise le système (nettoie l'état interne au reset)
+   */
+  initialize(_entityManager: import('../core/EntityManager').EntityManager): void {
+    // Nettoyer l'historique des forces pour éviter que les anciennes valeurs
+    // ne contaminent le comportement après un reset
+    this.previousForces.clear();
+    this.previousTorques.clear();
+  }
+  
   update(context: SimulationContext): void {
     const { entityManager } = context;
     const windCache = context.windCache as Map<string, WindState> | undefined;
@@ -159,7 +169,8 @@ export class AeroSystem extends System {
           lift: panelLift.clone(),
           drag: panelDrag.clone(),
           gravity: gravityPerFace.clone(),
-          apparentWind: localApparentWind.clone()
+          apparentWind: localApparentWind.clone(),
+          angleOfAttack: alpha // Angle d'attaque local en degrés
         });
       });
 

@@ -75,6 +75,35 @@
       border-bottom: 2px solid rgba(100, 150, 255, 0.3);
       padding-bottom: 6px;
       color: #4da6ff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .copy-panel-btn {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(77, 166, 255, 0.2);
+      color: #4da6ff;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 600;
+    }
+
+    .copy-panel-btn:hover {
+      background: rgba(77, 166, 255, 0.4);
+      box-shadow: 0 0 8px rgba(77, 166, 255, 0.4);
+    }
+
+    .copy-panel-btn:active {
+      background: rgba(77, 166, 255, 0.6);
+    }
+
+    .copy-panel-btn.copied {
+      background: rgba(76, 175, 80, 0.4);
+      color: #76ff7a;
     }
 
     .panel h3 {
@@ -227,7 +256,10 @@
 <body>
     <!-- Panneau d'informations (gauche) -->
     <div id="info-panel" class="panel">
-      <h2>📊 État de vol</h2>
+      <h2>
+        <span>📊 État de vol</span>
+        <button class="copy-panel-btn" id="copy-info-btn">📋 Copier</button>
+      </h2>
 
       <h3>🪁 Cerf-volant</h3>
       <div class="info-item">
@@ -243,12 +275,19 @@
         <span id="kite-position-x-value">-- m</span>
       </div>
       <div class="info-item">
+        <strong>Position Y:</strong>
+        <span id="kite-position-y-value">-- m</span>
+      </div>
+      <div class="info-item">
         <strong>Position Z:</strong>
         <span id="kite-position-z-value">-- m</span>
       </div>
       <div class="info-item">
         <strong>Angle d'attaque:</strong>
         <span id="kite-aoa-value">-- °</span>
+      </div>
+      <div class="info-item" style="margin-left: 10px; font-size: 10px; color: #888;">
+        <div id="kite-aoa-faces">Faces: --</div>
       </div>
 
       <h3>⚡ Forces</h3>
@@ -312,7 +351,10 @@
 
     <!-- Panneau de contrôles (droite) -->
     <div id="controls-panel" class="panel">
-      <h2>⚙️ Contrôles Simulation</h2>
+      <h2>
+        <span>⚙️ Contrôles Simulation</span>
+        <button class="copy-panel-btn" id="copy-controls-btn">📋 Copier</button>
+      </h2>
       
       <!-- Boutons de contrôle en haut -->
       <div class="button-group">

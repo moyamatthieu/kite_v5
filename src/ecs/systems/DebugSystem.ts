@@ -31,8 +31,34 @@ export class DebugSystem extends System {
     super('DebugSystem', 48); // Priority 48 : APRÈS ConstraintSystem (40) mais AVANT PhysicsSystem (50)
   }
 
+  /**
+   * Nettoie l'état du debug précédent (flèches, groupe de scène)
+   * @private
+   */
+  private cleanupPreviousState(): void {
+    if (!this.debugEntity || !this.renderSystem) return;
+
+    const debugComp = this.debugEntity.getComponent('debug') as DebugComponent | null;
+    if (debugComp) {
+      // Nettoyer toutes les flèches
+      debugComp.clearArrows();
+
+      // Retirer le groupe de la scène
+      if (debugComp.debugGroup.parent) {
+        this.renderSystem.scene.remove(debugComp.debugGroup);
+      }
+    }
+
+    // Réinitialiser le flag et les timestamps
+    this.prevDebugMode = false;
+    this.lastLogTime = 0;
+  }
+
   initialize(entityManager: EntityManager): void {
     console.log('🐛 [DebugSystem] Initializing...');
+    
+    // Nettoyer l'état précédent avant de réinitialiser
+    this.cleanupPreviousState();
     
     // Chercher l'InputComponent
     const inputEntities = entityManager.query(['Input']);
@@ -322,26 +348,10 @@ export class DebugSystem extends System {
   /**
    * Réinitialise l'état du debug (appelé lors d'un reset de simulation)
    * Nettoie tous les vecteurs de debug et retire le groupe de la scène
+   * @deprecated Utilisez initialize() à la place - cette méthode appelle cleanupPreviousState()
    */
   resetDebugState(): void {
-    if (!this.debugEntity || !this.renderSystem) return;
-
-    const debugComp = this.debugEntity.getComponent('debug') as DebugComponent | null;
-    if (debugComp) {
-      console.log('🐛 [DebugSystem] Resetting debug state...');
-
-      // Nettoyer toutes les flèches
-      debugComp.clearArrows();
-
-      // Retirer le groupe de la scène
-      if (debugComp.debugGroup.parent) {
-        this.renderSystem.scene.remove(debugComp.debugGroup);
-        console.log('🐛 [DebugSystem] DebugGroup removed from scene');
-      }
-
-      // Réinitialiser le flag prevDebugMode pour forcer la ré-ajout si debug activé
-      this.prevDebugMode = false;
-    }
+    this.cleanupPreviousState();
   }
 
   dispose(): void {

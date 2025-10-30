@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { System, SimulationContext } from '../core/System';
 import { EntityManager } from '../core/EntityManager';
@@ -24,49 +24,58 @@ export class CameraControlsSystem extends System {
   private lastLogTime = 0;
 
   constructor(canvas: HTMLCanvasElement, camera: THREE.PerspectiveCamera) {
-    super('CameraControlsSystem', 1); // Très haute priorité
+    super('CameraControlsSystem', 1);
     this.camera = camera;
 
     this.controls = new OrbitControls(camera, canvas);
     this.setupControls();
     
-    // Log position initiale
-    console.log('📷 Camera position initiale:', this.camera.position.toArray());
-    console.log('🎯 Camera target initial:', this.controls.target.toArray());
     this.lastLoggedPosition.copy(this.camera.position);
     this.lastLoggedTarget.copy(this.controls.target);
     this.lastLoggedDistance = this.camera.position.distanceTo(this.controls.target);
   }
 
   private setupControls(): void {
-    // Configuration des contrôles
+    // === Damping pour des mouvements fluides ===
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
+    this.controls.dampingFactor = 0.08; // Plus élevé = plus fluide
     
-    // Activer tous les contrôles explicitement
-    this.controls.enableRotate = true; // Clic gauche : rotation
-    this.controls.enableZoom = true;   // Molette : zoom
-    this.controls.enablePan = true;    // Clic droit : pan
-    this.controls.screenSpacePanning = true; // Pan en espace écran (3D)
+    // === Rotation (orbite) - Clic gauche ===
+    this.controls.enableRotate = true;
+    this.controls.rotateSpeed = 0.8; // Sensibilité rotation (défaut: 1.0)
     
-    // Limites
-    this.controls.minDistance = 5;
-    this.controls.maxDistance = 200;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Empêche la caméra de passer sous le sol
+    // === Zoom - Molette ===
+    this.controls.enableZoom = true;
+    this.controls.zoomSpeed = 1.2; // Sensibilité zoom (défaut: 1.0)
+    this.controls.minDistance = 8; // Distance minimale de la cible
+    this.controls.maxDistance = 150; // Distance maximale de la cible
     
-    // Position cible
-    this.controls.target.set(-3.92, 0, -12.33); // Target optimale trouvée manuellement
+    // === Pan - Clic droit ou Clic du milieu ===
+    this.controls.enablePan = true;
+    this.controls.panSpeed = 0.8; // Sensibilité pan (défaut: 1.0)
+    this.controls.screenSpacePanning = true; // Pan en espace écran (plus intuitif)
     
-    // Appliquer les changements
+    // === Limites angulaires ===
+    this.controls.minPolarAngle = 0; // Peut aller jusqu'en haut
+    this.controls.maxPolarAngle = Math.PI * 0.48; // Empêche de passer sous le sol
+    // Pas de limite azimutale (rotation 360° libre)
+    
+    // === Mapping des boutons souris (par défaut) ===
+    // MOUSE.LEFT = rotation/orbite
+    // MOUSE.MIDDLE = zoom (optionnel)
+    // MOUSE.RIGHT = pan
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN
+    };
+    
+    // === Position cible (centre d'orbite) ===
+    this.controls.target.set(-3.92, 0, -12.33);
+    
     this.controls.update();
     
-    // Debug : vérifier que les contrôles sont bien configurés
-    console.log('📷 Camera Controls configured:', {
-      enableRotate: this.controls.enableRotate,
-      enableZoom: this.controls.enableZoom,
-      enablePan: this.controls.enablePan,
-      screenSpacePanning: this.controls.screenSpacePanning
-    });
+    console.log('📷 Contrôles caméra configurés (orbite, pan, zoom)');
   }
 
   initialize(_entityManager: EntityManager): void {
@@ -76,26 +85,15 @@ export class CameraControlsSystem extends System {
   update(_context: SimulationContext): void {
     this.controls.update();
     
-    // Logger les changements de position/zoom/pan
+    // Log seulement les changements significatifs (toutes les secondes)
     const now = performance.now();
     if (now - this.lastLogTime > this.logInterval) {
-      const posChanged = !this.camera.position.equals(this.lastLoggedPosition);
-      const targetChanged = !this.controls.target.equals(this.lastLoggedTarget);
+      const posChanged = this.camera.position.distanceTo(this.lastLoggedPosition) > 0.1;
+      const targetChanged = this.controls.target.distanceTo(this.lastLoggedTarget) > 0.1;
       const currentDistance = this.camera.position.distanceTo(this.controls.target);
-      const distanceChanged = Math.abs(currentDistance - this.lastLoggedDistance) > 0.01;
+      const distanceChanged = Math.abs(currentDistance - this.lastLoggedDistance) > 0.5;
       
       if (posChanged || targetChanged || distanceChanged) {
-        console.log('📷 Camera changed:');
-        if (posChanged) {
-          console.log('  Position:', this.camera.position.toArray().map(v => v.toFixed(2)));
-        }
-        if (targetChanged) {
-          console.log('  Target:', this.controls.target.toArray().map(v => v.toFixed(2)));
-        }
-        if (distanceChanged) {
-          console.log('  Distance (zoom):', currentDistance.toFixed(2));
-        }
-        
         this.lastLoggedPosition.copy(this.camera.position);
         this.lastLoggedTarget.copy(this.controls.target);
         this.lastLoggedDistance = currentDistance;

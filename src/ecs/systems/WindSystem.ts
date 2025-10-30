@@ -91,6 +91,16 @@ export class WindSystem extends System {
   }
   
   /**
+   * Initialise le système (nettoie l'état interne au reset)
+   */
+  initialize(_entityManager: import('../core/EntityManager').EntityManager): void {
+    // Réinitialiser le timestamp pour forcer une mise à jour immédiate
+    this.lastWindUpdate = 0;
+    // Recalculer le vent ambiant
+    this.updateAmbientWind();
+  }
+
+  /**
    * Met à jour le vecteur de vent ambiant selon la vitesse et direction courantes
    * Le vent est dans le plan horizontal XZ (Y = 0)
    */

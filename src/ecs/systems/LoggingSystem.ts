@@ -27,6 +27,14 @@ export class LoggingSystem extends System {
     this.logInterval = options.logInterval ?? DEFAULT_LOG_INTERVAL_MS;
   }
   
+  /**
+   * Initialise le système (nettoie l'état interne au reset)
+   */
+  initialize(_entityManager: import('../core/EntityManager').EntityManager): void {
+    // Réinitialiser le timestamp pour forcer un log immédiat après le reset
+    this.lastLogTime = 0;
+  }
+  
   update(context: SimulationContext): void {
     const { totalTime, entityManager } = context;
     

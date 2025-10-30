@@ -266,12 +266,6 @@ export class SimulationApp {
     if (renderSystem && renderSystem.resetRenderState) {
       renderSystem.resetRenderState();
     }
-
-    // Nettoyer l'état du debug AVANT de supprimer les entités
-    const debugSystem = this.systemManager.getSystem('DebugSystem') as any;
-    if (debugSystem && debugSystem.resetDebugState) {
-      debugSystem.resetDebugState();
-    }
     
     // Supprimer uniquement les entités (pas les systèmes pour conserver les event listeners)
     const entities = this.entityManager.getAllEntities();
@@ -281,6 +275,7 @@ export class SimulationApp {
     this.createEntities();
     
     // Ré-initialiser les systèmes avec les nouvelles entités
+    // Ceci va nettoyer les états internes (caches, timestamps) via initialize()
     await this.systemManager.initializeAll(this.entityManager);
     
     // Restaurer l'état pause/play APRÈS recréation des entités

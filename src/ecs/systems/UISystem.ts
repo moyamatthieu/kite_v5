@@ -62,6 +62,7 @@ export class UISystem extends System {
     // Initialiser les boutons une seule fois (ils se réfèrent à l'InputComponent qui peut changer)
     if (!this.buttonsInitialized) {
       this.setupButtons();
+      this.setupCopyButtons();
       this.buttonsInitialized = true;
     }
 
@@ -313,6 +314,12 @@ export class UISystem extends System {
         posXValue.textContent = `${transform.position.x.toFixed(DECIMAL_PRECISION_POSITION)} m`;
       }
 
+      // === Position Y ===
+      const posYValue = document.getElementById('kite-position-y-value');
+      if (posYValue) {
+        posYValue.textContent = `${transform.position.y.toFixed(DECIMAL_PRECISION_POSITION)} m`;
+      }
+
       // === Position Z ===
       const posZValue = document.getElementById('kite-position-z-value');
       if (posZValue) {
@@ -320,7 +327,7 @@ export class UISystem extends System {
       }
 
       // === Angle d'attaque ===
-      this.updateAngleOfAttack(context, transform);
+      this.updateAngleOfAttack(context, transform, physics);
 
       // === Forces (portance et traînée) ===
       this.updateForces(physics);
@@ -339,8 +346,9 @@ export class UISystem extends System {
   /**
    * Calcule et affiche l'angle d'attaque du kite
    */
-  private updateAngleOfAttack(context: SimulationContext, transform: TransformComponent): void {
+  private updateAngleOfAttack(context: SimulationContext, transform: TransformComponent, physics: PhysicsComponent): void {
     const aoaValue = document.getElementById('kite-aoa-value');
+    const aoaFaces = document.getElementById('kite-aoa-faces');
     if (!aoaValue) return;
 
     const windCache = context.windCache as Map<string, any> | undefined;
@@ -349,6 +357,7 @@ export class UISystem extends System {
     const windState = windCache.get('kite');
     if (!windState || !windState.apparent) {
       aoaValue.textContent = '-- °';
+      if (aoaFaces) aoaFaces.textContent = 'Faces: --';
       return;
     }
 
@@ -357,16 +366,27 @@ export class UISystem extends System {
 
     if (windSpeed < 0.01) {
       aoaValue.textContent = '0.0 °';
+      if (aoaFaces) aoaFaces.textContent = 'Faces: 0.0°';
       return;
     }
 
-    // Calculer l'angle d'attaque : angle entre la corde du kite et la direction du vent
+    // Calculer l'angle d'attaque global : angle entre la corde du kite et la direction du vent
     const chord = new THREE.Vector3(1, 0, 0).applyQuaternion(transform.quaternion);
     const windDir = apparentWind.clone().normalize();
     const dotProduct = chord.dot(windDir);
     const alpha = Math.asin(Math.max(-1, Math.min(1, dotProduct))) * 180 / Math.PI;
 
     aoaValue.textContent = `${alpha.toFixed(DECIMAL_PRECISION_ANGLE)} °`;
+
+    // Afficher les angles d'attaque par face (depuis physics.faceForces)
+    if (physics && physics.faceForces.length > 0) {
+      const faceAngles = physics.faceForces.map((face, i) => 
+        `F${i + 1}:${face.angleOfAttack.toFixed(1)}°`
+      ).join(' ');
+      if (aoaFaces) aoaFaces.textContent = `Faces: ${faceAngles}`;
+    } else {
+      if (aoaFaces) aoaFaces.textContent = 'Faces: --';
+    }
   }
 
   /**
@@ -552,5 +572,96 @@ export class UISystem extends System {
         }
       }
     }
+  }
+
+  /**
+   * Configure les boutons de copie pour chaque panneau
+   */
+  private setupCopyButtons(): void {
+    // Bouton de copie pour le panneau d'informations
+    const copyInfoBtn = document.getElementById('copy-info-btn');
+    if (copyInfoBtn) {
+      copyInfoBtn.onclick = () => {
+        this.copyPanelData('info-panel');
+        this.showCopyFeedback(copyInfoBtn);
+      };
+    }
+
+    // Bouton de copie pour le panneau de contrôles
+    const copyControlsBtn = document.getElementById('copy-controls-btn');
+    if (copyControlsBtn) {
+      copyControlsBtn.onclick = () => {
+        this.copyPanelData('controls-panel');
+        this.showCopyFeedback(copyControlsBtn);
+      };
+    }
+  }
+
+  /**
+   * Copie toutes les données d'un panneau dans le presse-papiers
+   */
+  private copyPanelData(panelId: string): void {
+    const panel = document.getElementById(panelId);
+    if (!panel) {
+      this.logger.warn(`Panel ${panelId} not found`, 'UISystem');
+      return;
+    }
+
+    let data = '';
+    const title = panel.querySelector('h2 span')?.textContent || 'Panneau';
+    data += `${title}\n${'='.repeat(50)}\n\n`;
+
+    // Parcourir les sections (h3) et leurs éléments
+    const sections = panel.querySelectorAll('h3');
+    sections.forEach(section => {
+      const sectionTitle = section.textContent || '';
+      data += `${sectionTitle}\n${'-'.repeat(30)}\n`;
+
+      // Récupérer tous les éléments après cette section jusqu'à la prochaine h3
+      let nextElement = section.nextElementSibling;
+      while (nextElement && nextElement.tagName !== 'H3') {
+        if (nextElement.classList.contains('info-item')) {
+          const label = nextElement.querySelector('strong')?.textContent || '';
+          const value = nextElement.querySelector('span')?.textContent || 
+                        nextElement.querySelector('div')?.textContent || '';
+          data += `${label} ${value}\n`;
+        } else if (nextElement.classList.contains('control-group')) {
+          const label = nextElement.querySelector('label')?.textContent?.split('\n')[0]?.trim() || '';
+          const value = nextElement.querySelector('.value-display')?.textContent || '';
+          data += `${label}: ${value}\n`;
+        } else if (nextElement.classList.contains('button-group')) {
+          // Ignorer les groupes de boutons dans la copie
+        } else if (nextElement.textContent?.trim()) {
+          // Capturer tout autre élément avec du texte (comme les divs de faces)
+          const text = nextElement.textContent.trim();
+          if (text) data += `${text}\n`;
+        }
+        nextElement = nextElement.nextElementSibling;
+      }
+      data += '\n';
+    });
+
+    // Copier dans le presse-papiers
+    navigator.clipboard.writeText(data.trim())
+      .then(() => {
+        this.logger.info(`Panel data copied to clipboard: ${panelId}`, 'UISystem');
+      })
+      .catch(err => {
+        this.logger.error(`Failed to copy panel data: ${err}`, 'UISystem');
+      });
+  }
+
+  /**
+   * Affiche un retour visuel après la copie
+   */
+  private showCopyFeedback(button: HTMLElement): void {
+    const originalText = button.textContent;
+    button.textContent = '✓ Copié';
+    button.classList.add('copied');
+
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.classList.remove('copied');
+    }, 2000);
   }
 }

@@ -42,6 +42,14 @@ export class BridleConstraintSystem extends System {
     super('BridleConstraintSystem', PRIORITY);
   }
 
+  /**
+   * Initialise le système (nettoie l'état interne au reset)
+   */
+  initialize(_entityManager: EntityManager): void {
+    // Réinitialiser les longueurs pour forcer un recalcul après le reset
+    this.lastLengths = { nez: 0, inter: 0, centre: 0 };
+  }
+
   update(context: SimulationContext): void {
     const { entityManager } = context;
 
